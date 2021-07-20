@@ -91,7 +91,7 @@ namespace sight {
 
                 ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
 
-                ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
+                ImGui::Text("This is some aaaa text. 123");               // Display some text (you can use a format strings too)
                 ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
                 ImGui::Checkbox("Another Window", &show_another_window);
 
@@ -104,6 +104,15 @@ namespace sight {
                 ImGui::Text("counter = %d", counter);
 
                 ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+
+
+                const int BUF_SIZE = 1024;
+                char buf[BUF_SIZE] = {0};
+                ImGui::InputText("js_stmt", buf, BUF_SIZE);
+                if (ImGui::Button("run js")){
+                    // run
+                }
+
                 ImGui::End();
             }
 

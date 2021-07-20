@@ -1,5 +1,8 @@
-// all ui function 
+// Main window ui
 //
+
+
+#pragma once
 
 namespace sight {
     
