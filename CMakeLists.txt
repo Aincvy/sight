@@ -26,10 +26,10 @@ target_sources(sight PRIVATE
 )
 
 # depend
-#target_include_directories(
-#    sight PRIVATE
-#        dependencies/imgui
-#)
+target_include_directories(
+    sight PRIVATE
+        dependencies/v8pp/v8pp
+)
 
 target_sources(sight PRIVATE
         dependencies/tree-sitter-javascript/src/parser.c

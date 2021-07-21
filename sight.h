@@ -6,4 +6,10 @@
 
 namespace sight {
 
+    /**
+     * exit program.
+     * do clean work except ui and node_editor
+     */
+    void exitSight(int v = 0);
+
 }

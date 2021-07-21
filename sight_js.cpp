@@ -7,6 +7,10 @@
 #include "v8.h"
 #include "libplatform/libplatform.h"
 
+// global Isolate
+static v8::Isolate* g_Isolate = nullptr;
+static v8::Isolate::CreateParams* g_CreateParams = nullptr;
+static bool use_once = false;
 
 namespace sight {
 
@@ -83,6 +87,47 @@ namespace sight {
         v8::V8::Dispose();
         v8::V8::ShutdownPlatform();
         delete create_params.array_buffer_allocator;
+    }
+
+    int initJsEngine(char *arg1) {
+        // Initialize V8.
+        v8::V8::InitializeICUDefaultLocation(arg1);
+        v8::V8::InitializeExternalStartupData(arg1);
+        std::unique_ptr<v8::Platform> platform = v8::platform::NewDefaultPlatform();
+        v8::V8::InitializePlatform(platform.get());
+        v8::V8::Initialize();
+        // Create a new Isolate and make it the current one.
+        g_CreateParams = new v8::Isolate::CreateParams;
+        g_CreateParams->array_buffer_allocator =
+                v8::ArrayBuffer::Allocator::NewDefaultAllocator();
+
+        v8::Isolate::CreateParams create_params;
+        create_params.array_buffer_allocator =
+                v8::ArrayBuffer::Allocator::NewDefaultAllocator();
+        g_Isolate = v8::Isolate::New(create_params);
+
+        return 0;
+    }
+
+    int destroyJsEngine() {
+        if (!g_Isolate) {
+            return -1;
+        }
+        if (!use_once) {
+            return -2;
+        }
+
+        g_Isolate->Dispose();
+        v8::V8::Dispose();
+        v8::V8::ShutdownPlatform();
+
+        if (g_CreateParams) {
+            delete g_CreateParams->array_buffer_allocator;
+            g_CreateParams = nullptr;
+        }
+
+        g_Isolate = nullptr;
+        return 0;
     }
 
 

@@ -1,5 +1,6 @@
 #include "sight_ui.h"
 #include "sight_node_editor.h"
+#include "sight.h"
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -22,7 +23,7 @@ namespace sight {
     namespace {
         // private members and functions.
 
-        void showMainFileMenu(){
+        void showMainFileMenu(UIStatus& uiStatus){
             if (ImGui::MenuItem("New")){
 
             }
@@ -38,7 +39,7 @@ namespace sight {
             }
 
             if (ImGui::MenuItem("Exit")){
-                exit(0);
+                uiStatus.closeWindow = true;
             }
         }
 
@@ -76,10 +77,10 @@ namespace sight {
             }
         }
 
-        void showMainMenuBar(){
+        void showMainMenuBar(UIStatus& uiStatus){
             if (ImGui::BeginMainMenuBar()){
                 if (ImGui::BeginMenu("File")) {
-                    showMainFileMenu();
+                    showMainFileMenu(uiStatus);
                     ImGui::EndMenu();
                 }
                 if (ImGui::BeginMenu("Edit")) {
@@ -134,8 +135,8 @@ namespace sight {
     }
 
 
-    void mainWindowFrame(const UIStatus & uiStatus) {
-        showMainMenuBar();
+    void mainWindowFrame(UIStatus & uiStatus) {
+        showMainMenuBar(uiStatus);
 
         //showDemoWindow();
         // windows
@@ -193,12 +194,13 @@ namespace sight {
 
         UIStatus uiStatus = {
             true,
-            io
+            io,
+            false,
         };
         initNodeEditor();
 
         // Main loop
-        while (!glfwWindowShouldClose(window))
+        while (!glfwWindowShouldClose(window) && !uiStatus.closeWindow)
         {
             // Poll and handle events (inputs, window resize, etc.)
             // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
@@ -238,6 +240,8 @@ namespace sight {
 
         glfwDestroyWindow(window);
         glfwTerminate();
+
+        exitSight();
 
         return 0;
     }

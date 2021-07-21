@@ -9,4 +9,20 @@ namespace sight{
 
     void testJs(char *arg1);
 
+    /**
+     * init js engine (v8)
+     *
+     * @param arg1
+     * @return
+     */
+    int initJsEngine(char *arg1);
+
+
+    /**
+     * destroy js engine
+     * @return
+     */
+    int destroyJsEngine();
+
+
 }
