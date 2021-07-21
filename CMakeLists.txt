@@ -21,6 +21,8 @@ target_sources(sight PRIVATE
         sight_node_editor.cpp
         sight_js.cpp
         sight_js_parser.cpp
+        sight_project.cpp
+        sight.cpp
 )
 
 # depend

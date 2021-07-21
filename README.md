@@ -2,5 +2,5 @@
 
 A low-code tool for web server dev.
 
-For macos only. 
+For macos only, now. 
 
