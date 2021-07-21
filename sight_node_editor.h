@@ -4,7 +4,25 @@
 
 #pragma once
 
+#include "imgui.h"
+
+
 namespace sight {
 
+    /**
+     * init
+     * @return
+     */
+    int initNodeEditor();
+
+    /**
+     * destroy and free
+     * @return
+     *
+     */
+    int destroyNodeEditor();
+
+
+    int testNodeEditor(const ImGuiIO& io);
 
 }
