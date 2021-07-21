@@ -2,5 +2,5 @@
 	path = dependencies/imgui
 	url = https://github.com/ocornut/imgui
 [submodule "imgui-node-editor"]
-	path = imgui-node-editor
+	path = dependencies/imgui-node-editor
 	url = git@github.com:Aincvy/imgui-node-editor.git
