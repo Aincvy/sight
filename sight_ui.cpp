@@ -1,6 +1,7 @@
 #include "sight_ui.h"
 #include "sight_node_editor.h"
 #include "sight.h"
+#include "sight_js.h"
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -74,6 +75,8 @@ namespace sight {
         void showMainCustomMenu(){
             if (ImGui::MenuItem("Trigger")) {
                 printf("trigger clicked!\n");
+
+                addJsCommand(JsCommandType::File, "/Volumes/mac_extend/Project/sight/scripts/nodes.js");
             }
         }
 

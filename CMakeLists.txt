@@ -28,7 +28,7 @@ target_sources(sight PRIVATE
 # depend
 target_include_directories(
     sight PRIVATE
-        dependencies/v8pp/v8pp
+        dependencies/v8pp
 )
 
 target_sources(sight PRIVATE
@@ -49,5 +49,5 @@ MESSAGE(STATUS "TREE_SITTER_LIBRARY: ${TREE_SITTER_LIBRARY}")
 # imgui
 INCLUDE(dependencies/CMakeLists.txt)
 
-SET(EXTRA_LIBS ${V8_LIBRARIES} ${TREE_SITTER_LIBRARY} imgui imgui_node_editor)
+SET(EXTRA_LIBS ${V8_LIBRARIES} ${TREE_SITTER_LIBRARY} imgui imgui_node_editor sight-util)
 target_link_libraries(sight PRIVATE ${EXTRA_LIBS})

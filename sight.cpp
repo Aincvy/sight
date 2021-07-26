@@ -12,7 +12,7 @@ namespace sight {
 
     void exitSight(int v) {
 
-        destroyJsEngine();
+        addJsCommand(JsCommandType::Destroy);
         exit(v);
     }
 

@@ -226,19 +226,22 @@ namespace sight {
             ed::BeginNode(node->nodeId);
             ImGui::Text("%s", node->nodeName.c_str());
 
-            // ports / pins
-            int index = -1;
-            for (const auto &item : node->ports) {
-                ++index;
+            // inputPorts
+            ImGuiEx_BeginColumn();
+            for (const auto &item : node->inputPorts) {
                 ed::BeginPin(item.id, item.kind);
-                ImGui::Text("%s", item.portName.c_str());
+                ImGui::Text("-> %s", item.portName.c_str());
                 ed::EndPin();
-
-                if (index % 2 == 0){
-                    ImGui::SameLine();
-                }
             }
 
+            ImGuiEx_NextColumn();
+            for (const auto &item : node->outputPorts) {
+                ed::BeginPin(item.id, item.kind);
+                ImGui::Text("%s ->", item.portName.c_str());
+                ed::EndPin();
+            }
+
+            ImGuiEx_EndColumn();
             ed::EndNode();
             return 0;
         }
@@ -354,12 +357,12 @@ namespace sight {
         auto *node1 = new SightNode();
         node1->nodeName = "TestNode";
         node1->nodeId = ++id;
-        node1->ports.push_back({
+        node1->inputPorts.push_back({
                                        "Input",
                                        ++id,
                                        ed::PinKind::Input
                                });
-        node1->ports.push_back({
+        node1->outputPorts.push_back({
                                        "Output",
                                        ++id,
                                        ed::PinKind::Output
@@ -369,17 +372,17 @@ namespace sight {
         auto *node2 = new SightNode();
         node2->nodeName = "Node2";
         node2->nodeId = ++id;
-        node1->ports.push_back({
+        node2->inputPorts.push_back({
                                        "Input",
                                        ++id,
                                        ed::PinKind::Input
                                });
-        node2->ports.push_back({
+        node2->outputPorts.push_back({
                                        "Output1",
                                        ++id,
                                        ed::PinKind::Output
                                });
-        node2->ports.push_back({
+        node2->outputPorts.push_back({
                                        "Output2",
                                        ++id,
                                        ed::PinKind::Output

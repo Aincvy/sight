@@ -63,3 +63,20 @@ target_link_libraries(
         imgui_node_editor PRIVATE
         imgui
 )
+
+
+# sight-util
+
+SET(
+        SIGHT_UTIL_SOURCES
+        ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_log.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_queue.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/sight-util/shared_queue.cpp
+)
+
+add_library(sight-util SHARED ${SIGHT_UTIL_SOURCES})
+
+target_include_directories(
+        sight-util PUBLIC
+        ${CMAKE_CURRENT_LIST_DIR}/sight-util
+)

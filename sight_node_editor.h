@@ -26,7 +26,20 @@ namespace sight {
         std::string nodeName;
         ed::NodeId nodeId;
 
-        std::vector<SightNodePort> ports;
+        std::vector<SightNodePort> inputPorts;
+        std::vector<SightNodePort> outputPorts;
+    };
+
+    /**
+     * js node
+     */
+    struct SightJsNode : SightNode{
+
+
+        void callFunction(const char *name){
+
+        }
+
     };
 
 
