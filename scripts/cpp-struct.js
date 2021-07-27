@@ -1,4 +1,4 @@
-// class
+// used for syntax-highlight
 
 sight = {};
 sight.SightJsNode = class {
@@ -25,4 +25,8 @@ sight.SightNodePort = class {
 
 sight.nextNodeOrPortId = function (){
     return 0;
+}
+
+sight.addNode = function (node){
+
 }

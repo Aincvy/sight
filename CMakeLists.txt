@@ -46,8 +46,14 @@ target_compile_definitions(sight PRIVATE V8_COMPRESS_POINTERS V8_31BIT_SMIS_ON_6
 find_library(TREE_SITTER_LIBRARY "tree-sitter" HINTS "/usr/local/lib")
 MESSAGE(STATUS "TREE_SITTER_LIBRARY: ${TREE_SITTER_LIBRARY}")
 
-# imgui
+# libuv
+find_package(LibUV REQUIRED)
+MESSAGE(STATUS "LIBUV_INCLUDE_DIRS: ${LIBUV_INCLUDE_DIRS}")
+MESSAGE(STATUS "LIBUV_LIBRARIES: ${LIBUV_LIBRARIES}")
+target_include_directories(sight PRIVATE ${LIBUV_INCLUDE_DIRS})
+
+# imgui and others library.
 INCLUDE(dependencies/CMakeLists.txt)
 
-SET(EXTRA_LIBS ${V8_LIBRARIES} ${TREE_SITTER_LIBRARY} imgui imgui_node_editor sight-util)
+SET(EXTRA_LIBS ${V8_LIBRARIES} ${TREE_SITTER_LIBRARY} ${LIBUV_LIBRARIES} imgui imgui_node_editor sight-util)
 target_link_libraries(sight PRIVATE ${EXTRA_LIBS})

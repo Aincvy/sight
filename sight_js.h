@@ -4,12 +4,13 @@
 // Js engine and something else.
 #pragma once
 
+#include "sight.h"
 #include "shared_queue.h"
 
 namespace sight{
 
     enum JsCommandType {
-        None,
+        JsCommandHolder,
         // run a file
         File,
         // destroy js engine
@@ -18,21 +19,8 @@ namespace sight{
     };
 
     struct JsCommand {
-        JsCommandType type = JsCommandType::None;
-
-        // string arg.
-        const char * argString{};
-        int argStringLength{};
-        bool argStringNeedFree = false;
-
-        int argInt{};
-
-        /**
-         * dispose command
-         */
-        void dispose(){
-
-        }
+        JsCommandType type = JsCommandType::JsCommandHolder;
+        struct CommandArgs args;
     };
 
     void testJs(char *arg1);

@@ -50,6 +50,13 @@ namespace sight {
 
 
         void addPort(SightNodePort & port);
+
+        /**
+         * clone this node
+         * you should `delete` this function's return value.
+         * @return
+         */
+        SightNode* clone() const;
     };
 
     /**
@@ -74,14 +81,13 @@ namespace sight {
      */
     int destroyNodeEditor();
 
-
-    int testNodeEditor(const ImGuiIO& io);
-
-
     int showNodeEditorGraph(const UIStatus & uiStatus);
 
     void initTestData();
 
     int nextNodeOrPortId();
+
+
+    int addNode(SightNode *node);
 
 }

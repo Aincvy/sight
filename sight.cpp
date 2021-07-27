@@ -16,4 +16,23 @@ namespace sight {
         exit(v);
     }
 
+    void *copyObject(void *from, size_t size) {
+        auto dst = calloc(1, size);
+        memcpy(dst, from, size);
+        return dst;
+    }
+
+    void CommandArgs::dispose() {
+        if (needFree) {
+            if (argString) {
+                free(const_cast<char*>(argString));
+                argString = nullptr;
+                argStringLength = 0;
+            }
+            if (data) {
+                free(data);
+            }
+        }
+
+    }
 }

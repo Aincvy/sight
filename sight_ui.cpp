@@ -19,6 +19,9 @@ static void glfw_error_callback(int error, const char* description)
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
 
+
+static sight::UIStatus* g_UIStatus = nullptr;
+
 namespace sight {
 
     namespace {
@@ -74,8 +77,6 @@ namespace sight {
 
         void showMainCustomMenu(){
             if (ImGui::MenuItem("Trigger")) {
-                printf("trigger clicked!\n");
-
                 addJsCommand(JsCommandType::File, "/Volumes/mac_extend/Project/sight/scripts/nodes.js");
             }
         }
@@ -137,7 +138,6 @@ namespace sight {
 
     }
 
-
     void mainWindowFrame(UIStatus & uiStatus) {
         showMainMenuBar(uiStatus);
 
@@ -149,6 +149,33 @@ namespace sight {
 
     }
 
+    void runUICommand(UICommand *command){
+        printf("runUICommand...");
+        switch (command->type) {
+            case UICommandHolder:
+                break;
+            case COMMON:
+                break;
+            case AddNode:
+            {
+                // command->args.needFree = false;
+                auto* nodePointer = (SightNode**) command->args.data;
+                auto size = command->args.dataLength;
+                for (int i = 0; i < size; ++i) {
+                    addNode(nodePointer[i]);
+                }
+                break;
+            }
+        }
+
+        command->args.dispose();
+    }
+
+    void runUICommandCallback(uv_async_t *handle){
+        auto *command = (UICommand *)handle->data;
+        runUICommand(command);
+        free(command);
+    }
 
     int showMainWindow(){
 
@@ -200,6 +227,16 @@ namespace sight {
             io,
             false,
         };
+        g_UIStatus = &uiStatus;
+        uv_async_t uvAsync;
+        uiStatus.uvAsync = &uvAsync;
+
+        // uv loop init
+        auto uvLoop = (uv_loop_t*)malloc(sizeof(uv_loop_t));
+        uiStatus.uvLoop = uvLoop;
+        uv_loop_init(uvLoop);
+        uv_async_init(uvLoop, uiStatus.uvAsync, runUICommandCallback);
+
         initNodeEditor();
 
         // Main loop
@@ -232,6 +269,8 @@ namespace sight {
             glfwSwapBuffers(window);
 
             uiStatus.needInit = false;
+            // printf("before uv run\n");
+            uv_run(uvLoop, UV_RUN_NOWAIT);
         }
 
         destroyNodeEditor();
@@ -244,9 +283,47 @@ namespace sight {
         glfwDestroyWindow(window);
         glfwTerminate();
 
+        uv_loop_close(uvLoop);
+        free(uvLoop);
+        uiStatus.uvLoop = nullptr;
         exitSight();
 
         return 0;
     }
+
+    void addUICommand(UICommandType type, int argInt) {
+        UICommand command = {
+                type,
+                {
+                        .argInt = argInt
+                }
+        };
+
+        addUICommand(command);
+    }
+
+
+    int addUICommand(UICommandType type, void *data, size_t dataLength, bool needFree) {
+        UICommand command = {
+                type,
+                {
+                        .needFree = needFree,
+                        .data =  data,
+                        .dataLength = dataLength,
+                }
+        };
+
+        return addUICommand(command);
+    }
+
+    int addUICommand(UICommand &command) {
+        auto async = g_UIStatus->uvAsync;
+        async->data = copyObject(&command, sizeof(UICommand));
+        uv_async_send(async);
+        printf("addUICommand ...\n");
+        return 0;
+    }
+
+
 
 }

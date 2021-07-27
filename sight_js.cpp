@@ -8,6 +8,7 @@
 #include "sight_node_editor.h"
 #include "shared_queue.h"
 #include "sight_log.h"
+#include "sight_ui.h"
 
 #include "v8.h"
 #include "libplatform/libplatform.h"
@@ -22,6 +23,8 @@ namespace sight {
 }
 static sight::V8Runtime* g_V8Runtime = nullptr;
 
+// cache for js script, it will send to ui thread once
+static std::vector<sight::SightNode> g_NodeCache;
 
 namespace sight {
 
@@ -99,6 +102,10 @@ namespace sight {
         void v8rPrint(const char*msg) {
             printf("%s\n", msg);
 
+        }
+
+        void v8AddNode(SightJsNode & node){
+            g_NodeCache.push_back(node);
         }
 
     }
@@ -285,6 +292,7 @@ namespace sight {
 
         // functions ...
         module.set("nextNodeOrPortId", &nextNodeOrPortId);
+        module.set("addNode", &v8AddNode);
 
         auto currentContext = context;
         currentContext->Global()->Set(currentContext, v8pp::to_v8(isolate, "sight"), module.new_instance());
@@ -320,6 +328,21 @@ namespace sight {
         //
         // v8::ScriptCompiler::CompileFunctionInContext()
 
+        // send nodes to ui thread.
+        if (!g_NodeCache.empty()) {
+            auto size = g_NodeCache.size();
+            auto* nodePointer = (SightNode**)malloc(size * sizeof(void*));
+//            auto* nodePointer = new SightNode*[size];
+            int index = 0;
+            for (const auto &item : g_NodeCache) {
+                // copy item to array
+                nodePointer[index++] = item.clone();
+            }
+            g_NodeCache.clear();
+
+            addUICommand(AddNode, nodePointer, size);
+        }
+
         return 0;
     }
 
@@ -337,14 +360,14 @@ namespace sight {
                 case Destroy:
                     goto break_commands_loop;
                 case File:
-                    runJsFile(command.argString);
+                    runJsFile(command.args.argString);
                     break;
-                case None:
+                case JsCommandHolder:
                     // do nothing.
                     break;
             }
 
-            command.dispose();
+            command.args.dispose();
             queue.pop_front();
         }
 
@@ -369,7 +392,9 @@ namespace sight {
     int addJsCommand(JsCommandType type, int argInt) {
         JsCommand command = {
                 type,
-                argInt: argInt,
+                {
+                    .argInt =  argInt
+                },
         };
 
         return addJsCommand(command);
@@ -378,10 +403,11 @@ namespace sight {
     int addJsCommand(JsCommandType type, const char *argString, int argStringLength, bool argStringNeedFree) {
         JsCommand command = {
                 type,
-                argString,
-                argStringLength,
-                argStringNeedFree,
-
+                {
+                        argString,
+                        argStringLength,
+                        argStringNeedFree,
+                },
         };
 
         return addJsCommand(command);

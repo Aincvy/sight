@@ -15,6 +15,11 @@
 
     const NodePortType = new sight.NodePortType();
 
+    print("" + NodePortType.Input);
+    print("" + NodePortType.Output);
+    print("" + NodePortType.Both);
+
+
     let port1 = new sight.SightNodePort();
     port1.id = sight.nextNodeOrPortId();
     port1.portName = "input1";
@@ -24,8 +29,13 @@
     let port2 = new sight.SightNodePort();
     port2.id = sight.nextNodeOrPortId();
     port2.portName = "output1";
-    port2.intKind = NodePortType.Input;
+    port2.intKind = NodePortType.Output;
     node1.addPort(port2);
+
+    print("before add");
+
+    sight.addNode(node1);
+    print("after add");
 
     function a(){
         print("this is in function a!");

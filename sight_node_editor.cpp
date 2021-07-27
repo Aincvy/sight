@@ -29,6 +29,7 @@ static ImVector<LinkInfo> g_Links;                // List of live links. It is d
 static int g_NextLinkId = 100;     // Counter to help generate link ids. In real application this will probably based on pointer to user data structure.
 
 // node list
+// todo clear data
 static std::vector<sight::SightNode *> g_Nodes;
 //
 static std::atomic<int> nodeOrPortId(10000);
@@ -397,6 +398,11 @@ namespace sight {
         return nodeOrPortId++;
     }
 
+    int addNode(SightNode *node) {
+        g_Nodes.push_back(node);
+        return 0;
+    }
+
 
     void SightNodePort::updateStatus() {
         this->kind = NodePortType(intKind);
@@ -414,6 +420,15 @@ namespace sight {
         } else if (port.kind == NodePortType::Both) {
             // todo
         }
+    }
+
+    SightNode *SightNode::clone() const{
+        auto p = new SightNode();
+        p->nodeId = this->nodeId;
+        p->nodeName = this->nodeName;
+        p->inputPorts.assign(this->inputPorts.begin(), this->inputPorts.end());
+        p->outputPorts.assign(this->outputPorts.begin(), this->outputPorts.end());
+        return p;
     }
 
     void SightJsNode::callFunction(const char *name) {
