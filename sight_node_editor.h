@@ -15,19 +15,41 @@ namespace ed = ax::NodeEditor;
 
 namespace sight {
 
+    /**
+     *
+     */
+    enum NodePortType {
+        Input = 100,
+        Output,
+        // both input and output
+        Both,
+        // do not have a port, only field.  on this way, it should has a textbox.
+        Field,
+    };
+
     // pin
     struct SightNodePort {
         std::string portName;
-        ed::PinId id;
-        ed::PinKind kind;
+        int id;
+        NodePortType kind;
+        // for `kind` member, this one has higher priority.
+        int intKind;
+
+        /**
+         * fix status,  you should call it before use node port.
+         */
+        void updateStatus();
     };
 
     struct SightNode {
         std::string nodeName;
-        ed::NodeId nodeId;
+        int nodeId;
 
         std::vector<SightNodePort> inputPorts;
         std::vector<SightNodePort> outputPorts;
+
+
+        void addPort(SightNodePort & port);
     };
 
     /**
@@ -35,11 +57,7 @@ namespace sight {
      */
     struct SightJsNode : SightNode{
 
-
-        void callFunction(const char *name){
-
-        }
-
+        void callFunction(const char *name);
     };
 
 
@@ -64,5 +82,6 @@ namespace sight {
 
     void initTestData();
 
+    int nextNodeOrPortId();
 
 }

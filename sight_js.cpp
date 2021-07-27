@@ -36,6 +36,25 @@ namespace sight {
             SharedQueue<JsCommand> commandQueue;
         };
 
+        // use it for register to v8.
+        struct NodePortTypeStruct{
+            int getInput() const {
+                return NodePortType::Input;
+            }
+
+            int getOutput() const{
+                return NodePortType::Output;
+            }
+
+            int getBoth() const{
+                return NodePortType::Both;
+            }
+
+            int getField() const {
+                return NodePortType::Field;
+            }
+        };
+
         /**
          *
          * @from https://github.com/danbev/learning-v8/blob/master/run-script.cc
@@ -233,16 +252,40 @@ namespace sight {
         }
 
         auto isolate = g_V8Runtime->isolate;
-
         v8pp::module module(isolate);
-        v8pp::class_<SightJsNode> jsNodeClass(isolate);
 
+
+        // classes ...
+        v8pp::class_<NodePortTypeStruct> jsNodePortTypeEnum(isolate);
+        jsNodePortTypeEnum.ctor<>()
+                .set("Input", v8pp::property(&NodePortTypeStruct::getInput))
+                .set("Output", v8pp::property(&NodePortTypeStruct::getOutput))
+                .set("Both", v8pp::property(&NodePortTypeStruct::getBoth))
+                .set("Field", v8pp::property(&NodePortTypeStruct::getField))
+                ;
+        module.set("NodePortType", jsNodePortTypeEnum);
+
+        v8pp::class_<SightNodePort> jsNodePortClass(isolate);
+        jsNodePortClass.ctor<>()
+                .set("portName", &SightNodePort::portName)
+                .set("id", &SightNodePort::id)
+                .set("intKind", &SightNodePort::intKind)
+                .set("updateStatus", &SightNodePort::updateStatus)
+                ;
+        module.set("SightNodePort", jsNodePortClass);
+
+        v8pp::class_<SightJsNode> jsNodeClass(isolate);
         jsNodeClass
             .ctor<>()
             .set("nodeName", &SightJsNode::nodeName)
+            .set("nodeId", &SightJsNode::nodeId)
+            .set("addPort", &SightJsNode::addPort)
         ;
-
         module.set("SightJsNode", jsNodeClass);
+
+        // functions ...
+        module.set("nextNodeOrPortId", &nextNodeOrPortId);
+
         auto currentContext = context;
         currentContext->Global()->Set(currentContext, v8pp::to_v8(isolate, "sight"), module.new_instance());
 
@@ -265,12 +308,17 @@ namespace sight {
 
         auto isolate = g_V8Runtime->isolate;
         v8::HandleScope handle_scope(isolate);
-        auto context = isolate->GetCurrentContext();
+         auto context = isolate->GetCurrentContext();
+//        auto context = v8::Context::New(isolate);
+//        v8::Context::Scope contextScope(context);
 //        printf(context.IsEmpty() ? "empty\n" : "not empty\n");
 
         v8::Local<v8::String> source = readFile(isolate, filepath).ToLocalChecked();
         v8::MaybeLocal<v8::Script> script = v8::Script::Compile(context, source).ToLocalChecked();
         v8::MaybeLocal<v8::Value> result = script.ToLocalChecked()->Run(context);
+
+        //
+        // v8::ScriptCompiler::CompileFunctionInContext()
 
         return 0;
     }
@@ -327,7 +375,7 @@ namespace sight {
         return addJsCommand(command);
     }
 
-    int sight::addJsCommand(JsCommandType type, const char *argString, int argStringLength, bool argStringNeedFree) {
+    int addJsCommand(JsCommandType type, const char *argString, int argStringLength, bool argStringNeedFree) {
         JsCommand command = {
                 type,
                 argString,
@@ -339,7 +387,7 @@ namespace sight {
         return addJsCommand(command);
     }
 
-    int sight::addJsCommand(JsCommand &command) {
+    int addJsCommand(JsCommand &command) {
         if (!g_V8Runtime) {
             return -1;
         }

@@ -3,6 +3,7 @@
 //
 
 #include <vector>
+#include <atomic>
 
 #include "sight_node_editor.h"
 
@@ -27,8 +28,10 @@ static bool g_FirstFrame = true;    // Flag set for first frame only, some actio
 static ImVector<LinkInfo> g_Links;                // List of live links. It is dynamic unless you want to create read-only view over nodes.
 static int g_NextLinkId = 100;     // Counter to help generate link ids. In real application this will probably based on pointer to user data structure.
 
-// 节点列表
+// node list
 static std::vector<sight::SightNode *> g_Nodes;
+//
+static std::atomic<int> nodeOrPortId(10000);
 
 
 namespace sight {
@@ -229,14 +232,14 @@ namespace sight {
             // inputPorts
             ImGuiEx_BeginColumn();
             for (const auto &item : node->inputPorts) {
-                ed::BeginPin(item.id, item.kind);
+                ed::BeginPin(item.id, ed::PinKind::Input);
                 ImGui::Text("-> %s", item.portName.c_str());
                 ed::EndPin();
             }
 
             ImGuiEx_NextColumn();
             for (const auto &item : node->outputPorts) {
-                ed::BeginPin(item.id, item.kind);
+                ed::BeginPin(item.id, ed::PinKind::Output);
                 ImGui::Text("%s ->", item.portName.c_str());
                 ed::EndPin();
             }
@@ -352,44 +355,68 @@ namespace sight {
     }
 
     void initTestData() {
-        int id = 10000;
 
         auto *node1 = new SightNode();
         node1->nodeName = "TestNode";
-        node1->nodeId = ++id;
+        node1->nodeId = nextNodeOrPortId();
         node1->inputPorts.push_back({
-                                       "Input",
-                                       ++id,
-                                       ed::PinKind::Input
+                                            "Input",
+                                            nextNodeOrPortId(),
+                                            NodePortType::Input
                                });
         node1->outputPorts.push_back({
-                                       "Output",
-                                       ++id,
-                                       ed::PinKind::Output
+                                             "Output",
+                                             nextNodeOrPortId(),
+                                             NodePortType::Output
                                });
         g_Nodes.push_back(node1);
 
         auto *node2 = new SightNode();
         node2->nodeName = "Node2";
-        node2->nodeId = ++id;
+        node2->nodeId = nextNodeOrPortId();
         node2->inputPorts.push_back({
-                                       "Input",
-                                       ++id,
-                                       ed::PinKind::Input
+                                            "Input",
+                                            nextNodeOrPortId(),
+                                            NodePortType::Input
                                });
         node2->outputPorts.push_back({
-                                       "Output1",
-                                       ++id,
-                                       ed::PinKind::Output
+                                             "Output1",
+                                             nextNodeOrPortId(),
+                                             NodePortType::Output
                                });
         node2->outputPorts.push_back({
-                                       "Output2",
-                                       ++id,
-                                       ed::PinKind::Output
+                                             "Output2",
+                                             nextNodeOrPortId(),
+                                             NodePortType::Output
                                });
         g_Nodes.push_back(node2);
 
     }
 
+    int nextNodeOrPortId() {
+        return nodeOrPortId++;
+    }
 
+
+    void SightNodePort::updateStatus() {
+        this->kind = NodePortType(intKind);
+    }
+
+
+    void SightNode::addPort(SightNodePort &port) {
+        port.updateStatus();
+        printf("add port, id: %d, name: %s\n", port.id, port.portName.c_str());
+
+        if (port.kind == NodePortType::Input) {
+            this->inputPorts.push_back(port);
+        } else if (port.kind == NodePortType::Output) {
+            this->outputPorts.push_back(port);
+        } else if (port.kind == NodePortType::Both) {
+            // todo
+        }
+    }
+
+    void SightJsNode::callFunction(const char *name) {
+
+    }
 }
