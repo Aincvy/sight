@@ -7,7 +7,7 @@ project(sight)
 # specify the C++ standard
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-set(CMAKE_BUILD_TYPE DEBUG)
+set(CMAKE_BUILD_TYPE "Debug")
 
 add_executable(sight program.cpp)
 
@@ -57,3 +57,10 @@ INCLUDE(dependencies/CMakeLists.txt)
 
 SET(EXTRA_LIBS ${V8_LIBRARIES} ${TREE_SITTER_LIBRARY} ${LIBUV_LIBRARIES} imgui imgui_node_editor sight-util)
 target_link_libraries(sight PRIVATE ${EXTRA_LIBS})
+
+# backward-cpp
+SET(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "/usr/local/include/libelf")
+#add_subdirectory(dependencies/backward-cpp)
+#add_backward(sight)
+target_include_directories(sight PRIVATE dependencies/backward-cpp)
+

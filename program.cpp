@@ -9,6 +9,9 @@
 #include "sight_js.h"
 #include "sight_node_editor.h"
 
+
+#include "backward.hpp"
+
 using namespace sight;
 
 void handler(int sig) {
@@ -27,7 +30,8 @@ void handler(int sig) {
 
 
 int main(int argc, char* argv[]){
-    signal(SIGSEGV, handler);
+    // signal(SIGSEGV, handler);
+    backward::SignalHandling sh;
 
     std::thread jsThread(sight::jsThreadRun, argv[0]);
 

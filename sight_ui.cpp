@@ -79,6 +79,11 @@ namespace sight {
             if (ImGui::MenuItem("Trigger")) {
                 addJsCommand(JsCommandType::File, "/Volumes/mac_extend/Project/sight/scripts/nodes.js");
             }
+            if (ImGui::MenuItem("Crash")) {
+                // produce a crash for test.
+                int *p = NULL;
+                *p = 1;
+            }
         }
 
         void showMainMenuBar(UIStatus& uiStatus){
