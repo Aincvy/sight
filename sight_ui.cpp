@@ -152,11 +152,11 @@ namespace sight {
     void runUICommand(UICommand *command){
         printf("runUICommand...");
         switch (command->type) {
-            case UICommandHolder:
+            case UICommandType::UICommandHolder:
                 break;
-            case COMMON:
+            case UICommandType::COMMON:
                 break;
-            case AddNode:
+            case UICommandType::AddNode:
             {
                 // command->args.needFree = false;
                 auto* nodePointer = (SightNode**) command->args.data;

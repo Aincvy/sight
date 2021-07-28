@@ -340,7 +340,7 @@ namespace sight {
             }
             g_NodeCache.clear();
 
-            addUICommand(AddNode, nodePointer, size);
+            addUICommand(UICommandType::AddNode, nodePointer, size);
         }
 
         return 0;
@@ -357,12 +357,12 @@ namespace sight {
             auto command = queue.front();
 
             switch (command.type) {
-                case Destroy:
+                case JsCommandType::Destroy:
                     goto break_commands_loop;
-                case File:
+                case JsCommandType::File:
                     runJsFile(command.args.argString);
                     break;
-                case JsCommandHolder:
+                case JsCommandType::JsCommandHolder:
                     // do nothing.
                     break;
             }

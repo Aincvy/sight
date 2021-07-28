@@ -9,7 +9,7 @@
 
 namespace sight{
 
-    enum JsCommandType {
+    enum class JsCommandType {
         JsCommandHolder,
         // run a file
         File,

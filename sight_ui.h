@@ -8,7 +8,7 @@
 
 namespace sight {
 
-    enum UICommandType{
+    enum class UICommandType{
         UICommandHolder,
 
         // common ui part
