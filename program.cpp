@@ -9,7 +9,7 @@
 #include "sight_js.h"
 #include "sight_node_editor.h"
 
-
+#include "dbg.h"
 #include "backward.hpp"
 
 using namespace sight;
@@ -31,8 +31,10 @@ void handler(int sig) {
 
 int main(int argc, char* argv[]){
     // signal(SIGSEGV, handler);
+    dbg("program start!");
     backward::SignalHandling sh;
 
+    dbg("start js thread!");
     std::thread jsThread(sight::jsThreadRun, argv[0]);
 
     sight::initTestData();
