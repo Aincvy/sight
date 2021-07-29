@@ -35,6 +35,16 @@ namespace sight {
     };
 
     /**
+     *
+     */
+    class Selection{
+    public:
+
+    private:
+
+    };
+
+    /**
      * init window function.
      * @return
      */

@@ -59,8 +59,12 @@ SET(EXTRA_LIBS ${V8_LIBRARIES} ${TREE_SITTER_LIBRARY} ${LIBUV_LIBRARIES} imgui i
 target_link_libraries(sight PRIVATE ${EXTRA_LIBS})
 
 # backward-cpp
-SET(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "/usr/local/include/libelf")
-#add_subdirectory(dependencies/backward-cpp)
-#add_backward(sight)
+#SET(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "/usr/local/include/libelf")
 target_include_directories(sight PRIVATE dependencies/backward-cpp)
+
+# dbg
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message(STATUS "in debug mode, add defines")
+    target_compile_definitions(sight PRIVATE DBG_MACRO_NO_WARNING)
+ENDIF(CMAKE_BUILD_TYPE STREQUAL "Debug")
 

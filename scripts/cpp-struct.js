@@ -20,7 +20,10 @@ sight.NodePortType = class {
 sight.SightNodePort = class {
     portName;
     id;
-    intKind;
+
+    setKind(intKind){
+
+    };
 };
 
 sight.nextNodeOrPortId = function (){

@@ -9,6 +9,7 @@ namespace sight {
 
     int logDebug(const char *msg) {
         printf(msg);
+
         return 0;
     }
 }

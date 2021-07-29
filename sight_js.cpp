@@ -276,8 +276,7 @@ namespace sight {
         jsNodePortClass.ctor<>()
                 .set("portName", &SightNodePort::portName)
                 .set("id", &SightNodePort::id)
-                .set("intKind", &SightNodePort::intKind)
-                .set("updateStatus", &SightNodePort::updateStatus)
+                .set("setKind", &SightNodePort::setKind)
                 ;
         module.set("SightNodePort", jsNodePortClass);
 

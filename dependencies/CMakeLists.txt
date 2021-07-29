@@ -81,3 +81,10 @@ target_include_directories(
         ${CMAKE_CURRENT_LIST_DIR}/sight-util
         ${CMAKE_CURRENT_LIST_DIR}/dbg-macro
 )
+
+# abseil
+#add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/abseil-cpp)
+#target_link_libraries(
+#        sight-util PUBLIC
+#        absl::base absl::strings absl::time
+#)

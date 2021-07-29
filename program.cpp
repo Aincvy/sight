@@ -37,7 +37,6 @@ int main(int argc, char* argv[]){
     dbg("start js thread!");
     std::thread jsThread(sight::jsThreadRun, argv[0]);
 
-    sight::initTestData();
     sight::showMainWindow();
 
     jsThread.join();
