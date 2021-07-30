@@ -9,7 +9,6 @@
 #include "sight_js.h"
 #include "sight_node_editor.h"
 
-#include "dbg.h"
 #include "backward.hpp"
 
 using namespace sight;

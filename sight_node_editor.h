@@ -5,6 +5,7 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <map>
 
 #include "imgui.h"
 #include "imgui_node_editor.h"
@@ -28,6 +29,8 @@ namespace sight {
     };
 
     struct SightNodeConnection;
+    class SightNodeGraph;
+    struct SightNode;
 
     /**
      * Port, or you can call it pin.
@@ -38,6 +41,7 @@ namespace sight {
         NodePortType kind;
         // connections
         std::vector<SightNodeConnection*> connections;
+        SightNode* node = nullptr;
 
         /**
          * Set kind from int.
@@ -67,20 +71,26 @@ namespace sight {
         struct SightNodePort* left;
         struct SightNodePort* right;
 
-        // others
+        /**
+         * Add ref to left and right.
+         * You should call this function only once.
+         */
+        void addRefs();
 
         /**
          * Remove from left and right port.
          */
         void removeRefs();
+
+        int leftPortId() const;
+        int rightPortId() const;
+
     };
 
     /**
      * -
      */
     struct SightNodePortConnection {
-
-
         struct SightNodePort* self = nullptr;
         struct SightNodePort* target = nullptr;
         struct SightNodeConnection* connection = nullptr;
@@ -94,6 +104,7 @@ namespace sight {
         int nodeId;
         // this node's template node.
         SightNode* templateNode = nullptr;
+        SightNodeGraph* graph = nullptr;
 
         std::vector<SightNodePort> inputPorts;
         std::vector<SightNodePort> outputPorts;
@@ -139,14 +150,47 @@ namespace sight {
 
     };
 
+    enum class SightAnyThingType {
+        Node,
+        Port,
+        Connection,
+
+        // used for return value, it means this struct entity is invalid.
+        Invalid,
+    };
+
+    struct SightAnyThingWrapper{
+        SightAnyThingType type = SightAnyThingType::Node;
+        void* pointer = nullptr;
+
+        SightNode* asNode() const;
+        SightNodePort* asPort() const;
+        SightNodeConnection* asConnection() const;
+    };
+
     /**
      * A graph contains many nodes.
      */
-    struct SightNodeGraph{
-        // real nodes
-        std::vector<SightNode> nodes;
-        // real connections.
-        std::vector<SightNodeConnection> connections;
+    class SightNodeGraph{
+    public:
+
+        SightNodeGraph();
+        ~SightNodeGraph();
+
+        /**
+         *
+         * @param leftPortId
+         * @param rightPortId
+         * @return If create success, the connection's id.
+         * -1: one of left,right is invalid. -2: they are same. -3: same kind.
+         */
+        int createConnection(int leftPortId, int rightPortId, int connectionId = -1);
+
+        /**
+         *
+         * @param connection
+         */
+        void addConnection(const SightNodeConnection& connection);
 
         /**
          *
@@ -155,9 +199,50 @@ namespace sight {
         void addNode(const SightNode &node);
 
         /**
-         * Dispose graph.
+         *
+         * @param id
+         * @return
          */
-        void dispose();
+        int delNode(int id);
+
+        /**
+         *
+         * @param id
+         * @return
+         */
+        int delConnection(int id);
+
+        /**
+         * Find a node by id
+         * @param id
+         * @return The element of vector, you should not free the result. If not find, nullptr.
+         */
+        SightNode* findNode(int id);
+
+        /**
+         *
+         * @param id
+         * @return The element of vector, you should not free the result. If not find, nullptr.
+         */
+        SightNodeConnection* findConnection(int id);
+
+        SightNodePort* findPort(int id);
+
+        /**
+         *
+         * @param id
+         * @return You should not keep the return value, just use it's asXXX function.
+         */
+        const SightAnyThingWrapper& findSightAnyThing(int id) ;
+
+        /**
+         * You should call this function at init step.
+         * after call this function, this->filepath will be `path`.
+         * @return
+         */
+        int load(const char *path);
+
+        int save();
 
         /**
          * Save graph data to file.
@@ -167,15 +252,40 @@ namespace sight {
          */
         int saveToFile(const char *path = nullptr, bool set = false);
 
-        void setFilePath(const char* path);
 
+        void setFilePath(const char* path);
         const char* getFilePath() const;
+
+        const std::vector<SightNode> & getNodes() const;
+        const std::vector<SightNodeConnection> & getConnections() const;
 
     private:
 
         // save and read path.
         std::string filepath;
 
+        // templates, it loads from js file every times.
+        std::vector<SightNode> templateNodes;
+
+        // real nodes
+        std::vector<SightNode> nodes;
+        // real connections.
+        std::vector<SightNodeConnection> connections;
+        // key: node/port/connection id, value: the pointer of the instance.
+        std::map<int, SightAnyThingWrapper> idMap;
+        // for ...
+        const static SightAnyThingWrapper invalidAnyThingWrapper;
+
+
+        /**
+         * Dispose graph.
+         */
+        void dispose();
+
+        /**
+         * clear data
+         */
+        void reset();
     };
 
     /**
@@ -194,6 +304,13 @@ namespace sight {
          * @return
          */
         int createGraph(const char*path);
+
+        /**
+         * Try to load graph first, if failed, then create one.
+         * @param path
+         * @return
+         */
+        int loadOrCreateGraph(const char*path);
     };
 
     /**
@@ -211,8 +328,6 @@ namespace sight {
 
     int showNodeEditorGraph(const UIStatus & uiStatus);
 
-    void initTestData();
-
     int nextNodeOrPortId();
 
     /**
@@ -221,5 +336,22 @@ namespace sight {
      * @return
      */
     int addNode(SightNode *node);
+
+    /**
+     *
+     * @return
+     */
+    SightNodeGraph* getCurrentGraph();
+
+    /**
+     * Load a graph
+     * @param path
+     */
+    void loadGraph(const char*path);
+
+    /**
+     *
+     */
+    void disposeGraph();
 
 }

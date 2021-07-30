@@ -8,8 +8,7 @@
 #include "imgui_impl_opengl3.h"
 #include <stdio.h>
 
-// ignore loader part.
-//#include IMGUI_IMPL_OPENGL_LOADER_CUSTOM
+
 #include <GL/gl3w.h>
 
 #include <GLFW/glfw3.h>
@@ -33,7 +32,11 @@ namespace sight {
             }
 
             if (ImGui::MenuItem("Open", "Ctrl+O")) {
-
+                dbg("open graph file");
+                loadGraph("./simple1.yaml");
+            }
+            if (ImGui::MenuItem("Save", "Ctrl+S")){
+                getCurrentGraph()->save();
             }
 
             ImGui::Separator();
@@ -196,7 +199,7 @@ namespace sight {
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // Required on Mac
 
         // Create window with graphics context
-        GLFWwindow* window = glfwCreateWindow(1280, 720, "Dear ImGui GLFW+OpenGL3 example", NULL, NULL);
+        GLFWwindow* window = glfwCreateWindow(1280, 720, "sight - a low-code tool", NULL, NULL);
         if (window == NULL)
             return 1;
         glfwMakeContextCurrent(window);

@@ -5,18 +5,19 @@
 #include <vector>
 #include <atomic>
 #include <algorithm>
+#include <fstream>
 
+#include "sight.h"
 #include "sight_node_editor.h"
 
 #include "imgui.h"
 
 #define IMGUI_DEFINE_MATH_OPERATORS
-
 #include "imgui_canvas.h"
 #include "imgui_internal.h"
 #include "imgui_node_editor.h"
 
-#include "dbg.h"
+#include "yaml-cpp/yaml.h"
 
 #define BACKGROUND_CONTEXT_MENU "BackgroundContextMenu"
 #define LINK_CONTEXT_MENU "LinkContextMenu"
@@ -27,23 +28,19 @@
 
 namespace ed = ax::NodeEditor;
 
-struct LinkInfo {
-    ed::LinkId Id;
-    ed::PinId InputId;
-    ed::PinId OutputId;
-};
-
-static ImVector<LinkInfo> g_Links;                // List of live links. It is dynamic unless you want to create read-only view over nodes.
-
-// node list
-// todo clear data
-// static std::vector<sight::SightNode*> g_Nodes;
 //
 static std::atomic<int> nodeOrPortId(10000);
 // node editor status
 static sight::NodeEditorStatus g_NodeEditorStatus;
 
+
 namespace sight {
+
+    // define SightNodeGraph::invalidAnyThingWrapper
+    const SightAnyThingWrapper SightNodeGraph::invalidAnyThingWrapper = {
+            SightAnyThingType::Invalid,
+            nullptr
+    };
 
     void ImGuiEx_BeginColumn() {
         ImGui::BeginGroup();
@@ -66,12 +63,21 @@ namespace sight {
             ed::Suspend();
 
             if (ImGui::BeginPopup(NODE_CONTEXT_MENU)) {
+                if (ImGui::MenuItem("itemA")) {
+                    dbg("item a");
+                }
                 ImGui::EndPopup();
             }
             if (ImGui::BeginPopup(PIN_CONTEXT_MENU)) {
+                if (ImGui::MenuItem("itemA")) {
+                    dbg("item a");
+                }
                 ImGui::EndPopup();
             }
             if (ImGui::BeginPopup(LINK_CONTEXT_MENU)) {
+                if (ImGui::MenuItem("itemA")) {
+                    dbg("item a");
+                }
                 ImGui::EndPopup();
             }
             if (ImGui::BeginPopup(BACKGROUND_CONTEXT_MENU)) {
@@ -191,13 +197,17 @@ namespace sight {
             ed::Begin("My Editor", ImVec2(0.0, 0.0f));
 
             // nodes
-            for (const auto &node : CURRENT_GRAPH->nodes) {
+            for (const auto &node : CURRENT_GRAPH->getNodes()) {
                 showNode(&node);
             }
 
             // Submit Links
-            for (auto &linkInfo : g_Links)
-                ed::Link(linkInfo.Id, linkInfo.InputId, linkInfo.OutputId);
+//            for (auto &linkInfo : g_Links)
+//                ed::Link(linkInfo.Id, linkInfo.InputId, linkInfo.OutputId);
+
+            for (const auto &connection : CURRENT_GRAPH->getConnections()) {
+                ed::Link(connection.connectionId, connection.leftPortId(), connection.rightPortId());
+            }
 
             //
             // 2) Handle interactions
@@ -224,11 +234,16 @@ namespace sight {
                         // ed::AcceptNewItem() return true when user release mouse button.
                         if (ed::AcceptNewItem()) {
                             // Since we accepted new link, lets add one to our list of links.
-                            g_Links.push_back({ed::LinkId(nextNodeOrPortId()), inputPinId, outputPinId});
+                            // g_Links.push_back({ed::LinkId(nextNodeOrPortId()), inputPinId, outputPinId});
+                            auto id = CURRENT_GRAPH->createConnection(static_cast<int>(inputPinId.Get()), static_cast<int>(outputPinId.Get()));
+                            if (id > 0) {
+                                // valid connection.
 
-
-                            // Draw new link.
-                            ed::Link(g_Links.back().Id, g_Links.back().InputId, g_Links.back().OutputId);
+                                // Draw new link.
+                                ed::Link(id, inputPinId, outputPinId);
+                            } else {
+                                // may show something to user.
+                            }
                         }
 
                         // You may choose to reject connection between these nodes
@@ -239,25 +254,42 @@ namespace sight {
             }
             ed::EndCreate(); // Wraps up object creation action handling.
 
+            // Handle deletion action
+            if (ed::BeginDelete())
+            {
+                // There may be many links marked for deletion, let's loop over them.
+                ed::LinkId deletedLinkId;
+                while (ed::QueryDeletedLink(&deletedLinkId))
+                {
+                    // If you agree that link can be deleted, accept deletion.
+                    if (ed::AcceptDeletedItem())
+                    {
+                        // Then remove link from your data.
+                        CURRENT_GRAPH->delConnection(static_cast<int>(deletedLinkId.Get()));
+                    }
+
+                    // You may reject link deletion by calling:
+                    // ed::RejectDeletedItem();
+                }
+            }
+            ed::EndDelete(); // Wrap up deletion action
+
+
             auto openPopupPosition = ImGui::GetMousePos();
             ed::Suspend();
             static ed::NodeId contextNodeId      = 0;
             static ed::LinkId contextLinkId      = 0;
             static ed::PinId  contextPinId       = 0;
             if (ed::ShowNodeContextMenu(&contextNodeId)) {
-                dbg("ShowNodeContextMenu");
                 ImGui::OpenPopup(NODE_CONTEXT_MENU);
             } else if (ed::ShowPinContextMenu(&contextPinId)) {
-                dbg("ShowPinContextMenu");
                 ImGui::OpenPopup(PIN_CONTEXT_MENU);
             }
             else if (ed::ShowLinkContextMenu(&contextLinkId)) {
-                dbg("ShowLinkContextMenu");
                 ImGui::OpenPopup(LINK_CONTEXT_MENU);
             }
             else if (ed::ShowBackgroundContextMenu())
             {
-                dbg("ShowBackgroundContextMenu");
                 ImGui::OpenPopup(BACKGROUND_CONTEXT_MENU);
             }
             ed::Resume();
@@ -281,9 +313,8 @@ namespace sight {
         ed::Config config;
         config.SettingsFile = "Simple.json";
         g_NodeEditorStatus.context = ed::CreateEditor(&config);
-        g_NodeEditorStatus.createGraph("./path/to/somewhere");
+        g_NodeEditorStatus.loadOrCreateGraph("./simple.yaml");
 
-        initTestData();
         return 0;
     }
 
@@ -313,49 +344,6 @@ namespace sight {
         return 0;
     }
 
-    void initTestData() {
-
-        SightNode sightNode1;
-        auto node1 = &sightNode1;
-        node1->nodeName = "TestNode";
-        node1->nodeId = nextNodeOrPortId();
-        node1->inputPorts.push_back({
-                                            "Input",
-                                            nextNodeOrPortId(),
-                                            NodePortType::Input
-                               });
-        node1->outputPorts.push_back({
-                                             "Output",
-                                             nextNodeOrPortId(),
-                                             NodePortType::Output
-                               });
-        CURRENT_GRAPH->nodes.push_back(sightNode1);
-        // g_Nodes.push_back(node1);
-
-        SightNode sightNode2;
-        auto *node2 = &sightNode2;
-        node2->nodeName = "Node2";
-        node2->nodeId = nextNodeOrPortId();
-        node2->inputPorts.push_back({
-                                            "Input",
-                                            nextNodeOrPortId(),
-                                            NodePortType::Input
-                               });
-        node2->outputPorts.push_back({
-                                             "Output1",
-                                             nextNodeOrPortId(),
-                                             NodePortType::Output
-                               });
-        node2->outputPorts.push_back({
-                                             "Output2",
-                                             nextNodeOrPortId(),
-                                             NodePortType::Output
-                               });
-        //g_Nodes.push_back(node2);
-        CURRENT_GRAPH->nodes.push_back(sightNode2);
-
-    }
-
     int nextNodeOrPortId() {
         return nodeOrPortId++;
     }
@@ -365,6 +353,26 @@ namespace sight {
         CURRENT_GRAPH->addNode(*node);
         delete node;
         return 0;
+    }
+
+    SightNodeGraph *getCurrentGraph() {
+        return CURRENT_GRAPH;
+    }
+
+    void loadGraph(const char *path) {
+        disposeGraph();
+
+        dbg(path);
+        auto graph = new SightNodeGraph();
+        graph->load(path);
+        CURRENT_GRAPH = graph;
+    }
+
+    void disposeGraph() {
+        if (CURRENT_GRAPH) {
+            delete CURRENT_GRAPH;
+            CURRENT_GRAPH = nullptr;
+        }
     }
 
 
@@ -382,7 +390,7 @@ namespace sight {
 
 
     void SightNode::addPort(SightNodePort &port) {
-        dbg("add port, id: ", port.id ,", name: ",  port.portName);
+        dbg(port.id,  port.portName);
 
         if (port.kind == NodePortType::Input) {
             this->inputPorts.push_back(port);
@@ -443,13 +451,166 @@ namespace sight {
         }
     }
 
-    int SightNodeGraph::saveToFile(const char *path, bool set) {
-        // todo save file
+    int SightNodeConnection::leftPortId() const {
+        return this->left->id;
+    }
 
+    int SightNodeConnection::rightPortId() const {
+        return this->right->id;
+    }
+
+    void SightNodeConnection::addRefs() {
+        this->left->connections.push_back(this);
+        this->right->connections.push_back(this);
+    }
+
+    int SightNodeGraph::saveToFile(const char *path, bool set) {
         if (set) {
             this->setFilePath(path);
         }
+
+        // ctor yaml object
+        YAML::Emitter out;
+        out << YAML::BeginMap;
+        // nodes
+        out << YAML::Key << "nodes";
+        out << YAML::Value << YAML::BeginMap;
+        for (const auto &node : nodes) {
+            out << YAML::Key << node.nodeId;
+            out << YAML::Value;
+            out << YAML::BeginMap;
+            out << YAML::Key << "name" << YAML::Value << node.nodeName;
+            out << YAML::Key << "id" << YAML::Value << node.nodeId;
+            out << YAML::Key << "template" << YAML::Value << "not impl";
+            out << YAML::Key << "fields" << YAML::Value << "not impl";
+
+            // input and output
+            out << YAML::Key << "inputs";
+            out << YAML::Value << YAML::BeginMap;
+            for (const auto &item : node.inputPorts) {
+                out << YAML::Key << item.portName;
+                out << YAML::Value << YAML::BeginMap;
+                out << YAML::Key << "id" << YAML::Value << item.id;
+                out << YAML::EndMap;
+            }
+            out << YAML::EndMap;
+            out << YAML::Key << "outputs";
+            out << YAML::Value << YAML::BeginMap;
+            for (const auto &item : node.outputPorts) {
+                out << YAML::Key << item.portName;
+                out << YAML::Value << YAML::BeginMap;
+                out << YAML::Key << "id" << YAML::Value << item.id;
+                out << YAML::EndMap;
+            }
+            out << YAML::EndMap;
+
+            //
+            out << YAML::EndMap;
+        }
+        out << YAML::EndMap;
+
+        // connections
+        out << YAML::Key << "connections";
+        out << YAML::Value << YAML::BeginMap;
+        for (const auto &connection : connections) {
+            out << YAML::Key << connection.connectionId << YAML::Value << YAML::BeginMap;
+            out << YAML::Key << "left" << YAML::Value << connection.leftPortId();
+            out << YAML::Key << "right" << YAML::Value << connection.rightPortId();
+            out << YAML::EndMap;
+        }
+        out << YAML::EndMap;
+
+        // other info
+        out << YAML::Key << "nodeOrPortId" << YAML::Value << nodeOrPortId.load();
+
+        out << YAML::EndMap;       // end of 1st begin map
+
+        // save file
+        std::ofstream outToFile(path, std::ios::out | std::ios::trunc);
+        outToFile << out.c_str() << std::endl;
+        outToFile.close();
         return 0;
+    }
+
+    int SightNodeGraph::load(const char *path) {
+        this->filepath = path;
+
+        std::ifstream fin(path);
+        if (!fin.is_open()) {
+            return -1;
+        }
+
+        try {
+            auto root = YAML::Load(fin);
+
+            // nodes
+            auto nodeRoot = root["nodes"];
+            dbg(nodeRoot.size());
+            for (const auto &nodeKeyPair : nodeRoot) {
+                auto node = nodeKeyPair.second;
+                SightNode sightNode;
+                sightNode.nodeId = node["id"].as<int>();
+                sightNode.nodeName = node["name"].as<std::string>();
+                auto templateNodeAddress = node["template"].as<std::string>();
+
+                auto inputs = node["inputs"];
+                for (const auto &input : inputs) {
+                    auto portName = input.first.as<std::string>();
+                    auto values = input.second;
+                    auto id = values["id"].as<int>();
+
+                    sightNode.inputPorts.push_back({
+                                                           portName,
+                                                           id,
+                                                           NodePortType::Input
+                                                   });
+                }
+
+                auto outputs = node["outputs"];
+                for (const auto &output : outputs) {
+                    auto portName = output.first.as<std::string>();
+                    auto values = output.second;
+                    auto id = values["id"].as<int>();
+
+                    sightNode.outputPorts.push_back({
+                                                            portName,
+                                                            id,
+                                                            NodePortType::Output
+                                                    });
+                }
+
+                addNode(sightNode);
+            }
+
+            // connections
+            auto connectionRoot = root["connections"];
+            dbg(connectionRoot.size());
+            for (const auto &item : connectionRoot) {
+                auto connectionId = item.first.as<int>();
+                auto left = item.second["left"].as<int>();
+                auto right = item.second["right"].as<int>();
+
+                createConnection(left, right, connectionId);
+            }
+
+            // other info
+            auto temp = root["nodeOrPortId"];
+            if (temp.IsDefined() && !temp.IsNull()) {
+                dbg(root["nodeOrPortId"].as<int>());
+                nodeOrPortId.store(temp.as<int>(20000));
+            } else {
+                nodeOrPortId.store(20000);
+            }
+
+            return 0;
+        }catch (const YAML::BadConversion & e){
+            fprintf(stderr, "read file %s error!\n", path);
+            fprintf(stderr, "%s\n", e.what());
+            this->reset();
+            return -2;    // bad file
+        }
+
+        // return 0;
     }
 
     void SightNodeGraph::dispose() {
@@ -466,6 +627,150 @@ namespace sight {
 
     void SightNodeGraph::addNode(const SightNode &node) {
         this->nodes.push_back(node);
+
+        // do ids.
+        auto & ref = this->nodes.back();
+        idMap[node.nodeId] = {
+                SightAnyThingType::Node,
+                &ref
+        };
+
+        for (auto &item : ref.inputPorts) {
+            idMap[item.id] = {
+                    SightAnyThingType::Port,
+                    &item
+            };
+        }
+        for (auto &item : ref.outputPorts) {
+            idMap[item.id] =  {
+                    SightAnyThingType::Port,
+                    &item
+            };
+        }
+    }
+
+    SightNode *SightNodeGraph::findNode(int id) {
+//        auto result = std::find_if(nodes.begin(), nodes.end(), [id](const SightNode& n){ return n.nodeId == id; });
+//        if (result == nodes.end()) {
+//            return nullptr;
+//        }
+//        return &(*result);
+        return findSightAnyThing(id).asNode();
+    }
+
+    SightNodeConnection *SightNodeGraph::findConnection(int id) {
+//        auto result = std::find_if(connections.begin(), connections.end(),
+//                     [id](const SightNodeConnection &c) { return c.connectionId == id; });
+//        if (result == connections.end()) {
+//            return nullptr;
+//        }
+//        return &(*result);
+        return findSightAnyThing(id).asConnection();
+    }
+
+    int SightNodeGraph::createConnection(int leftPortId, int rightPortId, int connectionId) {
+        dbg("try create connection.");
+        dbg(leftPortId, rightPortId);
+        if (leftPortId == rightPortId) {
+            return -2;
+        }
+
+        auto left = findPort(leftPortId);
+        auto right = findPort(rightPortId);
+        if (!left || !right) {
+            return -1;
+        }
+        if (left->kind == right->kind) {
+            return -3;
+        }
+
+        dbg(left, right);
+        auto id = connectionId > 0 ? connectionId : nextNodeOrPortId();
+        SightNodeConnection connection = {
+                id,
+                left,
+                right
+        };
+        addConnection(connection);
+        return id;
+    }
+
+    void SightNodeGraph::addConnection(const SightNodeConnection &connection) {
+        this->connections.push_back(connection);
+
+        // do id
+        auto & ref = this->connections.back();
+        idMap[connection.connectionId] = {
+                SightAnyThingType::Connection,
+                &ref,
+        };
+
+        // refs
+        ref.addRefs();
+    }
+
+    const std::vector<SightNode> &SightNodeGraph::getNodes() const {
+        return this->nodes;
+    }
+
+    const std::vector<SightNodeConnection> &SightNodeGraph::getConnections() const {
+        return this->connections;
+    }
+
+    SightNodePort *SightNodeGraph::findPort(int id) {
+        return findSightAnyThing(id).asPort();
+    }
+
+    const SightAnyThingWrapper &SightNodeGraph::findSightAnyThing(int id) {
+        std::map<int, SightAnyThingWrapper>::iterator iter;
+        if ((iter = idMap.find(id)) == idMap.end()) {
+            return invalidAnyThingWrapper;
+        }
+        return iter->second;
+    }
+
+    int SightNodeGraph::delNode(int id) {
+        auto result = std::find_if(nodes.begin(), nodes.end(), [id](const SightNode& n){ return n.nodeId == id; });
+        if (result == nodes.end()) {
+            return -1;
+        }
+
+        nodes.erase(result);
+        return 0;
+    }
+
+    int SightNodeGraph::delConnection(int id) {
+        auto result = std::find_if(connections.begin(), connections.end(),
+                                   [id](const SightNodeConnection &c) { return c.connectionId == id; });
+        if (result == connections.end()) {
+            return -1;
+        }
+
+        // deal refs.
+        result->removeRefs();
+        idMap.erase(id);
+
+        connections.erase(result);
+        dbg("delete connection");
+        return 0;
+    }
+
+    int SightNodeGraph::save() {
+        return saveToFile(this->filepath.c_str(), false);
+    }
+
+    SightNodeGraph::SightNodeGraph() {
+
+    }
+
+    SightNodeGraph::~SightNodeGraph() {
+        this->dispose();
+    }
+
+    void SightNodeGraph::reset() {
+        this->nodes.clear();
+        this->connections.clear();
+        this->idMap.clear();
     }
 
     int NodeEditorStatus::createGraph(const char *path) {
@@ -477,5 +782,42 @@ namespace sight {
         graph->saveToFile(path, true);
         return 0;
     }
+
+    int NodeEditorStatus::loadOrCreateGraph(const char *path) {
+        if (graph) {
+            return -1;
+        }
+
+        graph = new SightNodeGraph();
+        if (graph->load(path) != 0) {
+            // create one.
+            nodeOrPortId.store(10000);
+            graph->save();
+        }
+
+        return 0;
+    }
+
+    SightNode *SightAnyThingWrapper::asNode() const {
+        if (type != SightAnyThingType::Node) {
+            return nullptr;
+        }
+        return (SightNode*) pointer;
+    }
+
+    SightNodeConnection* SightAnyThingWrapper::asConnection() const{
+        if (type != SightAnyThingType::Connection) {
+            return nullptr;
+        }
+        return (SightNodeConnection*) pointer;
+    }
+
+    SightNodePort *SightAnyThingWrapper::asPort() const{
+        if (type != SightAnyThingType::Port) {
+            return nullptr;
+        }
+        return (SightNodePort*) pointer;
+    }
+
 
 }

@@ -5,9 +5,19 @@
     //let a = sight.SightJsNode;
     let node = new sight.SightJsNode();
     node.nodeName = "abc";
-    print("hello");
-    print(node.nodeName);
+    //print("hello");
+    //print(node.nodeName);
 
+    let nodeString = JSON.stringify(node);
+    print(nodeString);
+
+    let testObject = {
+      name: 'name',
+      age: 1,
+      whatever: [1,2,3]
+    };
+    nodeString = JSON.stringify(node);
+    print(nodeString);
 
     let node1 = new sight.SightJsNode();
     node1.nodeId = sight.nextNodeOrPortId();
@@ -18,9 +28,9 @@
 
     const NodePortType = new sight.NodePortType();
 
-    print("" + NodePortType.Input);
-    print("" + NodePortType.Output);
-    print("" + NodePortType.Both);
+    // print("" + NodePortType.Input);
+    // print("" + NodePortType.Output);
+    // print("" + NodePortType.Both);
 
 
     let port1 = new sight.SightNodePort();

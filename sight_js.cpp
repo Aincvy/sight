@@ -342,6 +342,7 @@ namespace sight {
             addUICommand(UICommandType::AddNode, nodePointer, size);
         }
 
+
         return 0;
     }
 

@@ -59,12 +59,19 @@ SET(EXTRA_LIBS ${V8_LIBRARIES} ${TREE_SITTER_LIBRARY} ${LIBUV_LIBRARIES} imgui i
 target_link_libraries(sight PRIVATE ${EXTRA_LIBS})
 
 # backward-cpp
-#SET(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "/usr/local/include/libelf")
 target_include_directories(sight PRIVATE dependencies/backward-cpp)
 
 # dbg
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+IF (CMAKE_BUILD_TYPE STREQUAL "Debug")
     message(STATUS "in debug mode, add defines")
     target_compile_definitions(sight PRIVATE DBG_MACRO_NO_WARNING)
+ELSE()
+    message(STATUS "in release mode, add defines")
+    target_compile_definitions(sight PRIVATE SIGHT_RELEASE)
 ENDIF(CMAKE_BUILD_TYPE STREQUAL "Debug")
 
+# yaml-cpp
+find_package(yaml-cpp REQUIRED)
+target_include_directories(sight PRIVATE YAML_CPP_INCLUDE_DIR)
+target_link_libraries(sight PRIVATE ${YAML_CPP_LIBRARIES})
+MESSAGE(STATUS "Found yaml-cpp at: ${YAML_CPP_INCLUDE_DIR}")
