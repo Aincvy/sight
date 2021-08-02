@@ -174,6 +174,16 @@ namespace sight {
                 }
                 break;
             }
+            case UICommandType::AddTemplateNode:{
+                auto *pointer = (SightNodeTemplateAddress**) command->args.data;
+                auto size = command->args.dataLength;
+                for (int i = 0; i < size; ++i) {
+                    auto p = pointer[i];
+                    addTemplateNode(*p);
+                    delete p;
+                }
+                break;
+            }
         }
 
         command->args.dispose();

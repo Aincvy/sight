@@ -16,6 +16,7 @@ namespace sight {
 
         // node editor part
         AddNode = 200,
+        AddTemplateNode = 201,
     };
 
     struct UICommand {

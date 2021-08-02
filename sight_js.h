@@ -23,8 +23,6 @@ namespace sight{
         struct CommandArgs args;
     };
 
-    void testJs(char *arg1);
-
     /**
      *
      * @param type

@@ -24,14 +24,14 @@
 #define PIN_CONTEXT_MENU "PinContextMenu"
 #define NODE_CONTEXT_MENU "NodeContextMenu"
 
-#define CURRENT_GRAPH g_NodeEditorStatus.graph
+#define CURRENT_GRAPH g_NodeEditorStatus->graph
 
 namespace ed = ax::NodeEditor;
 
 //
 static std::atomic<int> nodeOrPortId(10000);
 // node editor status
-static sight::NodeEditorStatus g_NodeEditorStatus;
+static sight::NodeEditorStatus* g_NodeEditorStatus;
 
 
 namespace sight {
@@ -81,19 +81,9 @@ namespace sight {
                 ImGui::EndPopup();
             }
             if (ImGui::BeginPopup(BACKGROUND_CONTEXT_MENU)) {
-                if (ImGui::MenuItem("itemA")) {
-                    dbg("item a");
-                }
-                if (ImGui::BeginMenu("class a")) {
-                    if (ImGui::MenuItem("1")) {
-                        dbg("click `class a/1`");
-                    }
-
-                    if (ImGui::MenuItem("2")) {
-                        dbg("click `class a/2`");
-                    }
-
-                    ImGui::EndMenu();
+                // g_NodeEditorStatus->rootTemplateAddress.showContextMenu();
+                for (const auto &item : g_NodeEditorStatus->templateAddressList) {
+                    item.showContextMenu(openPopupPosition);
                 }
 
                 ImGui::Separator();
@@ -191,7 +181,7 @@ namespace sight {
             ImGui::Text("FPS: %.2f (%.2gms)", io.Framerate, io.Framerate ? 1000.0f / io.Framerate : 0.0f);
             ImGui::Separator();
 
-            ed::SetCurrentEditor(g_NodeEditorStatus.context);
+            ed::SetCurrentEditor(g_NodeEditorStatus->context);
 
             // Start interaction with editor.
             ed::Begin("My Editor", ImVec2(0.0, 0.0f));
@@ -257,6 +247,14 @@ namespace sight {
             // Handle deletion action
             if (ed::BeginDelete())
             {
+                ed::NodeId deletedNodeId;
+                while (ed::QueryDeletedNode(&deletedNodeId)) {
+                    // ask for node delete.
+                    if (ed::AcceptDeletedItem()) {
+                        CURRENT_GRAPH->delNode(static_cast<int>(deletedNodeId.Get()));
+                    }
+                }
+
                 // There may be many links marked for deletion, let's loop over them.
                 ed::LinkId deletedLinkId;
                 while (ed::QueryDeletedLink(&deletedLinkId))
@@ -312,14 +310,19 @@ namespace sight {
     int initNodeEditor() {
         ed::Config config;
         config.SettingsFile = "Simple.json";
-        g_NodeEditorStatus.context = ed::CreateEditor(&config);
-        g_NodeEditorStatus.loadOrCreateGraph("./simple.yaml");
+        g_NodeEditorStatus = new NodeEditorStatus();
+        g_NodeEditorStatus->context = ed::CreateEditor(&config);
+        g_NodeEditorStatus->loadOrCreateGraph("./simple.yaml");
 
         return 0;
     }
 
     int destroyNodeEditor() {
-        ed::DestroyEditor(g_NodeEditorStatus.context);
+        ed::DestroyEditor(g_NodeEditorStatus->context);
+        g_NodeEditorStatus->context = nullptr;
+
+        delete g_NodeEditorStatus;
+        g_NodeEditorStatus = nullptr;
         return 0;
     }
 
@@ -389,7 +392,7 @@ namespace sight {
     }
 
 
-    void SightNode::addPort(SightNodePort &port) {
+    void SightNode::addPort(const SightNodePort &port) {
         dbg(port.id,  port.portName);
 
         if (port.kind == NodePortType::Input) {
@@ -798,6 +801,70 @@ namespace sight {
         return 0;
     }
 
+    NodeEditorStatus::NodeEditorStatus() {
+        // rootTemplateAddress.name = "root";
+
+        // add some test data.
+//        SightNodeTemplateAddress entity = {
+//                "entity",
+//                nullptr,
+//                {
+//                        {
+//                            "a",
+//                            nullptr,
+//                            {
+//                                    {
+//                                        "1",
+//                                    },
+//                                    {
+//                                        "2"
+//                                    },
+//                                    {
+//                                        "3"
+//                                    }
+//                            }
+//                        },
+//                        {
+//                            "b",
+//                        },
+//                        {
+//                            "c",
+//                        },
+//                }
+//        };
+//        templateAddressList.push_back(entity);
+
+//        SightNodeTemplateAddress logic = {
+//                "logic",
+//                nullptr,
+//                {
+//                        {
+//                            "if"
+//                        },
+//                        {
+//                                "if-else_if-else"
+//                        },
+//                        {
+//                                "switch"
+//                        },
+//                        {
+//                                "while"
+//                        },
+//                        {
+//                                "for"
+//                        },
+//                }
+//        };
+        //templateAddressList.push_back(logic);
+
+
+    }
+
+    NodeEditorStatus::~NodeEditorStatus() {
+        // todo free memory.
+
+    }
+
     SightNode *SightAnyThingWrapper::asNode() const {
         if (type != SightAnyThingType::Node) {
             return nullptr;
@@ -817,6 +884,51 @@ namespace sight {
             return nullptr;
         }
         return (SightNodePort*) pointer;
+    }
+
+
+    void SightNodeTemplateAddress::showContextMenu(const ImVec2 &openPopupPosition) const {
+        if (children.empty()) {
+            if (ImGui::MenuItem(name.c_str())) {
+                //
+                dbg("it will create a new node.", this->name);
+                auto node = this->templateNode->instantiate();
+                addNode(node);
+                ed::SetNodePosition(node->nodeId, openPopupPosition);
+            }
+        } else {
+            if (ImGui::BeginMenu(name.c_str())) {
+                for (const auto &item : children) {
+                    item.showContextMenu(openPopupPosition);
+                }
+
+                ImGui::EndMenu();
+            }
+        }
+    }
+
+    SightNodeTemplateAddress::SightNodeTemplateAddress() {
+
+    }
+
+
+    SightNodeTemplateAddress::SightNodeTemplateAddress(std::string name, SightNode* templateNode)
+        : name(name), templateNode(templateNode)
+    {
+
+    }
+
+    SightNodeTemplateAddress::~SightNodeTemplateAddress() {
+//        if (templateNode) {
+//            delete templateNode;
+//            templateNode = nullptr;
+//        }
+    }
+
+    int addTemplateNode(const SightNodeTemplateAddress &templateAddress) {
+        // todo path
+        g_NodeEditorStatus->templateAddressList.push_back(templateAddress);
+        return 0;
     }
 
 

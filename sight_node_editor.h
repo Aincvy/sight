@@ -113,7 +113,7 @@ namespace sight {
          *
          * @param port
          */
-        void addPort(SightNodePort & port);
+        void addPort(const SightNodePort & port);
 
         /**
          * instantiate a node by this node.
@@ -155,7 +155,7 @@ namespace sight {
         Port,
         Connection,
 
-        // used for return value, it means this struct entity is invalid.
+        // used for return value, it means nothing was find.
         Invalid,
     };
 
@@ -166,6 +166,26 @@ namespace sight {
         SightNode* asNode() const;
         SightNodePort* asPort() const;
         SightNodeConnection* asConnection() const;
+    };
+
+    /**
+     * Used for context menu.
+     */
+    struct SightNodeTemplateAddress {
+        std::string name;
+        //
+        SightNode* templateNode = nullptr;
+        //
+        std::vector<SightNodeTemplateAddress> children;
+
+        SightNodeTemplateAddress();
+        ~SightNodeTemplateAddress();
+        SightNodeTemplateAddress(std::string name, SightNode* templateNode);
+
+        /**
+         * If has children, then show them, otherwise, show self.
+         */
+        void showContextMenu(const ImVec2 &openPopupPosition) const;
     };
 
     /**
@@ -297,6 +317,10 @@ namespace sight {
         ed::EditorContext* context = nullptr;
         // node template
 
+        std::vector<SightNodeTemplateAddress> templateAddressList;
+
+        NodeEditorStatus();
+        ~NodeEditorStatus();
 
         /**
          * Create a graph.
@@ -336,6 +360,13 @@ namespace sight {
      * @return
      */
     int addNode(SightNode *node);
+
+    /**
+     *
+     * @param templateAddress
+     * @return
+     */
+    int addTemplateNode(const SightNodeTemplateAddress& templateAddress);
 
     /**
      *
