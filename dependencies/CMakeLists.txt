@@ -72,6 +72,7 @@ SET(
         ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_log.cpp
         ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_queue.cpp
         ${CMAKE_CURRENT_LIST_DIR}/sight-util/shared_queue.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_language.cpp
 )
 
 add_library(sight-util SHARED ${SIGHT_UTIL_SOURCES})
