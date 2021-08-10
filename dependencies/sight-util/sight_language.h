@@ -20,12 +20,13 @@ namespace sight {
 
     struct LanguageCommonKeys {
         char className[MOST_KEYS_BUF_SIZE] = "name";
+        char address[MOST_KEYS_BUF_SIZE] = "address";
         char preview[MOST_KEYS_BUF_SIZE] = "Preview";
         char ok[MOST_KEYS_BUF_SIZE] = "OK";
         char cancel[MOST_KEYS_BUF_SIZE] = "Cancel";
         char fieldName[MOST_KEYS_BUF_SIZE] = "name";
         char fieldType[MOST_KEYS_BUF_SIZE] = "type";
-        char fieldDefaultValue[MOST_KEYS_BUF_SIZE] = "defaultValue";
+        char fieldDefaultValue[MOST_KEYS_BUF_SIZE] = "value";
 
     };
 

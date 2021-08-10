@@ -2,6 +2,7 @@
 // Created by Aincvy(aincvy@gmail.com) on 2021/7/20.
 //
 
+#include <utility>
 #include <vector>
 #include <atomic>
 #include <algorithm>
@@ -9,6 +10,7 @@
 
 #include "sight.h"
 #include "sight_node_editor.h"
+#include "sight_address.h"
 
 #include "imgui.h"
 
@@ -308,18 +310,13 @@ namespace sight {
 
 
     int initNodeEditor() {
-        ed::Config config;
-        config.SettingsFile = "Simple.json";
         g_NodeEditorStatus = new NodeEditorStatus();
-        g_NodeEditorStatus->context = ed::CreateEditor(&config);
-        g_NodeEditorStatus->loadOrCreateGraph("./simple.yaml");
 
         return 0;
     }
 
     int destroyNodeEditor() {
-        ed::DestroyEditor(g_NodeEditorStatus->context);
-        g_NodeEditorStatus->context = nullptr;
+        disposeGraph();
 
         delete g_NodeEditorStatus;
         g_NodeEditorStatus = nullptr;
@@ -352,7 +349,7 @@ namespace sight {
     }
 
     int addNode(SightNode *node) {
-        //g_Nodes.push_back(node);
+
         CURRENT_GRAPH->addNode(*node);
         delete node;
         return 0;
@@ -362,22 +359,33 @@ namespace sight {
         return CURRENT_GRAPH;
     }
 
-    void loadGraph(const char *path) {
-        disposeGraph();
-
-        dbg(path);
-        auto graph = new SightNodeGraph();
-        graph->load(path);
-        CURRENT_GRAPH = graph;
-    }
-
-    void disposeGraph() {
+    void disposeGraph(bool context) {
         if (CURRENT_GRAPH) {
             delete CURRENT_GRAPH;
             CURRENT_GRAPH = nullptr;
         }
+
+        if (context && g_NodeEditorStatus->context) {
+            ed::DestroyEditor(g_NodeEditorStatus->context);       // todo need destroy.
+            g_NodeEditorStatus->context = nullptr;
+        }
     }
 
+    void changeGraph(const char *pathWithoutExt) {
+        dbg(pathWithoutExt);
+        disposeGraph();
+
+        ed::Config config;
+        char* configFilePath = g_NodeEditorStatus->contextConfigFile;
+        sprintf(configFilePath, "%s.json", pathWithoutExt);
+        config.SettingsFile = configFilePath;
+        g_NodeEditorStatus->context = ed::CreateEditor(&config);
+
+        char buf[NAME_BUF_SIZE];
+        sprintf(buf, "%s.yaml", pathWithoutExt);
+        g_NodeEditorStatus->loadOrCreateGraph(buf);
+        dbg("change over!");
+    }
 
     void SightNodePort::setKind(int intKind) {
         this->kind = NodePortType(intKind);
@@ -391,10 +399,16 @@ namespace sight {
         return static_cast<int>(connections.size());
     }
 
+    const char *SightNodePort::getType() const {
+        return type.c_str();
+    }
+
+    const char *SightNodePort::getDefaultValue() const {
+        return this->value.c_str();
+    }
+
 
     void SightNode::addPort(const SightNodePort &port) {
-        dbg(port.id,  port.portName);
-
         if (port.kind == NodePortType::Input) {
             this->inputPorts.push_back(port);
         } else if (port.kind == NodePortType::Output) {
@@ -804,60 +818,6 @@ namespace sight {
     NodeEditorStatus::NodeEditorStatus() {
         // rootTemplateAddress.name = "root";
 
-        // add some test data.
-//        SightNodeTemplateAddress entity = {
-//                "entity",
-//                nullptr,
-//                {
-//                        {
-//                            "a",
-//                            nullptr,
-//                            {
-//                                    {
-//                                        "1",
-//                                    },
-//                                    {
-//                                        "2"
-//                                    },
-//                                    {
-//                                        "3"
-//                                    }
-//                            }
-//                        },
-//                        {
-//                            "b",
-//                        },
-//                        {
-//                            "c",
-//                        },
-//                }
-//        };
-//        templateAddressList.push_back(entity);
-
-//        SightNodeTemplateAddress logic = {
-//                "logic",
-//                nullptr,
-//                {
-//                        {
-//                            "if"
-//                        },
-//                        {
-//                                "if-else_if-else"
-//                        },
-//                        {
-//                                "switch"
-//                        },
-//                        {
-//                                "while"
-//                        },
-//                        {
-//                                "for"
-//                        },
-//                }
-//        };
-        //templateAddressList.push_back(logic);
-
-
     }
 
     NodeEditorStatus::~NodeEditorStatus() {
@@ -891,7 +851,7 @@ namespace sight {
         if (children.empty()) {
             if (ImGui::MenuItem(name.c_str())) {
                 //
-                dbg("it will create a new node.", this->name);
+                // dbg("it will create a new node.", this->name);
                 auto node = this->templateNode->instantiate();
                 addNode(node);
                 ed::SetNodePosition(node->nodeId, openPopupPosition);
@@ -913,7 +873,7 @@ namespace sight {
 
 
     SightNodeTemplateAddress::SightNodeTemplateAddress(std::string name, SightNode* templateNode)
-        : name(name), templateNode(templateNode)
+        : name(std::move(name)), templateNode(templateNode)
     {
 
     }
@@ -927,9 +887,84 @@ namespace sight {
 
     int addTemplateNode(const SightNodeTemplateAddress &templateAddress) {
         // todo path
-        g_NodeEditorStatus->templateAddressList.push_back(templateAddress);
+        if (templateAddress.name.empty()) {
+            return -1;
+        }
+
+        auto address = resolveAddress(templateAddress.name);
+        auto pointer = address;
+        // compare and put.
+        auto* list = &g_NodeEditorStatus->templateAddressList;
+
+        bool findElement = false;
+        while (pointer) {
+            if (!pointer->next) {
+                // no next, this is the last element, it should be the node's name.
+                list->push_back(SightNodeTemplateAddress(pointer->part, templateAddress.templateNode));
+                break;
+            }
+
+            for(auto iter = list->begin(); iter != list->end(); iter++){
+                if (iter->name == pointer->part) {
+                    findElement = true;
+                    list = & iter->children;
+                    break;
+                }
+            }
+
+            if (!findElement) {
+                list->push_back(SightNodeTemplateAddress(pointer->part, nullptr));
+                list = & list->back().children;
+            }
+
+            pointer = pointer->next;
+        }
+
+        // list->push_back(templateAddress);
+        freeAddress(address);
         return 0;
     }
 
+    SightNode *generateNode(const UICreateEntity &createEntityData,SightNode *node) {
+        if (!node) {
+            node = new SightNode();
+        }
+
+        node->nodeName = createEntityData.name;
+        node->nodeId = nextNodeOrPortId();         // All node and port's ids need to be initialized.
+
+        auto c = createEntityData.first;
+        while (c) {
+            SightNodePort port = {
+                    c->name,
+                    nextNodeOrPortId(),
+                    NodePortType::Input,
+                    c->type,
+                    c->defaultValue,
+                    std::vector<SightNodeConnection*>(),
+            };
+            node->inputPorts.push_back(port);
+
+            port.id = nextNodeOrPortId();
+            node->outputPorts.push_back(port);
+
+            c = c->next;
+        }
+
+        return node;
+    }
+
+    int addEntity(const UICreateEntity &createEntityData) {
+        // convert to SightNode, and add it to entity graph.
+        SightNodeGraph graph;
+        graph.load("./entity.yaml");
+
+        SightNode node;
+        generateNode(createEntityData, &node);
+
+        graph.addNode(node);
+        graph.save();
+        return 0;
+    }
 
 }

@@ -38,7 +38,14 @@ namespace sight {
     struct SightNodePort {
         std::string portName;
         int id;
+        // input/output ...
         NodePortType kind;
+        // int/long/String/float ...
+        // use getType() function, do not use this field directly.
+        std::string type;
+        // use getDefaultValue() function, do not use this field directly.
+        std::string value;
+
         // connections
         std::vector<SightNodeConnection*> connections;
         SightNode* node = nullptr;
@@ -61,6 +68,18 @@ namespace sight {
          * @return
          */
         int connectionsSize() const;
+
+        /**
+         * int/long/String/float ...
+         * @return
+         */
+        const char* getType() const;
+
+        /**
+         *
+         * @return
+         */
+        const char* getDefaultValue() const;
     };
 
     /**
@@ -172,6 +191,7 @@ namespace sight {
      * Used for context menu.
      */
     struct SightNodeTemplateAddress {
+        // name or address
         std::string name;
         //
         SightNode* templateNode = nullptr;
@@ -308,6 +328,7 @@ namespace sight {
         void reset();
     };
 
+
     /**
      * sight  node editor status
      */
@@ -315,6 +336,8 @@ namespace sight {
 
         SightNodeGraph* graph = nullptr;
         ed::EditorContext* context = nullptr;
+        //
+        char contextConfigFile[NAME_BUF_SIZE * 2] = {0};
         // node template
 
         std::vector<SightNodeTemplateAddress> templateAddressList;
@@ -331,6 +354,7 @@ namespace sight {
 
         /**
          * Try to load graph first, if failed, then create one.
+         * Recommend use function `changeGraph`.
          * @param path
          * @return
          */
@@ -363,7 +387,8 @@ namespace sight {
 
     /**
      *
-     * @param templateAddress
+     * @param templateAddress  Make sure templateAddress's name's last element is it's real name.
+     *                          In this place, name = address.
      * @return
      */
     int addTemplateNode(const SightNodeTemplateAddress& templateAddress);
@@ -375,14 +400,30 @@ namespace sight {
     SightNodeGraph* getCurrentGraph();
 
     /**
-     * Load a graph
-     * @param path
+     *
      */
-    void loadGraph(const char*path);
+    void disposeGraph(bool context = true);
+
+    /**
+     * change graph to another one.
+     * @param pathWithoutExt   like './simple'  without dot.
+     */
+    void changeGraph(const char* pathWithoutExt);
+
 
     /**
      *
+     * @param createEntityData
+     * @return
      */
-    void disposeGraph();
+    SightNode* generateNode(const UICreateEntity & createEntityData, SightNode *node = nullptr);
+
+    /**
+     *
+     * @param createEntityData
+     * @return 0 ok.
+     */
+    int addEntity(const UICreateEntity & createEntityData);
+
 
 }

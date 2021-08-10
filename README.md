@@ -22,5 +22,6 @@ Use command `git submodule update --init` for that.
 brew install v8
 brew install yaml-cpp
 brew install libuv
+brew install abseil
 ```
 

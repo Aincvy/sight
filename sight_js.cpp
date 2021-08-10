@@ -322,7 +322,7 @@ namespace sight {
      * @param filepath
      * @return
      */
-    int runJsFile(const char *filepath) {
+    int runJsFile(const char *filepath, std::promise<int>* promise = nullptr) {
         if (!g_V8Runtime) {
             return -1;
         }
@@ -382,6 +382,9 @@ namespace sight {
             addUICommand(UICommandType::AddTemplateNode, pointer, size);
         }
 
+        if (promise) {
+            promise->set_value(1);
+        }
         return 0;
     }
 
@@ -399,7 +402,7 @@ namespace sight {
                 case JsCommandType::Destroy:
                     goto break_commands_loop;
                 case JsCommandType::File:
-                    runJsFile(command.args.argString);
+                    runJsFile(command.args.argString, command.args.promise);
                     break;
                 case JsCommandType::JsCommandHolder:
                     // do nothing.
@@ -439,7 +442,7 @@ namespace sight {
         return addJsCommand(command);
     }
 
-    int addJsCommand(JsCommandType type, const char *argString, int argStringLength, bool argStringNeedFree) {
+    int addJsCommand(JsCommandType type, const char *argString, int argStringLength, bool argStringNeedFree, std::promise<int>* promise) {
         JsCommand command = {
                 type,
                 {
@@ -449,6 +452,7 @@ namespace sight {
                 },
         };
 
+        command.args.promise = promise;
         return addJsCommand(command);
     }
 

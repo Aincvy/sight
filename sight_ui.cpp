@@ -7,6 +7,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include <stdio.h>
+#include <future>
 
 
 #include <GL/gl3w.h>
@@ -51,7 +52,7 @@ namespace sight {
 
             if (ImGui::MenuItem("Open", "Ctrl+O")) {
                 dbg("open graph file");
-                loadGraph("./simple1.yaml");
+                changeGraph("./simple1");
             }
             if (ImGui::MenuItem("Save", "Ctrl+S")){
                 getCurrentGraph()->save();
@@ -81,6 +82,13 @@ namespace sight {
         void showMainViewMenu(){
             if (ImGui::MenuItem("View")) {
 
+            }
+            if (ImGui::BeginMenu("Graph")) {
+                if (ImGui::MenuItem("Entity")) {
+                    // show entity graph
+                    changeGraph("./entity");
+                }
+                ImGui::EndMenu();
             }
         }
 
@@ -170,6 +178,8 @@ namespace sight {
             if (ImGui::Begin(WINDOW_LANGUAGE_KEYS.createEntity, &g_UIStatus->windowStatus.createEntity)) {
                 //LeftLabeledInput(COMMON_LANGUAGE_KEYS.className, g_UIStatus->createEntityData.name, NAME_BUF_SIZE);
                 ImGui::InputText(COMMON_LANGUAGE_KEYS.className, g_UIStatus->createEntityData.name, NAME_BUF_SIZE);
+                ImGui::InputText(COMMON_LANGUAGE_KEYS.address, g_UIStatus->createEntityData.templateAddress, NAME_BUF_SIZE);
+                // maybe need a help marker ?
 
                 ImGui::Separator();
                 // first line buttons
@@ -255,18 +265,23 @@ namespace sight {
                 ImGui::Dummy(ImVec2(0,3));
                 ImGui::Separator();
                 // preview
-                ImGui::Text(COMMON_LANGUAGE_KEYS.preview);
+                ImGui::Text("%s", COMMON_LANGUAGE_KEYS.preview);
                 ImGui::PushStyleColor(ImGuiCol_Text, g_UIStatus->uiColors->readonlyText);
                 ImGui::InputTextMultiline("##preview", buf, NAME_BUF_SIZE, ImVec2(0,0), ImGuiInputTextFlags_ReadOnly);
                 ImGui::PopStyleColor();
 
                 // buttons
                 if (ImGui::Button(COMMON_LANGUAGE_KEYS.ok)) {
-
+                    // add entity
+                    int r = addEntity(createEntityData);
+                    if (r == 0) {
+                        createEntityData.reset();
+                        g_UIStatus->windowStatus.createEntity = false;
+                    }
                 }
                 ImGui::SameLine();
                 if (ImGui::Button(COMMON_LANGUAGE_KEYS.cancel)) {
-
+                    g_UIStatus->windowStatus.createEntity = false;
                 }
             }
 
@@ -361,7 +376,7 @@ namespace sight {
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
         ImGuiIO& io = ImGui::GetIO(); (void)io;
-        //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
         //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
         // Setup Dear ImGui style
@@ -393,7 +408,15 @@ namespace sight {
         g_UIStatus->languageKeys = loadLanguage("");
         g_UIStatus->uiColors = new UIColors();
 
+        // load plugins
+        std::promise<int> promise;
+        addJsCommand(JsCommandType::File, "/Volumes/mac_extend/Project/sight/scripts/templateNodes.js", 0,false, &promise);
+        int t = promise.get_future().get();
+        dbg(t);
+
+        // init node editor.
         initNodeEditor();
+        changeGraph("./simple");
 
         // Main loop
         while (!glfwWindowShouldClose(window) && !uiStatus.closeWindow)
@@ -666,6 +689,40 @@ namespace sight {
         }
 
         return r;
+    }
+
+    void UICreateEntity::loadFrom(struct SightNode *node) {
+        if (!node) {
+            return;
+        }
+
+        sprintf(this->name, "%s", node->nodeName.c_str());
+
+        // For entity node, inputs is same as outputs, so just foreach one is fine.
+        for (const auto &item : node->inputPorts) {
+            addField();
+
+            auto p = lastField();
+            sprintf(p->name, "%s", item.portName.c_str());
+            sprintf(p->type, "%s", item.getType());
+            sprintf(p->defaultValue, "%s", item.getDefaultValue());
+        }
+
+    }
+
+    void UICreateEntity::reset() {
+        sprintf(this->name, "");
+        sprintf(this->templateAddress, "");
+
+        auto c = first;
+        while (c) {
+            auto t = c;
+            c = c->next;
+
+            free(t);
+        }
+
+        first = nullptr;
     }
 
 

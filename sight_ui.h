@@ -7,10 +7,9 @@
 #include "sight.h"
 #include "sight_language.h"
 
-// used for name string
-#define NAME_BUF_SIZE 256
-
 namespace sight {
+
+    struct SightNode;
 
     enum class UICommandType{
         UICommandHolder,
@@ -45,11 +44,12 @@ namespace sight {
      */
     struct UICreateEntity {
         char name[NAME_BUF_SIZE] = {0};
+        char templateAddress[NAME_BUF_SIZE] = {0};
         struct EntityField* first = nullptr;
 
+
+
         void addField();
-
-
 
         void resetFieldsStatus(bool editing = false, bool selected = false);
 
@@ -71,6 +71,10 @@ namespace sight {
          */
         void moveItemDown();
 
+        void loadFrom(struct SightNode* node);
+
+        void reset();
+
     private:
 
         /**
@@ -91,7 +95,7 @@ namespace sight {
 
     struct UIWindowStatus {
         bool nodeGraph = false;
-        bool createEntity = true;
+        bool createEntity = false;
         bool testWindow = false;
     };
 
@@ -167,6 +171,5 @@ namespace sight {
      * @return
      */
     bool LeftLabeledInput(const char* label, char* buf, size_t bufSize);
-
 
 }

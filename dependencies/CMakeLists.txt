@@ -66,13 +66,13 @@ target_link_libraries(
 
 
 # sight-util
-
 SET(
         SIGHT_UTIL_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_log.cpp
         ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_queue.cpp
         ${CMAKE_CURRENT_LIST_DIR}/sight-util/shared_queue.cpp
         ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_language.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_address.cpp
 )
 
 add_library(sight-util SHARED ${SIGHT_UTIL_SOURCES})
@@ -85,7 +85,9 @@ target_include_directories(
 
 # abseil
 #add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/abseil-cpp)
-#target_link_libraries(
-#        sight-util PUBLIC
-#        absl::base absl::strings absl::time
-#)
+find_package(absl REQUIRED)
+target_link_libraries(
+        sight-util PUBLIC
+        absl::base
+        absl::strings
+)

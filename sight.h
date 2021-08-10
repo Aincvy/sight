@@ -3,11 +3,9 @@
 //
 #pragma once
 
-#ifdef SIGHT_RELEASE
-#define dbg(...)
-#else
-#include "dbg.h"
-#endif
+#include <future>
+
+#include "sight_defines.h"
 
 namespace sight {
 
@@ -24,6 +22,9 @@ namespace sight {
         void* data = nullptr;
         // if data pointer to an array, this is the length.
         size_t dataLength = 0;
+
+        // for simple thread sync.
+        std::promise<int>* promise = nullptr;
 
         /**
          * dispose command

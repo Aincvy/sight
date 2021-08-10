@@ -4,6 +4,8 @@
 // Js engine and something else.
 #pragma once
 
+#include <future>
+
 #include "sight.h"
 #include "shared_queue.h"
 
@@ -39,7 +41,7 @@ namespace sight{
      * @param argStringNeedFree
      * @return
      */
-    int addJsCommand(JsCommandType type,const char *argString, int argStringLength = 0, bool argStringNeedFree = false);
+    int addJsCommand(JsCommandType type,const char *argString, int argStringLength = 0, bool argStringNeedFree = false, std::promise<int>* promise = nullptr);
 
     /**
      *

@@ -26,27 +26,6 @@ port2.portName = "output1";
 port2.setKind(NodePortType.Output);
 node1.addPort(port2);
 
-// sight.addNode(node1);
-
-// add template nodes
-addTemplateNode({
-    // meta info, start with __meta
-
-    __meta_name: "HttpGetReqNode",
-    // used for context menu
-    __meta_address: "HttpGetReqNode",
-
-    // other ideas
-    __meta_inputs: {
-
-    },
-    __meta_outputs: {
-        uid: 'Long',           //
-        sign: 'String',
-        timestamp: 'Long',
-    },
-
-});
-
+sight.addNode(node1);
 
 print("node init over!");
