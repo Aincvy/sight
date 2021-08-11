@@ -86,7 +86,7 @@ namespace sight {
             if (ImGui::BeginMenu("Graph")) {
                 if (ImGui::MenuItem("Entity")) {
                     // show entity graph
-                    changeGraph("./entity");
+                    changeGraph("./entity", true);
                 }
                 ImGui::EndMenu();
             }
@@ -416,6 +416,8 @@ namespace sight {
 
         // init node editor.
         initNodeEditor();
+        // load template nodes.
+        uv_run(uvLoop,UV_RUN_NOWAIT);
         changeGraph("./simple");
 
         // Main loop

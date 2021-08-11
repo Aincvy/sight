@@ -193,19 +193,19 @@ namespace sight {
     struct SightNodeTemplateAddress {
         // name or address
         std::string name;
-        //
-        SightNode* templateNode = nullptr;
+        // templateNode will call delete when current object deconstructing.
+        SightNode templateNode;
         //
         std::vector<SightNodeTemplateAddress> children;
 
         SightNodeTemplateAddress();
         ~SightNodeTemplateAddress();
-        SightNodeTemplateAddress(std::string name, SightNode* templateNode);
+        SightNodeTemplateAddress(std::string name, SightNode templateNode);
 
         /**
          * If has children, then show them, otherwise, show self.
          */
-        void showContextMenu(const ImVec2 &openPopupPosition) const;
+        void showContextMenu(const ImVec2 &openPopupPosition);
     };
 
     /**
@@ -213,6 +213,9 @@ namespace sight {
      */
     class SightNodeGraph{
     public:
+
+        //
+        std::atomic<int> nodeOrPortId = 10000;
 
         SightNodeGraph();
         ~SightNodeGraph();
@@ -280,7 +283,7 @@ namespace sight {
          * after call this function, this->filepath will be `path`.
          * @return
          */
-        int load(const char *path);
+        int load(const char *path, bool isLoadEntity = false);
 
         int save();
 
@@ -303,9 +306,6 @@ namespace sight {
 
         // save and read path.
         std::string filepath;
-
-        // templates, it loads from js file every times.
-        std::vector<SightNode> templateNodes;
 
         // real nodes
         std::vector<SightNode> nodes;
@@ -335,12 +335,14 @@ namespace sight {
     struct NodeEditorStatus {
 
         SightNodeGraph* graph = nullptr;
+        SightNodeGraph* entityGraph = nullptr;
         ed::EditorContext* context = nullptr;
         //
         char contextConfigFile[NAME_BUF_SIZE * 2] = {0};
         // node template
-
         std::vector<SightNodeTemplateAddress> templateAddressList;
+        // key: SightNode pointer, value: full template address.
+        std::map<SightNode*, std::string> templateReverseFindMap;
 
         NodeEditorStatus();
         ~NodeEditorStatus();
@@ -359,6 +361,14 @@ namespace sight {
          * @return
          */
         int loadOrCreateGraph(const char*path);
+
+        /**
+         *
+         * @param path
+         * @return
+         */
+        SightNode* findTemplateNode(const char* path);
+
     };
 
     /**
@@ -408,11 +418,11 @@ namespace sight {
      * change graph to another one.
      * @param pathWithoutExt   like './simple'  without dot.
      */
-    void changeGraph(const char* pathWithoutExt);
+    void changeGraph(const char* pathWithoutExt, bool loadEntityGraph = false);
 
 
     /**
-     *
+     * Generate node from entity.
      * @param createEntityData
      * @return
      */
@@ -425,5 +435,10 @@ namespace sight {
      */
     int addEntity(const UICreateEntity & createEntityData);
 
+    /**
+     * Load all entities.
+     * @return
+     */
+    int loadEntities();
 
 }

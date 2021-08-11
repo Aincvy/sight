@@ -11,6 +11,7 @@
 #include "sight.h"
 #include "sight_node_editor.h"
 #include "sight_address.h"
+#include "sight_util.h"
 
 #include "imgui.h"
 
@@ -30,8 +31,6 @@
 
 namespace ed = ax::NodeEditor;
 
-//
-static std::atomic<int> nodeOrPortId(10000);
 // node editor status
 static sight::NodeEditorStatus* g_NodeEditorStatus;
 
@@ -83,8 +82,7 @@ namespace sight {
                 ImGui::EndPopup();
             }
             if (ImGui::BeginPopup(BACKGROUND_CONTEXT_MENU)) {
-                // g_NodeEditorStatus->rootTemplateAddress.showContextMenu();
-                for (const auto &item : g_NodeEditorStatus->templateAddressList) {
+                for (auto &item : g_NodeEditorStatus->templateAddressList) {
                     item.showContextMenu(openPopupPosition);
                 }
 
@@ -312,6 +310,7 @@ namespace sight {
     int initNodeEditor() {
         g_NodeEditorStatus = new NodeEditorStatus();
 
+        loadEntities();
         return 0;
     }
 
@@ -345,7 +344,7 @@ namespace sight {
     }
 
     int nextNodeOrPortId() {
-        return nodeOrPortId++;
+        return CURRENT_GRAPH->nodeOrPortId++;
     }
 
     int addNode(SightNode *node) {
@@ -360,18 +359,19 @@ namespace sight {
     }
 
     void disposeGraph(bool context) {
-        if (CURRENT_GRAPH) {
+        // DO NOT delete entity graph.
+        if (CURRENT_GRAPH && CURRENT_GRAPH != g_NodeEditorStatus->entityGraph) {
             delete CURRENT_GRAPH;
             CURRENT_GRAPH = nullptr;
         }
 
         if (context && g_NodeEditorStatus->context) {
-            ed::DestroyEditor(g_NodeEditorStatus->context);       // todo need destroy.
+            ed::DestroyEditor(g_NodeEditorStatus->context);
             g_NodeEditorStatus->context = nullptr;
         }
     }
 
-    void changeGraph(const char *pathWithoutExt) {
+    void changeGraph(const char *pathWithoutExt, bool loadEntityGraph) {
         dbg(pathWithoutExt);
         disposeGraph();
 
@@ -381,10 +381,14 @@ namespace sight {
         config.SettingsFile = configFilePath;
         g_NodeEditorStatus->context = ed::CreateEditor(&config);
 
-        char buf[NAME_BUF_SIZE];
-        sprintf(buf, "%s.yaml", pathWithoutExt);
-        g_NodeEditorStatus->loadOrCreateGraph(buf);
-        dbg("change over!");
+        if (loadEntityGraph) {
+            g_NodeEditorStatus->graph = g_NodeEditorStatus->entityGraph;
+        } else {
+            char buf[NAME_BUF_SIZE];
+            sprintf(buf, "%s.yaml", pathWithoutExt);
+            g_NodeEditorStatus->loadOrCreateGraph(buf);
+            dbg("change over!");
+        }
     }
 
     void SightNodePort::setKind(int intKind) {
@@ -486,6 +490,8 @@ namespace sight {
             this->setFilePath(path);
         }
 
+        auto const& reverseFindMap = g_NodeEditorStatus->templateReverseFindMap;
+
         // ctor yaml object
         YAML::Emitter out;
         out << YAML::BeginMap;
@@ -498,7 +504,13 @@ namespace sight {
             out << YAML::BeginMap;
             out << YAML::Key << "name" << YAML::Value << node.nodeName;
             out << YAML::Key << "id" << YAML::Value << node.nodeId;
-            out << YAML::Key << "template" << YAML::Value << "not impl";
+
+            if (node.templateNode) {
+                auto address = reverseFindMap.find(node.templateNode);
+                if (address != reverseFindMap.end()) {
+                    out << YAML::Key << "template" << YAML::Value << address->second.c_str();
+                }
+            }
             out << YAML::Key << "fields" << YAML::Value << "not impl";
 
             // input and output
@@ -538,7 +550,7 @@ namespace sight {
         out << YAML::EndMap;
 
         // other info
-        out << YAML::Key << "nodeOrPortId" << YAML::Value << nodeOrPortId.load();
+        out << YAML::Key << "nodeOrPortId" << YAML::Value << this->nodeOrPortId.load();
 
         out << YAML::EndMap;       // end of 1st begin map
 
@@ -549,7 +561,7 @@ namespace sight {
         return 0;
     }
 
-    int SightNodeGraph::load(const char *path) {
+    int SightNodeGraph::load(const char *path, bool isLoadEntity) {
         this->filepath = path;
 
         std::ifstream fin(path);
@@ -557,6 +569,8 @@ namespace sight {
             return -1;
         }
 
+        // if isLocal is true, then do not change global vars.
+        bool isLocal = this != CURRENT_GRAPH;
         try {
             auto root = YAML::Load(fin);
 
@@ -568,7 +582,6 @@ namespace sight {
                 SightNode sightNode;
                 sightNode.nodeId = node["id"].as<int>();
                 sightNode.nodeName = node["name"].as<std::string>();
-                auto templateNodeAddress = node["template"].as<std::string>();
 
                 auto inputs = node["inputs"];
                 for (const auto &input : inputs) {
@@ -596,12 +609,28 @@ namespace sight {
                                                     });
                 }
 
+                auto templateNodeAddress = node["template"].as<std::string>("");
+                if (!templateNodeAddress.empty()) {
+                    if (isLoadEntity) {
+                        // entity should be into template
+                        SightNodeTemplateAddress address = {
+                                templateNodeAddress,
+                                sightNode
+                        };
+                        addTemplateNode(address);
+                    }
+
+                    sightNode.templateNode = g_NodeEditorStatus->findTemplateNode(templateNodeAddress.c_str());
+                    dbg(sightNode.templateNode);
+                } else {
+                    dbg(sightNode.nodeName, "entity do not have templateNodeAddress, jump it.");
+                }
+
                 addNode(sightNode);
             }
 
             // connections
             auto connectionRoot = root["connections"];
-            dbg(connectionRoot.size());
             for (const auto &item : connectionRoot) {
                 auto connectionId = item.first.as<int>();
                 auto left = item.second["left"].as<int>();
@@ -612,12 +641,11 @@ namespace sight {
 
             // other info
             auto temp = root["nodeOrPortId"];
+            auto tempNodeOrPortId = 20000;
             if (temp.IsDefined() && !temp.IsNull()) {
-                dbg(root["nodeOrPortId"].as<int>());
-                nodeOrPortId.store(temp.as<int>(20000));
-            } else {
-                nodeOrPortId.store(20000);
+                tempNodeOrPortId = temp.as<int>(20000);
             }
+            this->nodeOrPortId = tempNodeOrPortId;
 
             return 0;
         }catch (const YAML::BadConversion & e){
@@ -808,11 +836,43 @@ namespace sight {
         graph = new SightNodeGraph();
         if (graph->load(path) != 0) {
             // create one.
-            nodeOrPortId.store(10000);
             graph->save();
         }
 
         return 0;
+    }
+
+    SightNode* NodeEditorStatus::findTemplateNode(const char* path){
+        auto address = resolveAddress(path);
+        auto pointer = address;
+        // compare and put.
+        auto* list = &g_NodeEditorStatus->templateAddressList;
+
+        bool findElement = false;
+        SightNode* result = nullptr;
+        while (pointer) {
+            for(auto iter = list->begin(); iter != list->end(); iter++){
+                if (iter->name == pointer->part) {
+                    if (!pointer->next) {
+                        // the node
+                        result = &iter->templateNode;
+                    }
+
+                    findElement = true;
+                    list = & iter->children;
+                    break;
+                }
+            }
+            if (!findElement || result) {
+                break;
+            }
+
+            pointer = pointer->next;
+        }
+
+
+        freeAddress(address);
+        return result;
     }
 
     NodeEditorStatus::NodeEditorStatus() {
@@ -847,18 +907,18 @@ namespace sight {
     }
 
 
-    void SightNodeTemplateAddress::showContextMenu(const ImVec2 &openPopupPosition) const {
+    void SightNodeTemplateAddress::showContextMenu(const ImVec2 &openPopupPosition) {
         if (children.empty()) {
             if (ImGui::MenuItem(name.c_str())) {
                 //
                 // dbg("it will create a new node.", this->name);
-                auto node = this->templateNode->instantiate();
+                auto node = this->templateNode.instantiate();
                 addNode(node);
                 ed::SetNodePosition(node->nodeId, openPopupPosition);
             }
         } else {
             if (ImGui::BeginMenu(name.c_str())) {
-                for (const auto &item : children) {
+                for (auto &item : children) {
                     item.showContextMenu(openPopupPosition);
                 }
 
@@ -872,8 +932,8 @@ namespace sight {
     }
 
 
-    SightNodeTemplateAddress::SightNodeTemplateAddress(std::string name, SightNode* templateNode)
-        : name(std::move(name)), templateNode(templateNode)
+    SightNodeTemplateAddress::SightNodeTemplateAddress(std::string name, SightNode  templateNode)
+        : name(std::move(name)), templateNode(std::move(templateNode))
     {
 
     }
@@ -886,7 +946,6 @@ namespace sight {
     }
 
     int addTemplateNode(const SightNodeTemplateAddress &templateAddress) {
-        // todo path
         if (templateAddress.name.empty()) {
             return -1;
         }
@@ -913,14 +972,15 @@ namespace sight {
             }
 
             if (!findElement) {
-                list->push_back(SightNodeTemplateAddress(pointer->part, nullptr));
+                list->push_back(SightNodeTemplateAddress(pointer->part, {}));
                 list = & list->back().children;
             }
 
             pointer = pointer->next;
         }
 
-        // list->push_back(templateAddress);
+        auto nodePointer = & list->back().templateNode;
+        g_NodeEditorStatus->templateReverseFindMap[nodePointer] = templateAddress.name;
         freeAddress(address);
         return 0;
     }
@@ -930,14 +990,17 @@ namespace sight {
             node = new SightNode();
         }
 
+        auto & id = g_NodeEditorStatus->entityGraph->nodeOrPortId;
+
         node->nodeName = createEntityData.name;
-        node->nodeId = nextNodeOrPortId();         // All node and port's ids need to be initialized.
+        node->nodeId = id++;         // All node and port's ids need to be initialized.
 
         auto c = createEntityData.first;
         while (c) {
+            // input
             SightNodePort port = {
                     c->name,
-                    nextNodeOrPortId(),
+                    id++,
                     NodePortType::Input,
                     c->type,
                     c->defaultValue,
@@ -945,7 +1008,8 @@ namespace sight {
             };
             node->inputPorts.push_back(port);
 
-            port.id = nextNodeOrPortId();
+            // output
+            port.id = id++;
             node->outputPorts.push_back(port);
 
             c = c->next;
@@ -955,16 +1019,47 @@ namespace sight {
     }
 
     int addEntity(const UICreateEntity &createEntityData) {
-        // convert to SightNode, and add it to entity graph.
-        SightNodeGraph graph;
-        graph.load("./entity.yaml");
-
         SightNode node;
         generateNode(createEntityData, &node);
 
-        graph.addNode(node);
-        graph.save();
+        // add to templateNode
+        SightNodeTemplateAddress templateAddress;
+        std::string address = createEntityData.templateAddress;
+        const char* prefix = "entity/";
+        // check start with entity
+        if (address.find(prefix) != 0) {
+            address = prefix + address;
+        }
+        
+        // check end with node name.
+        if (!endsWith(address, createEntityData.name)) {
+            if (!endsWith(address, "/")) {
+                address += "/";
+            }
+            address += createEntityData.name;
+        }
+        templateAddress.name = address;
+        templateAddress.templateNode = node;
+        addTemplateNode(templateAddress);
+
+        // convert to SightNode, and add it to entity graph.
+        auto graph = g_NodeEditorStatus->entityGraph;
+        // let node's template be itself.
+        node.templateNode = g_NodeEditorStatus->findTemplateNode(address.c_str());
+        dbg(node.nodeName, node.templateNode);
+        graph->addNode(node);
+        graph->save();
         return 0;
+    }
+
+
+    int loadEntities() {
+        if (g_NodeEditorStatus->entityGraph) {
+            return 1;
+        }
+
+        auto graph = g_NodeEditorStatus->entityGraph = new SightNodeGraph();
+        return graph->load("./entity.yaml", true);
     }
 
 }

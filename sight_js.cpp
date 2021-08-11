@@ -2,13 +2,13 @@
 // Created by Aincvy(aincvy@gmail.com) on 2021/7/20.
 //
 #include <stdio.h>
-#include <thread>
 
 #include "sight_js.h"
 #include "sight_node_editor.h"
 #include "shared_queue.h"
 #include "sight_log.h"
 #include "sight_ui.h"
+#include "sight_util.h"
 
 #include "v8.h"
 #include "libplatform/libplatform.h"
@@ -126,7 +126,8 @@ namespace sight {
             auto context = isolate->GetCurrentContext();
 
             //
-            auto templateNode = new SightNode();
+            SightNode sightNode;
+            auto templateNode = &sightNode;
             std::string address;
 
             Local<Object> object = arg1.As<Object>();
@@ -191,11 +192,18 @@ namespace sight {
                 }
             }
 
-            //
-            g_TemplateNodeCache.push_back({
+            // check name
+            if (!endsWith(address, templateNode->nodeName)) {
+                if (!endsWith(address, "/")) {
+                    address += "/";
+                }
+                address += templateNode->nodeName;
+            }
+
+            g_TemplateNodeCache.emplace_back(
                 address,
-                templateNode,
-            });
+                sightNode
+            );
         }
 
     }
