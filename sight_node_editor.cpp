@@ -116,7 +116,11 @@ namespace sight {
             const auto c = rect_center;
             auto triangleStart = rect_center_x + 0.32f * rect_w;
 
-            drawList->AddCircleFilled(c, 0.5f * rect_w / 2.0f, color, 12 + extra_segments);
+            if (isConnected) {
+                drawList->AddCircleFilled(c, 0.5f * rect_w / 2.0f, color, 12 + extra_segments);
+            } else {
+                drawList->AddCircle(c, 0.5f * rect_w / 2.0f, color, 12 + extra_segments,1.35f);
+            }
 
             const auto triangleTip = triangleStart + rect_w * (0.45f - 0.32f);
 
@@ -153,7 +157,7 @@ namespace sight {
                 ed::BeginPin(item.id, ed::PinKind::Input);
                 ed::PinPivotAlignment(ImVec2(0, 0.5f));
                 ed::PinPivotSize(ImVec2(0, 0));
-                showNodePortIcon(color);
+                showNodePortIcon(color, item.isConnect());
                 ImGui::SameLine();
                 ImGui::Text("%s", item.portName.c_str());
                 ed::EndPin();
@@ -166,7 +170,7 @@ namespace sight {
                 ed::PinPivotSize(ImVec2(0, 0));
                 ImGui::Text("%s", item.portName.c_str());
                 ImGui::SameLine();
-                showNodePortIcon(color);
+                showNodePortIcon(color, item.isConnect());
                 ed::EndPin();
             }
 
@@ -876,7 +880,6 @@ namespace sight {
     }
 
     NodeEditorStatus::NodeEditorStatus() {
-        // rootTemplateAddress.name = "root";
 
     }
 

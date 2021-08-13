@@ -2,6 +2,7 @@
 #include "sight_node_editor.h"
 #include "sight.h"
 #include "sight_js.h"
+#include "sight_js_parser.h"
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -106,12 +107,14 @@ namespace sight {
 
         void showMainCustomMenu(){
             if (ImGui::MenuItem("Trigger")) {
-                addJsCommand(JsCommandType::File, "/Volumes/mac_extend/Project/sight/scripts/nodes.js");
+                // addJsCommand(JsCommandType::File, "/Volumes/mac_extend/Project/sight/scripts/nodes.js");
+//                testParser();
+                parseSource("a = 99 + 102;");
             }
             if (ImGui::MenuItem("Crash")) {
                 // produce a crash for test.
-//                int *p = NULL;
-//                *p = 1;
+                int *p = NULL;
+                *p = 1;
             }
         }
 
@@ -420,6 +423,9 @@ namespace sight {
         uv_run(uvLoop,UV_RUN_NOWAIT);
         changeGraph("./simple");
 
+        // todo  initParser should be in js thread.
+        initParser();
+
         // Main loop
         while (!glfwWindowShouldClose(window) && !uiStatus.closeWindow)
         {
@@ -468,6 +474,9 @@ namespace sight {
         free(uvLoop);
         uiStatus.uvLoop = nullptr;
         exitSight();
+
+        // todo  freeParser should be in js thread.
+        freeParser();
 
         return 0;
     }

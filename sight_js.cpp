@@ -422,21 +422,24 @@ namespace sight {
         }
 
         break_commands_loop:
-        destroyJsEngine();
+        return;
     }
-
 
     void jsThreadRun(const char *exeName) {
         initJsEngine(exeName);
 
-        auto isolate = g_V8Runtime->isolate;
-        v8::HandleScope handle_scope(isolate);
-        v8::Local<v8::Context> context = v8::Context::New(isolate);
-        //         Enter the context
-        v8::Context::Scope context_scope(context);
-        initJsBindings(context);
+        {
+            auto isolate = g_V8Runtime->isolate;
+            v8::HandleScope handle_scope(isolate);
+            v8::Local<v8::Context> context = v8::Context::New(isolate);
+            //         Enter the context
+            v8::Context::Scope context_scope(context);
+            initJsBindings(context);
 
-        runJsCommands();
+            runJsCommands();
+        }
+
+        destroyJsEngine();
     }
 
     int addJsCommand(JsCommandType type, int argInt) {

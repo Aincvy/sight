@@ -13,7 +13,7 @@ namespace sight {
     void exitSight(int v) {
 
         addJsCommand(JsCommandType::Destroy);
-        exit(v);
+        // exit(v);
     }
 
     void *copyObject(void *from, size_t size) {

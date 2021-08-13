@@ -48,3 +48,10 @@ addTemplateNode({
     },
 
 });
+
+function addStmt(string){
+    // xxxx
+}
+
+addStmt("if(input1) { output1(); } else output2();");
+
