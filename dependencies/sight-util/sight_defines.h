@@ -15,6 +15,10 @@
 
 #define LITTLE_NAME_BUF_SIZE 64
 
+#define LITTLE_ARRAY_SIZE 128
+#define MEDIUM_ARRAY_SIZE 486
+#define BIG_ARRAY_SIZE 1024
+
 namespace sight {
 
     /**

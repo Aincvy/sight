@@ -9,6 +9,8 @@
 #include "sight_js.h"
 #include "sight_node_editor.h"
 
+#define BACKWARD_HAS_BFD 1
+#define BACKWARD_HAS_DW 1
 #include "backward.hpp"
 
 using namespace sight;

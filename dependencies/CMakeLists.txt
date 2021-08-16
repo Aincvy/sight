@@ -74,6 +74,7 @@ SET(
         ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_language.cpp
         ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_address.cpp
         ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_util.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_memory.cpp
 )
 
 add_library(sight-util SHARED ${SIGHT_UTIL_SOURCES})
@@ -84,11 +85,22 @@ target_include_directories(
         ${CMAKE_CURRENT_LIST_DIR}/dbg-macro
 )
 
+# dbg
+IF (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message(STATUS "in debug mode, add defines")
+    target_compile_definitions(sight-util PUBLIC DBG_MACRO_NO_WARNING)
+ELSE()
+    message(STATUS "in release mode, add defines")
+    target_compile_definitions(sight-util PUBLIC SIGHT_RELEASE)
+ENDIF(CMAKE_BUILD_TYPE STREQUAL "Debug")
+
 # abseil
-#add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/abseil-cpp)
 find_package(absl REQUIRED)
 target_link_libraries(
         sight-util PUBLIC
         absl::base
         absl::strings
+        absl::hash
+        absl::flat_hash_map
+
 )
