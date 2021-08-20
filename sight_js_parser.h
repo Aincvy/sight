@@ -34,7 +34,7 @@ namespace sight {
         int fromNode = 0;
 
         GeneratedElement() = default;
-        GeneratedElement(int fromNode);
+        explicit GeneratedElement(int fromNode);
         virtual ~GeneratedElement() = default;
 
         virtual GeneratedElementType getElementType() const = 0;
@@ -185,12 +185,14 @@ namespace sight {
     };
 
     struct BinaryExpr : GeneratedElement {
-        Token left;
-        Token symbol;
-        Token right;
+        GeneratedElement* left;
+        GeneratedElement* symbol;
+        GeneratedElement* right;
 
         BinaryExpr() = default;
-        BinaryExpr(Token left, Token symbol, Token right);
+
+        BinaryExpr(GeneratedElement *left, GeneratedElement *symbol, GeneratedElement *right);
+
         ~BinaryExpr() = default;
         GeneratedElementType getElementType() const override;
     };
@@ -221,6 +223,7 @@ namespace sight {
         FunctionDeclaration* currentFunction = nullptr;
         GeneratedStatement* currentStatement = nullptr;
         GeneratedClass* currentClass = nullptr;
+        AssignValueStmt* assignValueStmt = nullptr;
 
         const static Token invalidToken;
 
@@ -261,6 +264,7 @@ namespace sight {
         SightArray<FunctionDeclaration> functionArray;
         SightArray<BinaryExpr> binaryExprArray;
         SightArray<IntLiteral> intLiteralArray;
+        SightArray<AssignValueStmt> assignValueStmtArray;
     };
 
 
@@ -275,19 +279,24 @@ namespace sight {
         /**
          * Visit a element.
          * @param element
-         * @return
+         * @return true goto next, false break.
          */
         virtual bool visit(GeneratedElement *element);
+
+        virtual bool visit(AssignValueStmt* assignValueStmt);
+
+        virtual bool visit(BinaryExpr* binaryExpr);
+
+        virtual bool visit(IntLiteral* intLiteral);
+
+        virtual bool visit(Token* token);
+
+
 
     private:
         GeneratedCode* generatedCode = nullptr;
     };
 
-    /**
-     * test tree-sitter functions
-     * @return
-     */
-    int testParser();
 
     int initParser();
 

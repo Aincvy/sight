@@ -32,34 +32,80 @@ namespace sight {
          */
         absl::flat_hash_map<std::string,std::function<GeneratedElement*(GeneratedCode &,TSNode &)>> nodeHandlerMap;
 
+        /**
+         * Generate this node to GeneratedElement
+         * @param generatedCode
+         * @param node
+         * @return
+         */
         GeneratedElement* generate(GeneratedCode & generatedCode, TSNode & node){
+            if (ts_node_is_null(node)) {
+                return nullptr;
+            }
+
             auto nodeType = ts_node_type(node);
-            dbg(nodeType);
             auto iter = nodeHandlerMap.find(nodeType);
             if (iter != nodeHandlerMap.end()) {
                 return iter->second(generatedCode, node);
+            }
+            dbg(std::string("do not handle ") + nodeType);
+
+            return nullptr;
+        }
+
+        /**
+         * Generate this node's children nodes to GeneratedElement. Do not generate this node.
+         * @param generatedCode
+         * @param node
+         * @return always return nullptr or block ?
+         */
+        GeneratedElement* generateChildrenNode(GeneratedCode & generatedCode, TSNode & node){
+            if (ts_node_is_null(node)) {
+                return nullptr;
+            }
+
+            auto cursor = ts_tree_cursor_new(node);
+            if (!ts_tree_cursor_goto_first_child(&cursor)) {
+                return nullptr;
+            }
+            auto childNode = ts_tree_cursor_current_node(&cursor);
+            generate(generatedCode, childNode);
+
+            while (ts_tree_cursor_goto_next_sibling(&cursor)) {
+                childNode = ts_tree_cursor_current_node(&cursor);
+                generate(generatedCode, childNode);
             }
 
             return nullptr;
         }
 
-        void parseNode(GeneratedCode & generatedCode, TSNode & node){
+        GeneratedElement *generateEmpty(GeneratedCode & generatedCode, TSNode & node){
+            return nullptr;
+        }
+
+
+        /**
+         * Use `dbg()` to display hierarchy.
+         * @param generatedCode
+         * @param node
+         */
+        void showNodeHierarchy(GeneratedCode & generatedCode, TSNode & node){
             if (ts_node_is_null(node)) {
                 return;
             }
 
-
-            generate(generatedCode, node);
+            // generate(generatedCode, node);
+            dbg(ts_node_type(node));
 
             auto childCount = ts_node_child_count(node);
             for (int i = 0; i < childCount; ++i) {
                 TSNode temp = ts_node_named_child(node, i);
-                parseNode( generatedCode, temp);
+                showNodeHierarchy(generatedCode, temp);
             }
         }
 
         void initCaseMap(){
-            nodeHandlerMap["number"] = [](GeneratedCode &generatedCode,TSNode &node){
+            nodeHandlerMap["number"] = [](GeneratedCode& generatedCode,TSNode& node){
                 auto token = generatedCode.getToken(&node);
                 if (token == GeneratedCode::invalidToken) {
                     // may need to do something.
@@ -82,12 +128,15 @@ namespace sight {
 
                 dbg(ts_node_child_count(node));
                 // 3 children.
-                std::any a = ts_node_named_child(node, 0);
-                std::any b = ts_node_named_child(node, 1);
-                std::any c = ts_node_named_child(node, 2);
-                auto left = generatedCode.getToken(a);
-                auto symbol = generatedCode.getToken(b);
-                auto right = generatedCode.getToken(c);
+                const char* $left = "left";
+                const char* $operator = "operator";
+                const char* $right = "right";
+                auto a = ts_node_child_by_field_name(node, $left, strlen($left));
+                auto b = ts_node_child_by_field_name(node, $operator, strlen($operator));
+                auto c = ts_node_child_by_field_name(node, $right, strlen($right));
+                auto left = generate(generatedCode, a);
+                auto symbol = generatedCode.addElement(generatedCode.getToken(&b));
+                auto right = generate(generatedCode, c);
 
                 return generatedCode.addElement(BinaryExpr(left, symbol, right));
             };
@@ -96,73 +145,19 @@ namespace sight {
                 dbg(ts_node_child_count(node));
                 auto a = ts_node_named_child(node, 0);
                 auto b = ts_node_named_child(node, 1);
+                dbg("assignment_expression");
 
                 auto left = generate(generatedCode, a);
                 auto right = generate(generatedCode, b);
                 return generatedCode.addElement(AssignValueStmt(left, right));
             };
 
+            nodeHandlerMap["program"] = generateChildrenNode;
+            nodeHandlerMap["expression_statement"] = generateChildrenNode;
+            nodeHandlerMap[";"] = generateEmpty;
+
         }
 
-    }
-
-    int testParser() {
-
-        // Create a parser.
-        TSParser *parser = ts_parser_new();
-
-        // Set the parser's language (JSON in this case).
-        ts_parser_set_language(parser, tree_sitter_javascript());
-
-        // Build a syntax tree based on source code stored in a string.
-        const char *source_code = "function abc(a,b) { console.log('123'); let c = a + b; }";
-        TSTree *tree = ts_parser_parse_string(
-                parser,
-                NULL,
-                source_code,
-                strlen(source_code)
-        );
-
-        // Get the root node of the syntax tree.
-        TSNode root_node = ts_tree_root_node(tree);
-        int count = ts_node_child_count(root_node);
-        printf("child count: %d\n", count);
-
-        // Get some child nodes.
-        TSNode array_node = ts_node_named_child(root_node, 0);
-
-        printf("number_node_type: %s\n", ts_node_type(array_node));
-
-        // Print the syntax tree as an S-expression.
-        char *string = ts_node_string(root_node);
-        printf("Syntax tree: %s\n", string);
-
-        // Free all of the heap-allocated memory.
-        free(string);
-        ts_tree_delete(tree);
-
-        const char *source_code2 = "a = 1 + 1;";
-        tree = ts_parser_parse_string(
-                parser,
-                NULL,
-                source_code2,
-                strlen(source_code2)
-
-        );
-
-        TSNode root_node2 = ts_tree_root_node(tree);
-        count = ts_node_child_count(root_node2);
-        printf("child count: %d\n", count);
-
-        // Print the syntax tree as an S-expression.
-        string = ts_node_string(root_node2);
-        printf("Syntax tree: %s\n", string);
-
-        free(string);
-        ts_tree_delete(tree);
-        ts_parser_delete(parser);
-
-        return 0;
     }
 
     int initParser() {
@@ -196,9 +191,17 @@ namespace sight {
         GeneratedCode generatedCode(source);
         TSNode rootNode = ts_tree_root_node(tree);
 
-        parseNode(generatedCode, rootNode);
+        showNodeHierarchy(generatedCode, rootNode);
+        generate(generatedCode, rootNode);
+
+        if (generatedCode.assignValueStmt) {
+            dbg("start visitor");
+            GeneratedCodeVisitor visitor(&generatedCode);
+            visitor.visit(generatedCode.assignValueStmt);
+        }
 
         ts_tree_delete(tree);
+        dbg("end of function parseSource");
     }
 
     Token::Token(const char *string) {
@@ -318,6 +321,13 @@ namespace sight {
                 result = binaryExprArray.add(b);
                 break;
             }
+            case GeneratedElementType::AssignValueStmt:
+            {
+                auto const & e = (AssignValueStmt const &)element;
+                assignValueStmt = assignValueStmtArray.add(e);
+                result = assignValueStmt;
+                break;
+            }
         }
 
         return result;
@@ -325,6 +335,9 @@ namespace sight {
 
     Token GeneratedCode::getToken(std::any &tsNode) const {
         auto node = std::any_cast<TSNode&>(tsNode);
+        if (ts_node_is_null(node)) {
+            return invalidToken;
+        }
         return Token(this->source, ts_node_start_byte(node), ts_node_end_byte(node));
     }
 
@@ -382,8 +395,10 @@ namespace sight {
         return GeneratedElementType::BinaryExpr;
     }
 
-    BinaryExpr::BinaryExpr(Token left, Token symbol, Token right) : left(std::move(left)), symbol(std::move(symbol)),
-                                                                                         right(std::move(right)) {}
+    BinaryExpr::BinaryExpr(GeneratedElement *left, GeneratedElement *symbol, GeneratedElement *right) : left(left),
+                                                                                                        symbol(symbol),
+                                                                                                        right(right) {}
+
 
     bool GeneratedCodeVisitor::visit(GeneratedElement *element) {
         if (element == nullptr) {
@@ -391,11 +406,62 @@ namespace sight {
         }
 
         dbg(element->getElementType());
-        return true;
+
+        switch (element->getElementType()) {
+            case GeneratedElementType::Token:
+                return visit((Token*) element);
+            case GeneratedElementType::IntLiteral:
+                return visit((IntLiteral*) element);
+            case GeneratedElementType::StringLiteral:
+                break;
+            case GeneratedElementType::BoolLiteral:
+                break;
+            case GeneratedElementType::CharLiteral:
+                break;
+            case GeneratedElementType::GeneratedBlock:
+                break;
+            case GeneratedElementType::FunctionDeclaration:
+                break;
+            case GeneratedElementType::FieldOrParameter:
+                break;
+            case GeneratedElementType::BinaryExpr:
+                return visit((BinaryExpr*) element);
+            case GeneratedElementType::AssignValueStmt:
+                return visit((AssignValueStmt*) element);
+        }
+
+        return false;
     }
 
     GeneratedCodeVisitor::GeneratedCodeVisitor(GeneratedCode* generatedCode) : generatedCode(generatedCode) {
 
+    }
+
+    bool GeneratedCodeVisitor::visit(AssignValueStmt *assignValueStmt) {
+        dbg("AssignValueStmt");
+
+        visit(assignValueStmt->left);
+        visit(assignValueStmt->right);
+        return false;
+    }
+
+    bool GeneratedCodeVisitor::visit(BinaryExpr *binaryExpr) {
+        dbg("BinaryExpr");
+
+        visit(binaryExpr->left);
+        visit(binaryExpr->symbol);
+        visit(binaryExpr->right);
+        return true;
+    }
+
+    bool GeneratedCodeVisitor::visit(IntLiteral *intLiteral) {
+        dbg("IntLiteral", intLiteral->value);
+        return true;
+    }
+
+    bool GeneratedCodeVisitor::visit(Token *token) {
+        dbg("Token", token->word);
+        return true;
     }
 
 

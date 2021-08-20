@@ -199,11 +199,13 @@ namespace sight {
                 }
                 address += templateNode->nodeName;
             }
-
+            
             g_TemplateNodeCache.emplace_back(
                 address,
                 sightNode
             );
+
+            args.GetReturnValue().Set(0);
         }
 
     }

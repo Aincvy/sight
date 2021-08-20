@@ -88,7 +88,7 @@ target_include_directories(
 # dbg
 IF (CMAKE_BUILD_TYPE STREQUAL "Debug")
     message(STATUS "in debug mode, add defines")
-    target_compile_definitions(sight-util PUBLIC DBG_MACRO_NO_WARNING)
+    target_compile_definitions(sight-util PUBLIC SIGHT_DEBUG)
 ELSE()
     message(STATUS "in release mode, add defines")
     target_compile_definitions(sight-util PUBLIC SIGHT_RELEASE)
@@ -102,5 +102,6 @@ target_link_libraries(
         absl::strings
         absl::hash
         absl::flat_hash_map
+        absl::flat_hash_set
 
 )

@@ -675,22 +675,41 @@ namespace sight {
     }
 
     void SightNodeGraph::addNode(const SightNode &node) {
-        this->nodes.push_back(node);
+//        this->nodes.push_back(node);
+//
+//        // do ids.
+//        auto & ref = this->nodes.back();
+//        idMap[node.nodeId] = {
+//                SightAnyThingType::Node,
+//                &ref
+//        };
+//
+//        for (auto &item : ref.inputPorts) {
+//            idMap[item.id] = {
+//                    SightAnyThingType::Port,
+//                    &item
+//            };
+//        }
+//        for (auto &item : ref.outputPorts) {
+//            idMap[item.id] =  {
+//                    SightAnyThingType::Port,
+//                    &item
+//            };
+//        }
 
-        // do ids.
-        auto & ref = this->nodes.back();
+        auto p = this->nodes.add(node);
         idMap[node.nodeId] = {
                 SightAnyThingType::Node,
-                &ref
+                p
         };
 
-        for (auto &item : ref.inputPorts) {
+        for (auto &item : p->inputPorts) {
             idMap[item.id] = {
                     SightAnyThingType::Port,
                     &item
             };
         }
-        for (auto &item : ref.outputPorts) {
+        for (auto &item : p->outputPorts) {
             idMap[item.id] =  {
                     SightAnyThingType::Port,
                     &item
@@ -745,24 +764,31 @@ namespace sight {
     }
 
     void SightNodeGraph::addConnection(const SightNodeConnection &connection) {
-        this->connections.push_back(connection);
+//        this->connections.push_back(connection);
+//
+//        // do id
+//        auto & ref = this->connections.back();
+//        idMap[connection.connectionId] = {
+//                SightAnyThingType::Connection,
+//                &ref,
+//        };
+//
+//        // refs
+//        ref.addRefs();
 
-        // do id
-        auto & ref = this->connections.back();
+        auto p = this->connections.add(connection);
         idMap[connection.connectionId] = {
                 SightAnyThingType::Connection,
-                &ref,
+                p,
         };
-
-        // refs
-        ref.addRefs();
+        p->addRefs();
     }
 
-    const std::vector<SightNode> &SightNodeGraph::getNodes() const {
+    const SightArray <SightNode> & SightNodeGraph::getNodes() const {
         return this->nodes;
     }
 
-    const std::vector<SightNodeConnection> &SightNodeGraph::getConnections() const {
+    const SightArray <SightNodeConnection> & SightNodeGraph::getConnections() const {
         return this->connections;
     }
 
@@ -958,8 +984,8 @@ namespace sight {
         // compare and put.
         auto* list = &g_NodeEditorStatus->templateAddressList;
 
-        bool findElement = false;
         while (pointer) {
+            bool findElement = false;
             if (!pointer->next) {
                 // no next, this is the last element, it should be the node's name.
                 list->push_back(SightNodeTemplateAddress(pointer->part, templateAddress.templateNode));

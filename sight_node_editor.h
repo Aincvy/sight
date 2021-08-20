@@ -11,6 +11,7 @@
 #include "imgui_node_editor.h"
 
 #include "sight_ui.h"
+#include "sight_memory.h"
 
 namespace ed = ax::NodeEditor;
 
@@ -299,8 +300,8 @@ namespace sight {
         void setFilePath(const char* path);
         const char* getFilePath() const;
 
-        const std::vector<SightNode> & getNodes() const;
-        const std::vector<SightNodeConnection> & getConnections() const;
+        const SightArray <SightNode> & getNodes() const;
+        const SightArray <SightNodeConnection> & getConnections() const;
 
     private:
 
@@ -308,9 +309,11 @@ namespace sight {
         std::string filepath;
 
         // real nodes
-        std::vector<SightNode> nodes;
+//        std::vector<SightNode> nodes;
+        SightArray<SightNode> nodes;
         // real connections.
-        std::vector<SightNodeConnection> connections;
+//        std::vector<SightNodeConnection> connections;
+        SightArray<SightNodeConnection> connections{BIG_ARRAY_SIZE};
         // key: node/port/connection id, value: the pointer of the instance.
         std::map<int, SightAnyThingWrapper> idMap;
         // for ...

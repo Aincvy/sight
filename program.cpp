@@ -9,9 +9,11 @@
 #include "sight_js.h"
 #include "sight_node_editor.h"
 
+#ifdef SIGHT_DEBUG
 #define BACKWARD_HAS_BFD 1
 #define BACKWARD_HAS_DW 1
 #include "backward.hpp"
+#endif
 
 using namespace sight;
 
@@ -33,7 +35,10 @@ void handler(int sig) {
 int main(int argc, char* argv[]){
     // signal(SIGSEGV, handler);
     dbg("program start!");
+
+#ifdef SIGHT_DEBUG
     backward::SignalHandling sh;
+#endif
 
     dbg("start js thread!");
     std::thread jsThread(sight::jsThreadRun, argv[0]);
