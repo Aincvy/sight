@@ -100,7 +100,12 @@ namespace sight {
                     // here it is.
                     elementIndex = p - temp;
                     arrayIndex = i;
-                    notUsed.insert(arrayIndex * capacityPerArray + elementIndex);
+                    int tempIndex = arrayIndex * capacityPerArray + elementIndex;
+                    if (tempIndex == current - 1) {
+                        current--;
+                    } else {
+                        notUsed.insert(tempIndex);
+                    }
 
                     // reset element
                     resetElement(p);
@@ -119,6 +124,7 @@ namespace sight {
                 }
             }
             current = 0;
+            notUsed.clear();
         }
 
 
@@ -158,7 +164,7 @@ namespace sight {
         };
 
         SightArrayConstIterator begin() const{
-            return SightArrayConstIterator(this, 0);
+            return SightArrayConstIterator(this, findFirstValidIndex());
         }
 
         SightArrayConstIterator end() const{
@@ -166,7 +172,7 @@ namespace sight {
         }
 
         SightArrayIterator begin(){
-            return SightArrayIterator(this, 0);
+            return SightArrayIterator(this, findFirstValidIndex());
         }
 
         SightArrayIterator end(){
@@ -250,6 +256,14 @@ namespace sight {
             }
 
             *p = {};
+        }
+
+        [[nodiscard]] size_t findFirstValidIndex() const{
+            int i = 0;
+            while (notUsed.template contains(i)) {
+                i++;
+            }
+            return i;
         }
 
     };

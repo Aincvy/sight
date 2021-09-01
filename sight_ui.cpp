@@ -10,9 +10,6 @@
 #include <stdio.h>
 #include <future>
 
-
-#include <GL/gl3w.h>
-
 #include <GLFW/glfw3.h>
 
 #define COMMON_LANGUAGE_KEYS g_UIStatus->languageKeys->commonKeys
@@ -368,13 +365,6 @@ namespace sight {
         glfwMakeContextCurrent(window);
         glfwSwapInterval(1); // Enable vsync
 
-        bool err = gl3wInit() != 0;
-        if (err)
-        {
-            fprintf(stderr, "Failed to initialize OpenGL loader!\n");
-            return 1;
-        }
-
         // Setup Dear ImGui context
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
@@ -715,7 +705,7 @@ namespace sight {
 
             auto p = lastField();
             sprintf(p->name, "%s", item.portName.c_str());
-            sprintf(p->type, "%s", item.getType());
+            sprintf(p->type, "%s", item.getType().c_str());
             sprintf(p->defaultValue, "%s", item.getDefaultValue());
         }
 

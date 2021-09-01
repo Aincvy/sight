@@ -16,6 +16,9 @@
 #include "v8pp/module.hpp"
 #include "v8pp/class.hpp"
 
+
+#define IS_V8_STRING(localVal) (localVal)->IsString() || (localVal)->IsStringObject()
+
 using namespace v8;
 
 namespace sight {
@@ -180,11 +183,22 @@ namespace sight {
                     auto outputKeys = outputRoot->GetOwnPropertyNames(context).ToLocalChecked();
                     for (int j = 0; j < outputKeys->Length(); ++j) {
                         auto outputKey = outputKeys->Get(context, j).ToLocalChecked();
-                        templateNode->addPort({
-                                                      v8pp::from_v8<std::string>(isolate, outputKey),
-                                                      -1,
-                                                      NodePortType::Output
-                                              });
+                        auto outputValue = outputRoot->Get(context, outputKey).ToLocalChecked();
+                        SightNodePort port = {
+                                v8pp::from_v8<std::string>(isolate, outputKey),
+                                -1,
+                                NodePortType::Output
+                        };
+
+                        if (IS_V8_STRING(outputValue)) {
+                            // type
+                            port.type = v8pp::from_v8<std::string>(isolate, outputValue);
+                        } else if (outputValue->IsObject()) {
+                            //
+
+                        }
+
+                        templateNode->addPort(port);
                     }
                 } else {
                     // fields
@@ -199,7 +213,7 @@ namespace sight {
                 }
                 address += templateNode->nodeName;
             }
-            
+
             g_TemplateNodeCache.emplace_back(
                 address,
                 sightNode

@@ -11,7 +11,6 @@ SET(
         ${CMAKE_CURRENT_LIST_DIR}/imgui/imgui_tables.cpp
         ${CMAKE_CURRENT_LIST_DIR}/imgui/backends/imgui_impl_glfw.cpp
         ${CMAKE_CURRENT_LIST_DIR}/imgui/backends/imgui_impl_opengl3.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/imgui/examples/libs/gl3w/GL/gl3w.c
 )
 
 add_library(imgui SHARED ${IMGUI_SOURCES})

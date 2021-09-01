@@ -138,7 +138,7 @@ namespace sight {
          * @param node
          * @return
          */
-        int showNode(const SightNode *node) {
+        int showNode(SightNode *node) {
             if (!node) {
                 return -1;
             }
@@ -153,7 +153,7 @@ namespace sight {
             auto color = ImColor(0,99,160,255);
             // inputPorts
             ImGuiEx_BeginColumn();
-            for (const auto &item : node->inputPorts) {
+            for (auto &item : node->inputPorts) {
                 ed::BeginPin(item.id, ed::PinKind::Input);
                 ed::PinPivotAlignment(ImVec2(0, 0.5f));
                 ed::PinPivotSize(ImVec2(0, 0));
@@ -164,7 +164,23 @@ namespace sight {
             }
 
             ImGuiEx_NextColumn();
-            for (const auto &item : node->outputPorts) {
+            for (SightNodePort &item : node->outputPorts) {
+                // test value
+                if (item.type == "Process"){
+
+                } else {
+                    char buf[LITTLE_NAME_BUF_SIZE];
+                    sprintf(buf, "## %d", item.id);
+                    ImGui::SetNextItemWidth(120);
+                    if (item.type == "Number") {
+                        ImGui::DragFloat(buf, &item.value.f, 0.5f);
+                    }
+                    else {
+                        ImGui::InputText(buf, item.value.string, NAME_BUF_SIZE);
+                    }
+                    ImGui::SameLine();
+                }
+
                 ed::BeginPin(item.id, ed::PinKind::Output);
                 ed::PinPivotAlignment(ImVec2(1.0f, 0.5f));
                 ed::PinPivotSize(ImVec2(0, 0));
@@ -191,14 +207,11 @@ namespace sight {
             ed::Begin("My Editor", ImVec2(0.0, 0.0f));
 
             // nodes
-            for (const auto &node : CURRENT_GRAPH->getNodes()) {
+            for (auto &node : CURRENT_GRAPH->getNodes()) {
                 showNode(&node);
             }
 
             // Submit Links
-//            for (auto &linkInfo : g_Links)
-//                ed::Link(linkInfo.Id, linkInfo.InputId, linkInfo.OutputId);
-
             for (const auto &connection : CURRENT_GRAPH->getConnections()) {
                 ed::Link(connection.connectionId, connection.leftPortId(), connection.rightPortId());
             }
@@ -308,6 +321,23 @@ namespace sight {
             return 0;
         }
 
+        /**
+         * Only sync id. From src to dst.
+         * @param src
+         * @param dst
+         */
+        void syncNodePortId(std::vector<SightNodePort> & src,std::vector<SightNodePort> & dst){
+            for (auto &item : dst) {
+                for (const auto &srcItem : src) {
+                    if (srcItem.portName == item.portName) {
+                        // same port.
+                        item.id = srcItem.id;
+                        break;
+                    }
+                }
+            }
+        }
+
     }
 
 
@@ -407,12 +437,16 @@ namespace sight {
         return static_cast<int>(connections.size());
     }
 
-    const char *SightNodePort::getType() const {
-        return type.c_str();
-    }
 
     const char *SightNodePort::getDefaultValue() const {
-        return this->value.c_str();
+        return this->value.string;
+    }
+
+    std::string const& SightNodePort::getType() const {
+        if (templatePort) {
+            return templatePort->getType();
+        }
+        return this->type;
     }
 
 
@@ -428,18 +462,21 @@ namespace sight {
 
     SightNode *SightNode::clone() const{
         auto p = new SightNode();
-        p->copyFrom(this);
+        p->copyFrom(this, false);
         return p;
     }
 
-    SightNode *SightNode::instantiate() {
+    SightNode *SightNode::instantiate(bool generateId) const {
         if (this->templateNode) {
             return this->templateNode->instantiate();
         }
 
         auto p = new SightNode();
-        p->templateNode = this;
-        p->copyFrom(this);
+        p->copyFrom(this, true);
+
+        if (!generateId) {
+            return p;
+        }
 
         // generate id
         p->nodeId = nextNodeOrPortId();
@@ -453,11 +490,33 @@ namespace sight {
         return p;
     }
 
-    void SightNode::copyFrom(const SightNode *node) {
+    void SightNode::copyFrom(const SightNode *node, bool isTemplate) {
         this->nodeId = node->nodeId;
         this->nodeName = node->nodeName;
-        this->inputPorts.assign(node->inputPorts.begin(), node->inputPorts.end());
-        this->outputPorts.assign(node->outputPorts.begin(), node->outputPorts.end());
+        if (isTemplate) {
+            this->templateNode = node;
+        } else {
+            this->templateNode = node->templateNode;
+        }
+
+        for (const auto &item : node->inputPorts) {
+            this->inputPorts.push_back(item);
+            if (isTemplate) {
+                this->inputPorts.back().templatePort = &item;
+            } else {
+                this->inputPorts.back().templatePort = item.templatePort;
+            }
+        }
+
+        for (const auto &item : node->outputPorts) {
+            this->outputPorts.push_back(item);
+
+            if (isTemplate) {
+                this->outputPorts.back().templatePort = &item;
+            } else {
+                this->outputPorts.back().templatePort = item.templatePort;
+            }
+        }
     }
 
 
@@ -582,12 +641,13 @@ namespace sight {
             auto nodeRoot = root["nodes"];
             dbg(nodeRoot.size());
             for (const auto &nodeKeyPair : nodeRoot) {
-                auto node = nodeKeyPair.second;
-                SightNode sightNode;
-                sightNode.nodeId = node["id"].as<int>();
-                sightNode.nodeName = node["name"].as<std::string>();
+                auto yamlNode = nodeKeyPair.second;
 
-                auto inputs = node["inputs"];
+                SightNode sightNode;
+                sightNode.nodeId = yamlNode["id"].as<int>();
+                sightNode.nodeName = yamlNode["name"].as<std::string>();
+
+                auto inputs = yamlNode["inputs"];
                 for (const auto &input : inputs) {
                     auto portName = input.first.as<std::string>();
                     auto values = input.second;
@@ -600,7 +660,7 @@ namespace sight {
                                                    });
                 }
 
-                auto outputs = node["outputs"];
+                auto outputs = yamlNode["outputs"];
                 for (const auto &output : outputs) {
                     auto portName = output.first.as<std::string>();
                     auto values = output.second;
@@ -613,7 +673,7 @@ namespace sight {
                                                     });
                 }
 
-                auto templateNodeAddress = node["template"].as<std::string>("");
+                auto templateNodeAddress = yamlNode["template"].as<std::string>("");
                 if (!templateNodeAddress.empty()) {
                     if (isLoadEntity) {
                         // entity should be into template
@@ -624,13 +684,24 @@ namespace sight {
                         addTemplateNode(address);
                     }
 
-                    sightNode.templateNode = g_NodeEditorStatus->findTemplateNode(templateNodeAddress.c_str());
-                    dbg(sightNode.templateNode);
+                    auto templateNode = g_NodeEditorStatus->findTemplateNode(templateNodeAddress.c_str());
+                    if (!templateNode) {
+                        dbg(templateNodeAddress, " template not found.");
+                    } else {
+                        // use template node init.
+                        auto nodePointer = templateNode->instantiate(false);
+                        nodePointer->nodeId = sightNode.nodeId;
+                        syncNodePortId(sightNode.inputPorts,nodePointer->inputPorts);
+                        syncNodePortId(sightNode.outputPorts,nodePointer->outputPorts);
+                        sightNode = *nodePointer;
+                        delete nodePointer;
+                    }
+//                    sightNode.templateNode = templateNode;
                 } else {
                     dbg(sightNode.nodeName, "entity do not have templateNodeAddress, jump it.");
                 }
 
-                addNode(sightNode);
+                addNode( sightNode);
             }
 
             // connections
@@ -675,28 +746,6 @@ namespace sight {
     }
 
     void SightNodeGraph::addNode(const SightNode &node) {
-//        this->nodes.push_back(node);
-//
-//        // do ids.
-//        auto & ref = this->nodes.back();
-//        idMap[node.nodeId] = {
-//                SightAnyThingType::Node,
-//                &ref
-//        };
-//
-//        for (auto &item : ref.inputPorts) {
-//            idMap[item.id] = {
-//                    SightAnyThingType::Port,
-//                    &item
-//            };
-//        }
-//        for (auto &item : ref.outputPorts) {
-//            idMap[item.id] =  {
-//                    SightAnyThingType::Port,
-//                    &item
-//            };
-//        }
-
         auto p = this->nodes.add(node);
         idMap[node.nodeId] = {
                 SightAnyThingType::Node,
@@ -826,7 +875,7 @@ namespace sight {
         idMap.erase(id);
 
         connections.erase(result);
-        dbg("delete connection");
+        dbg("delete connection" );
         return 0;
     }
 
@@ -846,6 +895,10 @@ namespace sight {
         this->nodes.clear();
         this->connections.clear();
         this->idMap.clear();
+    }
+
+    SightArray<SightNode> &SightNodeGraph::getNodes() {
+        return this->nodes;
     }
 
     int NodeEditorStatus::createGraph(const char *path) {
@@ -1032,9 +1085,11 @@ namespace sight {
                     id++,
                     NodePortType::Input,
                     c->type,
-                    c->defaultValue,
+                    {},
                     std::vector<SightNodeConnection*>(),
             };
+            // todo distinguish type
+            sprintf(port.value.string, "%s", c->defaultValue);
             node->inputPorts.push_back(port);
 
             // output

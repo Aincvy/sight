@@ -33,6 +33,15 @@ namespace sight {
     class SightNodeGraph;
     struct SightNode;
 
+    union SightNodeValue{
+        int i;
+        float f;
+        double d;
+        bool b;
+        char string[NAME_BUF_SIZE] = {0};
+        char* largeString;
+    };
+
     /**
      * Port, or you can call it pin.
      */
@@ -44,12 +53,12 @@ namespace sight {
         // int/long/String/float ...
         // use getType() function, do not use this field directly.
         std::string type;
-        // use getDefaultValue() function, do not use this field directly.
-        std::string value;
+        SightNodeValue value;
 
         // connections
         std::vector<SightNodeConnection*> connections;
         SightNode* node = nullptr;
+        SightNodePort const* templatePort = nullptr;
 
         /**
          * Set kind from int.
@@ -74,13 +83,14 @@ namespace sight {
          * int/long/String/float ...
          * @return
          */
-        const char* getType() const;
+        std::string const& getType() const;
 
         /**
          *
          * @return
          */
         const char* getDefaultValue() const;
+
     };
 
     /**
@@ -122,8 +132,8 @@ namespace sight {
     struct SightNode {
         std::string nodeName;
         int nodeId;
-        // this node's template node.
-        SightNode* templateNode = nullptr;
+        // this node's template node.  Real template node's `templateNode` must be nullptr.
+        SightNode const* templateNode = nullptr;
         SightNodeGraph* graph = nullptr;
 
         std::vector<SightNodePort> inputPorts;
@@ -141,7 +151,7 @@ namespace sight {
          * else it will instantiate one by this node's template.
          * @return a new node, you should `delete` the object when you do not need it.
          */
-        SightNode* instantiate();
+        SightNode* instantiate(bool generateId = true) const;
 
         /**
          * clone this node
@@ -152,7 +162,12 @@ namespace sight {
 
     private:
 
-        void copyFrom(const SightNode *node);
+        /**
+         *
+         * @param node
+         * @param isTemplate   if true, node will as a template node.
+         */
+        void copyFrom(const SightNode *node, bool isTemplate);
     };
 
     /**
@@ -300,6 +315,7 @@ namespace sight {
         void setFilePath(const char* path);
         const char* getFilePath() const;
 
+        SightArray <SightNode> & getNodes();
         const SightArray <SightNode> & getNodes() const;
         const SightArray <SightNodeConnection> & getConnections() const;
 
@@ -345,7 +361,7 @@ namespace sight {
         // node template
         std::vector<SightNodeTemplateAddress> templateAddressList;
         // key: SightNode pointer, value: full template address.
-        std::map<SightNode*, std::string> templateReverseFindMap;
+        std::map<SightNode const*, std::string> templateReverseFindMap;
 
         NodeEditorStatus();
         ~NodeEditorStatus();
