@@ -4,6 +4,10 @@
 
 #include "sight_util.h"
 
+#include <algorithm>
+#include <cctype>
+#include <locale>
+
 namespace sight {
 
     bool endsWith(const std::string &fullString, const std::string &ending) {

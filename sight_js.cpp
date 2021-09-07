@@ -48,21 +48,24 @@ namespace sight {
 
         // use it for register to v8.
         struct NodePortTypeStruct {
-            int getInput() const {
-                return NodePortType::Input;
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "readability-convert-member-functions-to-static"
+            int getInput() {
+                return static_cast<int>(NodePortType::Input);
             }
 
-            int getOutput() const {
-                return NodePortType::Output;
+            int getOutput() {
+                return static_cast<int>(NodePortType::Output);
             }
 
-            int getBoth() const {
-                return NodePortType::Both;
+            int getBoth() {
+                return static_cast<int>(NodePortType::Both);
             }
 
-            int getField() const {
-                return NodePortType::Field;
+            int getField() {
+                return static_cast<int>(NodePortType::Field);
             }
+#pragma clang diagnostic pop
         };
 
         /**
@@ -127,12 +130,42 @@ namespace sight {
             }
 
             auto context = isolate->GetCurrentContext();
-
             //
-            SightNode sightNode;
+            SightJsNode sightNode;
             auto templateNode = &sightNode;
             std::string address;
 
+            // func
+            auto nodePortWork = [isolate, &context](Local<Value> key,Local<Value> value, NodePortType nodePortType) -> SightNodePort {
+                SightNodePort port = {
+                        v8pp::from_v8<std::string>(isolate, key),
+                        0,
+                        nodePortType
+                };
+
+                if (IS_V8_STRING(value)) {
+                    // type
+                    port.type = v8pp::from_v8<std::string>(isolate, value);
+                } else if (value->IsObject()) {
+                    // object
+                    auto option = value.As<Object>();
+                    auto temp = option->Get(context, v8pp::to_v8(isolate, "type"));
+                    if (!temp.IsEmpty()) {
+                        // has type
+                        port.type = v8pp::from_v8<std::string>(isolate, temp.ToLocalChecked());
+                    }
+
+                    temp = option->Get(context, v8pp::to_v8(isolate, "showValue"));
+                    if (!temp.IsEmpty()) {
+                        // has
+                        port.options.showValue = v8pp::from_v8<bool>(isolate, temp.ToLocalChecked());
+                    }
+                }
+
+                return port;
+            };
+
+            // parse object
             Local<Object> object = arg1.As<Object>();
             auto props = object->GetOwnPropertyNames(context).ToLocalChecked();
             for (int i = 0, l = props->Length(); i < l; ++i) {
@@ -167,11 +200,10 @@ namespace sight {
                     auto inputKeys = inputRoot->GetOwnPropertyNames(context).ToLocalChecked();
                     for (int j = 0; j < inputKeys->Length(); ++j) {
                         auto inputKey = inputKeys->Get(context, j).ToLocalChecked();
-                        templateNode->addPort({
-                                                      v8pp::from_v8<std::string>(isolate, inputKey),
-                                                      -1,
-                                                      NodePortType::Input
-                                              });
+                        auto inputValue = inputRoot->Get(context, inputKey).ToLocalChecked();
+
+                        auto port = nodePortWork(inputKey, inputValue, NodePortType::Input);
+                        templateNode->addPort(port);
                     }
                 } else if (key == "__meta_outputs") {
                     if (!localVal->IsObject()) {
@@ -184,23 +216,68 @@ namespace sight {
                     for (int j = 0; j < outputKeys->Length(); ++j) {
                         auto outputKey = outputKeys->Get(context, j).ToLocalChecked();
                         auto outputValue = outputRoot->Get(context, outputKey).ToLocalChecked();
-                        SightNodePort port = {
-                                v8pp::from_v8<std::string>(isolate, outputKey),
-                                -1,
-                                NodePortType::Output
-                        };
 
-                        if (IS_V8_STRING(outputValue)) {
-                            // type
-                            port.type = v8pp::from_v8<std::string>(isolate, outputValue);
-                        } else if (outputValue->IsObject()) {
-                            //
-
-                        }
-
+                        SightNodePort port = nodePortWork(outputKey, outputValue, NodePortType::Output);
                         templateNode->addPort(port);
                     }
-                } else {
+                } else if (key == "__meta_func") {
+                    // functions.
+                    if (localVal->IsFunction()) {
+                        //
+                        sightNode.generateCodeWork = Persistent<Function, CopyablePersistentTraits<Function>>(isolate, localVal.As<Function>());
+                        sightNode.onReverseActive = sightNode.generateCodeWork;
+                    } else if (localVal->IsObject()) {
+                        auto functionRoot = localVal.As<Object>();
+                        auto temp = functionRoot->Get(context, v8pp::to_v8(isolate, "generateCodeWork"));
+
+                        if (!temp.IsEmpty()) {
+                            sightNode.generateCodeWork = Persistent<Function, CopyablePersistentTraits<Function>>(isolate, temp.ToLocalChecked().As<Function>());
+                        }
+
+                        temp = functionRoot->Get(context, v8pp::to_v8(isolate, "onReverseActive"));
+                        if (temp.IsEmpty()) {
+                            dbg("empty function");
+                            sightNode.onReverseActive = sightNode.generateCodeWork;
+                        } else {
+                            auto checkedTemp = temp.ToLocalChecked();
+                            if (checkedTemp->IsFunction()) {
+                                sightNode.onReverseActive = Persistent<Function, CopyablePersistentTraits<Function>>(isolate, checkedTemp.As<Function>());
+                            } else {
+                                sightNode.onReverseActive = sightNode.generateCodeWork;
+                            }
+                        }
+
+                    } else {
+                        args.GetReturnValue().Set(-2);
+                        return;
+                    }
+                } else if (key == "__meta_options") {
+                    if (!localVal->IsObject()) {
+                        args.GetReturnValue().Set(-2);
+                        return;
+                    }
+
+                    auto optionsRoot = localVal.As<Object>();
+                    auto optionsKeys = optionsRoot->GetOwnPropertyNames(context).ToLocalChecked();
+
+                    for (int j = 0; j < optionsKeys->Length(); ++j) {
+                        auto outputKey = optionsKeys->Get(context, j).ToLocalChecked();
+                        std::string keyString = v8pp::from_v8<std::string>(isolate, outputKey);
+
+                        if (keyString == "enter") {
+                            sightNode.options.processFlag = SightNodeProcessType::Enter;
+                        } else if (keyString == "exit") {
+                            sightNode.options.processFlag = SightNodeProcessType::Exit;
+                        }
+
+                        else {
+                            dbg("unknown option key", keyString);
+                        }
+                    }
+
+                }
+
+                else {
                     // fields
 
                 }
@@ -412,6 +489,120 @@ namespace sight {
         return 0;
     }
 
+    std::string getFunctionBody(Isolate* isolate, Local<Function> function, Local<Context> context){
+        auto toString = function->Get(context, v8pp::to_v8(isolate, "toString")).ToLocalChecked();
+        auto toStringFunc = toString.As<Function>();
+        auto str = toStringFunc->Call(context, function, 0 , nullptr).ToLocalChecked();
+        std::string code;
+        if (IS_V8_STRING(str)) {
+            code = v8pp::from_v8<std::string>(isolate, str);
+        } else {
+            dbg("toString's result not a string");
+        }
+
+        auto p1 = code.find_first_of('{');
+        auto p2 = code.find_last_of('}');
+
+
+        return trimCopy(std::string(code, p1 + 1, p2 - p1 - 1));
+    }
+
+    /**
+     *
+     * @param node
+     */
+    void reverseActive(SightNode* node,  Isolate* isolate){
+        for (const auto &item : node->inputPorts) {
+            if (!item.isConnect() || item.getType() == TYPE_PROCESS) {
+                continue;
+            }
+            dbg(item.getType());
+
+            // maybe need reverseActive all connections
+            for (auto &c : item.connections) {
+                SightNodePortConnection connection(node->graph, c, node);
+                if (connection.bad()) {
+                    dbg("bad connection");
+                    continue;
+                }
+
+                auto targetNode = connection.target->node;
+                auto targetJsNode = findTemplateNode(targetNode);
+
+                auto context = isolate->GetCurrentContext();
+                Local<Object> recv = Object::New(isolate);
+                MaybeLocal<Value> result = targetJsNode->onReverseActive.Get(isolate)->Call(context, recv, 0, nullptr);
+            }
+        }
+    }
+
+    void parseNode(std::vector<SightNode*> & list, Isolate* isolate){
+        auto node = list.front();
+        auto jsNode = findTemplateNode(node);
+        list.erase(list.begin());
+
+        // 1. onReverseActive
+        reverseActive(node, isolate);
+
+        // 2. generateCodeWork
+        auto & generateCodeWork = jsNode->generateCodeWork;
+        if (generateCodeWork.IsEmpty()) {
+            // no function ?
+            dbg("no function");
+        } else {
+            auto function = generateCodeWork.Get(isolate);
+            auto context = isolate->GetCurrentContext();
+
+            std::string functionCode = getFunctionBody(isolate, function, context);
+            dbg(functionCode);
+//            MaybeLocal<Value> result = function->Call(context, recv, 0, nullptr);
+        }
+
+        // active the next.
+        auto connection = node->findConnectionByProcess();
+        if (connection.bad()) {
+            dbg("bad connection");
+            return;
+        }
+
+        list.push_back(connection.target->node);
+    }
+
+    /**
+     *
+     * @param filename
+     * @return
+     */
+    int parseGraph(const char* filename){
+        dbg(filename);
+        SightNodeGraph graph;
+        int i = graph.load(filename, false);
+        if (i == 1) {
+            return 1;
+        }
+        if (i < 0) {
+            return 2;
+        }
+
+        // get enter node.
+        int status = -1;
+        auto node = graph.findNode(SightNodeProcessType::Enter, &status);
+        if (status != 0) {
+            dbg("error graph",filename, status);
+            return 3;
+        }
+
+        // here it is.
+        auto isolate = g_V8Runtime->isolate;
+        std::vector<SightNode*> list;
+        list.push_back(node);
+
+        while (!list.empty()) {
+            parseNode(list, isolate);
+        }
+
+        return 0;
+    }
 
     void runJsCommands() {
         if (!g_V8Runtime) {
@@ -430,6 +621,9 @@ namespace sight {
                     break;
                 case JsCommandType::JsCommandHolder:
                     // do nothing.
+                    break;
+                case JsCommandType::ParseGraph:
+                    parseGraph(command.args.argString);
                     break;
             }
 

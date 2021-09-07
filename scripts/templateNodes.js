@@ -96,6 +96,9 @@ addTemplateNode({
     __meta_code: function (){
        this.number = this.number1 + this.number2;
     },
+    __meta_func(){
+        print('Add generateCodeWork.');
+    },
     // other ideas
     __meta_inputs: {
         chainIn: 'Process',
@@ -118,8 +121,9 @@ addTemplateNode({
     __meta_func: {
         // this function will be to string(only function body.).
         generateCodeWork($, $options) {
-            $options.isPart = true;
-            return $.number;       // When a output node is returned, it will be map to node's value.
+            // $options.isPart = true;
+            // return $.number;       // When a output node is returned, it will be map to node's value.
+            print('Number generateCodeWork.');
         },
 
         // If object do not has `onReverseActive` function, then it will be call generateCodeWork when this function is needed.
@@ -137,10 +141,38 @@ addTemplateNode({
 
 });
 
+addTemplateNode({
+    // meta info, start with __meta
+
+    __meta_name: "EnterNode",
+    // used for context menu
+    __meta_address: "process",
+    __meta_options: {
+        enter: true,
+    },
+    __meta_func: {
+        generateCodeWork($, $options) {
+            print('EnterNode generateCodeWork.');
+        },
+
+    },
+
+    // other ideas
+    __meta_inputs: {
+
+    },
+    __meta_outputs: {
+        next: 'Process',           //
+
+    },
+
+
+});
+
+
 function a($){
     return $.number1 + $.number2;
 }
 
 print("" + a);
-print("" + print);
 print('template node file end ');

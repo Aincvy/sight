@@ -100,6 +100,9 @@ namespace sight {
             if (ImGui::MenuItem("Clean")) {
 
             }
+            if (ImGui::MenuItem("Parse Graph")) {
+                addJsCommand(JsCommandType::ParseGraph, "./simple.yaml");
+            }
         }
 
         void showMainCustomMenu(){

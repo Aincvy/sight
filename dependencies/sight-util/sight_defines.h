@@ -20,6 +20,11 @@
 #define MEDIUM_ARRAY_SIZE 486
 #define BIG_ARRAY_SIZE 1024
 
+#define TYPE_PROCESS "Process"
+
+#define SET_INT_VALUE(p, v) if (p)  { *p = v; }
+
+
 namespace sight {
 
     /**
@@ -31,6 +36,5 @@ namespace sight {
      *
      */
     extern const int addressPrefixLen;
-
 
 }

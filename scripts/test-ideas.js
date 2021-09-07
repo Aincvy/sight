@@ -134,3 +134,33 @@ addTemplateNode({
     },
 
 });
+
+
+
+addTemplateNode({
+    // meta info, start with __meta
+
+    __meta_name: "EnterNode",
+    // used for context menu
+    __meta_address: "sight://template/nodes/process",
+    __meta_options: {
+        enter: true,
+    },
+    __meta_func: {
+        generateCodeWork($, $options) {
+            print('from generateCodeWork.');
+        },
+
+    },
+
+    // other ideas
+    __meta_inputs: {
+
+    },
+    __meta_outputs: {
+        next: 'Process',           //
+
+    },
+
+
+});

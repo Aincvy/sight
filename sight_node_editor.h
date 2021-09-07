@@ -13,6 +13,8 @@
 #include "sight_ui.h"
 #include "sight_memory.h"
 
+#include "v8.h"
+
 namespace ed = ax::NodeEditor;
 
 namespace sight {
@@ -20,12 +22,12 @@ namespace sight {
     /**
      *
      */
-    enum NodePortType {
+    enum class NodePortType {
         Input = 100,
         Output,
         // both input and output
         Both,
-        // do not have a port, only field.  on this way, it should has a textbox.
+        // do not have a port, only field.  on this way, it should has a input box.
         Field,
     };
 
@@ -42,18 +44,23 @@ namespace sight {
         char* largeString;
     };
 
+    struct SightNodePortOptions {
+        bool showValue = false;
+    };
+
     /**
      * Port, or you can call it pin.
      */
     struct SightNodePort {
         std::string portName;
-        int id;
+        uint id;
         // input/output ...
         NodePortType kind;
         // int/long/String/float ...
         // use getType() function, do not use this field directly.
         std::string type;
         SightNodeValue value;
+        SightNodePortOptions options;
 
         // connections
         std::vector<SightNodeConnection*> connections;
@@ -97,33 +104,62 @@ namespace sight {
      * a connection.
      */
     struct SightNodeConnection {
-        int connectionId;
-        struct SightNodePort* left;
-        struct SightNodePort* right;
+        uint connectionId;
+        uint left;
+        uint right;
 
-        /**
-         * Add ref to left and right.
-         * You should call this function only once.
-         */
-        void addRefs();
 
         /**
          * Remove from left and right port.
          */
-        void removeRefs();
+        void removeRefs(SightNodeGraph *graph = nullptr);
 
-        int leftPortId() const;
-        int rightPortId() const;
-
+        uint leftPortId() const;
+        uint rightPortId() const;
     };
 
     /**
-     * -
+     * Unstable struct, you shouldn't hold this. Just get it, use it, and drop it.
      */
     struct SightNodePortConnection {
         struct SightNodePort* self = nullptr;
         struct SightNodePort* target = nullptr;
         struct SightNodeConnection* connection = nullptr;
+
+        bool bad() const;
+
+        SightNodePortConnection() = default;
+        ~SightNodePortConnection() = default;
+        SightNodePortConnection(SightNodeGraph* graph, SightNodeConnection* connection, SightNode* node);
+        SightNodePortConnection(SightNodePort *self, SightNodePort *target, SightNodeConnection *connection);
+    };
+
+    struct SightNodePortHandle{
+        SightNode *node = nullptr;
+        uint portId = 0;
+
+        /**
+         * You shouldn't hold this function's result.
+         * @return
+         */
+        SightNodePort* get() const;
+
+        SightNodePort* operator->() const;
+        SightNodePort& operator*() const;
+        
+    };
+
+    enum class SightNodeProcessType {
+        Enter = 100,
+        Exit,
+
+        Normal = 200,
+    };
+
+    struct SightJsNodeOptions{
+        SightNodeProcessType processFlag = SightNodeProcessType::Normal;
+
+
     };
 
     /**
@@ -131,7 +167,7 @@ namespace sight {
      */
     struct SightNode {
         std::string nodeName;
-        int nodeId;
+        uint nodeId;
         // this node's template node.  Real template node's `templateNode` must be nullptr.
         SightNode const* templateNode = nullptr;
         SightNodeGraph* graph = nullptr;
@@ -160,7 +196,17 @@ namespace sight {
          */
         SightNode* clone() const;
 
-    private:
+        /**
+         * Find the next active connection.
+         * If there is one and only one valid process connection, return it, otherwise nullptr.
+         * Here is the priority.
+         * 1. The `chainOut` port.
+         * 2. Any valid connection.
+         * @return
+         */
+        SightNodePortConnection findConnectionByProcess();
+
+    protected:
 
         /**
          *
@@ -173,9 +219,21 @@ namespace sight {
     /**
      * js node
      */
-    struct SightJsNode : SightNode{
+    struct SightJsNode : public SightNode{
+
+        std::string fullTemplateAddress;
+
+        v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function>> generateCodeWork;
+        v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function>> onReverseActive;
+        SightJsNodeOptions options;
+
+        SightJsNode();
+        ~SightJsNode() = default;
 
         void callFunction(const char *name);
+
+        SightJsNode & operator=(SightNode const & sightNode);
+
     };
 
     /**
@@ -194,9 +252,25 @@ namespace sight {
         Invalid,
     };
 
+    union SightAnyThingData{
+        SightNode* node = nullptr;
+        SightNodeConnection* connection;
+        SightNodePortHandle portHandle;
+
+        SightAnyThingData();
+        SightAnyThingData(SightNodeConnection* connection);
+        SightAnyThingData(SightNode* node);
+        SightAnyThingData(SightNode* node, uint portId);
+    };
+
     struct SightAnyThingWrapper{
         SightAnyThingType type = SightAnyThingType::Node;
-        void* pointer = nullptr;
+        SightAnyThingData data;
+
+        SightAnyThingWrapper() = default;
+        SightAnyThingWrapper(SightAnyThingType type, SightNodeConnection* connection);
+        SightAnyThingWrapper(SightAnyThingType type, SightNode* node);
+        SightAnyThingWrapper(SightAnyThingType type, SightNode* node, uint portId);
 
         SightNode* asNode() const;
         SightNodePort* asPort() const;
@@ -209,14 +283,16 @@ namespace sight {
     struct SightNodeTemplateAddress {
         // name or address
         std::string name;
-        // templateNode will call delete when current object deconstructing.
-        SightNode templateNode;
+        //
+        SightJsNode templateNode;
         //
         std::vector<SightNodeTemplateAddress> children;
 
         SightNodeTemplateAddress();
         ~SightNodeTemplateAddress();
-        SightNodeTemplateAddress(std::string name, SightNode templateNode);
+        explicit SightNodeTemplateAddress(std::string name);
+        SightNodeTemplateAddress(std::string name, const SightJsNode& templateNode);
+        SightNodeTemplateAddress(std::string name, const SightNode& templateNode);
 
         /**
          * If has children, then show them, otherwise, show self.
@@ -231,7 +307,7 @@ namespace sight {
     public:
 
         //
-        std::atomic<int> nodeOrPortId = 10000;
+        std::atomic<uint> nodeOrPortId = 3000;
 
         SightNodeGraph();
         ~SightNodeGraph();
@@ -243,13 +319,13 @@ namespace sight {
          * @return If create success, the connection's id.
          * -1: one of left,right is invalid. -2: they are same. -3: same kind.
          */
-        int createConnection(int leftPortId, int rightPortId, int connectionId = -1);
+        uint createConnection(uint leftPortId, uint rightPortId, uint connectionId = 0);
 
         /**
          *
          * @param connection
          */
-        void addConnection(const SightNodeConnection& connection);
+        void addConnection(const SightNodeConnection& connection, SightNodePort* left = nullptr, SightNodePort* right = nullptr);
 
         /**
          *
@@ -280,24 +356,36 @@ namespace sight {
 
         /**
          *
+         * @param processType
+         * @param status   0 = success, 1 multiple enter. 2 no type nodes.
+         * @return
+         */
+        SightNode* findNode(SightNodeProcessType processType, int* status = nullptr);
+
+        /**
+         *
          * @param id
          * @return The element of vector, you should not free the result. If not find, nullptr.
          */
         SightNodeConnection* findConnection(int id);
 
-        SightNodePort* findPort(int id);
+        SightNodePort* findPort(uint id);
 
         /**
          *
          * @param id
          * @return You should not keep the return value, just use it's asXXX function.
          */
-        const SightAnyThingWrapper& findSightAnyThing(int id) ;
+        const SightAnyThingWrapper& findSightAnyThing(uint id) ;
 
         /**
          * You should call this function at init step.
          * after call this function, this->filepath will be `path`.
-         * @return
+         * @return 0 success. Positive number is warning, and negative number is error.
+         * 1: templateNode not found.
+         *
+         * -1: file not found.
+         * -2: bad file.
          */
         int load(const char *path, bool isLoadEntity = false);
 
@@ -325,13 +413,11 @@ namespace sight {
         std::string filepath;
 
         // real nodes
-//        std::vector<SightNode> nodes;
         SightArray<SightNode> nodes;
         // real connections.
-//        std::vector<SightNodeConnection> connections;
         SightArray<SightNodeConnection> connections{BIG_ARRAY_SIZE};
         // key: node/port/connection id, value: the pointer of the instance.
-        std::map<int, SightAnyThingWrapper> idMap;
+        std::map<uint, SightAnyThingWrapper> idMap;
         // for ...
         const static SightAnyThingWrapper invalidAnyThingWrapper;
 
@@ -347,7 +433,6 @@ namespace sight {
         void reset();
     };
 
-
     /**
      * sight  node editor status
      */
@@ -358,10 +443,8 @@ namespace sight {
         ed::EditorContext* context = nullptr;
         //
         char contextConfigFile[NAME_BUF_SIZE * 2] = {0};
-        // node template
+        // node template | for render
         std::vector<SightNodeTemplateAddress> templateAddressList;
-        // key: SightNode pointer, value: full template address.
-        std::map<SightNode const*, std::string> templateReverseFindMap;
 
         NodeEditorStatus();
         ~NodeEditorStatus();
@@ -405,7 +488,7 @@ namespace sight {
 
     int showNodeEditorGraph(const UIStatus & uiStatus);
 
-    int nextNodeOrPortId();
+    uint nextNodeOrPortId();
 
     /**
      * add and delete node memory.  (use keyword delete)
@@ -459,5 +542,12 @@ namespace sight {
      * @return
      */
     int loadEntities();
+
+    /**
+     *
+     * @param node
+     * @return
+     */
+    SightJsNode* findTemplateNode(const SightNode *node);
 
 }

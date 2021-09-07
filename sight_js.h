@@ -17,7 +17,8 @@ namespace sight{
         File,
         // destroy js engine
         Destroy,
-
+        //
+        ParseGraph,
     };
 
     struct JsCommand {
