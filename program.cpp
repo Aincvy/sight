@@ -18,27 +18,16 @@
 using namespace sight;
 
 void handler(int sig) {
-    void *array[10];
-    size_t size;
 
-    // get void*'s for all entries on the stack
-    size = backtrace(array, 30);
-
-    // print out all the frames to stderr
-    fprintf(stderr, "Error: signal %d:\n", sig);
-    backtrace_symbols_fd(array, size, STDERR_FILENO);
-
-    sight::exitSight(1);
 }
 
-
 int main(int argc, char* argv[]){
-    // signal(SIGSEGV, handler);
     dbg("program start!");
 
 #ifdef SIGHT_DEBUG
     backward::SignalHandling sh;
 #endif
+    signal(SIGSEGV, handler);
 
     dbg("start js thread!");
     std::thread jsThread(sight::jsThreadRun, argv[0]);

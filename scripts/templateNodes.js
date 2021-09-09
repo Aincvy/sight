@@ -96,8 +96,9 @@ addTemplateNode({
     __meta_code: function (){
        this.number = this.number1 + this.number2;
     },
-    __meta_func(){
-        print('Add generateCodeWork.');
+    __meta_func($){
+        //print('Add generateCodeWork.');
+        return $.number1() + $.number2();
     },
     // other ideas
     __meta_inputs: {
@@ -120,10 +121,10 @@ addTemplateNode({
     __meta_address: "test/math/literal",
     __meta_func: {
         // this function will be to string(only function body.).
-        generateCodeWork($, $options) {
-            // $options.isPart = true;
-            // return $.number;       // When a output node is returned, it will be map to node's value.
-            print('Number generateCodeWork.');
+        generateCodeWork($$) {
+            $$.options.isPart = true;
+            return 1;       // When a output node is returned, it will be map to node's value.
+            //print('Number generateCodeWork.');
         },
 
         // If object do not has `onReverseActive` function, then it will be call generateCodeWork when this function is needed.
@@ -151,7 +152,8 @@ addTemplateNode({
         enter: true,
     },
     __meta_func: {
-        generateCodeWork($, $options) {
+        generateCodeWork($$) {
+            $$.options.isPart = true;
             print('EnterNode generateCodeWork.');
         },
 

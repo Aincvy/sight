@@ -2,6 +2,8 @@
 // Created by Aincvy(aincvy@gmail.com) on 2021/7/20.
 //
 #include <stdio.h>
+#include <sstream>
+#include "functional"
 
 #include "sight_js.h"
 #include "sight_node_editor.h"
@@ -38,6 +40,24 @@ namespace sight {
 
     namespace {
 
+        struct GenerateOptions {
+            bool isPart = false;
+        };
+
+        struct V8ClassWrappers{
+            v8pp::class_<GenerateOptions>* generateOptions;
+
+            V8ClassWrappers() = default;
+            ~V8ClassWrappers();
+        };
+
+        V8ClassWrappers::~V8ClassWrappers() {
+            if (generateOptions) {
+                delete generateOptions;
+                generateOptions = nullptr;
+            }
+        }
+
         struct V8Runtime {
             std::unique_ptr<v8::Platform> platform;
             v8::Isolate *isolate = nullptr;
@@ -45,6 +65,14 @@ namespace sight {
             std::unique_ptr<v8::Isolate::Scope> isolateScope;
             SharedQueue<JsCommand> commandQueue;
         };
+
+        struct FunctionBodyStatus {
+            int paramCount = 0;
+            bool shouldEval = false;
+            std::string returnBody;
+            bool noReturn = false;
+        };
+
 
         // use it for register to v8.
         struct NodePortTypeStruct {
@@ -414,6 +442,12 @@ namespace sight {
         auto addTemplateNodeFunc = v8pp::wrap_function(isolate, "addTemplateNode", v8AddTemplateNode);
         currentContext->Global()->Set(currentContext, v8pp::to_v8(isolate, "addTemplateNode"), addTemplateNodeFunc);
 
+        v8pp::class_<GenerateOptions> generateOptionsClass(isolate);
+        generateOptionsClass
+                .ctor<>()
+                .set("isPart", &GenerateOptions::isPart)
+                ;
+
         logDebug("init js bindings over!\n");
         return 0;
     }
@@ -489,7 +523,7 @@ namespace sight {
         return 0;
     }
 
-    std::string getFunctionBody(Isolate* isolate, Local<Function> function, Local<Context> context){
+    std::string getFunctionBody(Isolate* isolate, Local<Function> function, Local<Context> context, FunctionBodyStatus* status = nullptr){
         auto toString = function->Get(context, v8pp::to_v8(isolate, "toString")).ToLocalChecked();
         auto toStringFunc = toString.As<Function>();
         auto str = toStringFunc->Call(context, function, 0 , nullptr).ToLocalChecked();
@@ -498,13 +532,244 @@ namespace sight {
             code = v8pp::from_v8<std::string>(isolate, str);
         } else {
             dbg("toString's result not a string");
+            return {};
         }
 
         auto p1 = code.find_first_of('{');
         auto p2 = code.find_last_of('}');
+        auto body = removeComment(trimCopy(std::string(code, p1 + 1, p2 - p1 - 1)));
+
+        if (status) {
+            auto title = std::string(code, 0, p1);
+            // dbg(title);
+            bool parentheses = false;
+            bool one = false;
+            bool lastIsDollar = false;
+            int count = 0;
+            for (auto c: title) {
+                if (!parentheses) {
+                    if (c == '(') {
+                        parentheses = true;
+                    }
+                } else {
+                    if (isspace(c)) {
+
+                    } else {
+                        if (c == ',') {
+                            count++;
+                        } else {
+                            one = true;
+                        }
+                    }
+                }
+
+                if (c == '$') {
+                    if (lastIsDollar) {
+                        // here it is $$
+                        status->shouldEval = true;
+                    }
+
+                    lastIsDollar = true;
+                } else {
+                    lastIsDollar = false;
+                }
+            }
+
+            if (one) {
+                count++;
+            }
+            status->paramCount = count;
+
+            if (status->paramCount >= 2) {
+                status->shouldEval = true;
+            }
 
 
-        return trimCopy(std::string(code, p1 + 1, p2 - p1 - 1));
+            auto pos = body.rfind(std::string("return"));
+            dbg(body);
+            if (pos != std::string::npos && pos + 6 < body.size()) {
+                // has a return keyword
+                auto left = trimCopy(std::string(body, pos + 6));
+                dbg(left);
+                if (startsWith(left, "function")) {
+                    status->shouldEval = true;
+                } else {
+                    // It returns a statement or expr
+                    auto commaPos = left.rfind(';');
+                    if (commaPos != std::string::npos) {
+                        // find last ;
+                        dbg(commaPos);
+                        status->returnBody = std::string (left, 0, commaPos);
+                    } else {
+                        status->returnBody = left;
+                    }
+                    // remove return stmt from body.
+                    body.erase(pos);
+                    trim(body);
+                }
+            } else {
+                status->noReturn = true;
+            }
+        }
+
+        return body;
+    }
+
+    MaybeLocal<Value> runGenerateCode(std::string const &functionCode ,Isolate* isolate, Local<Context> & context, GenerateOptions* options = nullptr){
+        auto sourceCode = v8pp::to_v8(isolate, functionCode);
+        ScriptCompiler::Source source(sourceCode);
+        Local<Object> contextExt[0];
+        v8::Local<v8::String> param$ = v8::String::NewFromUtf8(isolate, "$").ToLocalChecked();
+        v8::Local<v8::String> paramOptions = v8::String::NewFromUtf8(isolate, "$$").ToLocalChecked();
+        v8::Local<v8::String> arguments[] = {param$, paramOptions};
+        auto targetFunction = ScriptCompiler::CompileFunctionInContext(context, &source, std::size(arguments), arguments, 0,contextExt).ToLocalChecked();
+
+        // build args.
+        auto arg$$ = Object::New(isolate);
+
+        if (options) {
+            auto jsOptions = v8pp::class_<GenerateOptions>::reference_external(isolate, options);
+            arg$$->Set(context, v8pp::to_v8(isolate, "options"), jsOptions);
+        }
+
+        Local<Object> recv = Object::New(isolate);
+        Local<Value> args[2];
+        args[0] = Object::New(isolate);
+        args[1] = arg$$;
+        auto result = targetFunction->Call(context, recv,std::size(args), args);
+        v8pp::class_<GenerateOptions>::unreference_external(isolate, options);
+
+        return result;
+    }
+
+    std::string runGenerateFunction(v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function>> & persistent, Isolate* isolate, SightNode* node){
+        if (persistent.IsEmpty()) {
+            // no function ?
+            dbg("no function");
+            return "";
+        }
+
+        auto function = persistent.Get(isolate);
+        auto context = isolate->GetCurrentContext();
+
+        FunctionBodyStatus status;
+        std::string functionCode = getFunctionBody(isolate, function, context, &status);
+        MaybeLocal<Value> resultMaybe;
+        GenerateOptions options;
+        if (status.shouldEval && !functionCode.empty()) {
+            // The code need be eval first.
+            resultMaybe = runGenerateCode(functionCode, isolate, context, &options);
+        }
+
+        if (status.noReturn) {
+            functionCode = "";
+        } else if (status.returnBody.empty()) {
+            // expect `result` is a function
+            if (!resultMaybe.IsEmpty()) {
+                auto firstRunResult = resultMaybe.ToLocalChecked();
+                if (firstRunResult->IsFunction()) {
+                    functionCode = getFunctionBody(isolate, firstRunResult.As<Function>(), context);
+                }
+            }
+        } else {
+            // then, parse return body.
+            functionCode = status.returnBody;
+        }
+
+        if (!functionCode.empty()) {
+            std::stringstream ss;
+            bool dollar = false;
+            ss << "return `";
+            for (const auto &item : functionCode) {
+                if (!dollar) {
+                    if (item == '$') {
+                        dollar = true;
+                        ss << "${";
+                    }
+                } else {
+                    if (isalpha(item) || isnumber(item) || item == '.' || item == '_'
+                        || item == '(' || item == ')' || item == '$') {
+
+                    } else {
+                        dollar = false;
+                        ss << '}';
+                    }
+                }
+
+                ss << item;
+
+            }
+            if (dollar) {
+                dollar = false;
+                ss << '}';
+            }
+            ss << '`';
+
+            dbg(ss.str());
+
+            auto sourceCode = v8pp::to_v8(isolate, ss.str());
+            ScriptCompiler::Source source(sourceCode);
+            Local<Object> contextExt[0];
+            v8::Local<v8::String> param$ = v8::String::NewFromUtf8(isolate, "$").ToLocalChecked();
+            v8::Local<v8::String> arguments[] = {param$};
+            auto targetFunction = ScriptCompiler::CompileFunctionInContext(context, &source, std::size(arguments), arguments, 0,contextExt).ToLocalChecked();
+
+            // build args.
+            auto $ = Object::New(isolate);
+            for (const auto &item : node->inputPorts) {
+                std::string name = item.portName;
+                auto t = [&item,node,isolate]() -> std::string  {
+                    // reverseActive this port.
+                    //
+                    if (!item.isConnect()) {
+                        return "";      // maybe need throw sth ?
+                    }
+
+                    auto & connections = item.connections;
+                    if (connections.size() == 1) {
+                        // 1
+                        auto c = connections.front();
+                        SightNodePortConnection connection(node->graph, c, node);
+                        if (connection.bad()) {
+                            dbg("bad connection");
+                            return "";
+                        }
+
+                        auto targetNode = connection.target->node;
+                        auto targetJsNode = findTemplateNode(targetNode);
+                        if (targetJsNode) {
+                            return runGenerateFunction(targetJsNode->onReverseActive,isolate, targetNode);
+                        }
+                    } else {
+
+                    }
+                    return "";
+                };
+
+                auto functionObject = v8pp::wrap_function(isolate, name, t);
+                if (item.getType() == "Number") {
+                    functionObject->Set(context, v8pp::to_v8(isolate, "val"), v8pp::to_v8(isolate, item.value.f));
+                    functionObject->Set(context, v8pp::to_v8(isolate, "value"), v8pp::to_v8(isolate, item.value.f));
+                }
+                functionObject->Set(context, v8pp::to_v8(isolate, "isConnect"), v8pp::to_v8(isolate, item.isConnect()));
+
+                $->Set(context, v8pp::to_v8(isolate, name), functionObject);
+            }
+
+            Local<Object> recv = Object::New(isolate);
+            Local<Value> args[1];
+            args[0] = $;
+            auto result = targetFunction->Call(context, recv,1, args);
+            if (result.IsEmpty()) {
+                dbg("result is empty", ss.str());
+            } else {
+                auto resultString = v8pp::from_v8<std::string>(isolate, result.ToLocalChecked());
+                dbg(resultString.c_str());
+                return resultString;
+            }
+        }
+
+        return "";
     }
 
     /**
@@ -542,21 +807,10 @@ namespace sight {
         list.erase(list.begin());
 
         // 1. onReverseActive
-        reverseActive(node, isolate);
+        // reverseActive(node, isolate);
 
         // 2. generateCodeWork
-        auto & generateCodeWork = jsNode->generateCodeWork;
-        if (generateCodeWork.IsEmpty()) {
-            // no function ?
-            dbg("no function");
-        } else {
-            auto function = generateCodeWork.Get(isolate);
-            auto context = isolate->GetCurrentContext();
-
-            std::string functionCode = getFunctionBody(isolate, function, context);
-            dbg(functionCode);
-//            MaybeLocal<Value> result = function->Call(context, recv, 0, nullptr);
-        }
+        runGenerateFunction(jsNode->generateCodeWork, isolate, node);
 
         // active the next.
         auto connection = node->findConnectionByProcess();
@@ -594,6 +848,8 @@ namespace sight {
 
         // here it is.
         auto isolate = g_V8Runtime->isolate;
+        v8::HandleScope handle_scope(isolate);
+
         std::vector<SightNode*> list;
         list.push_back(node);
 

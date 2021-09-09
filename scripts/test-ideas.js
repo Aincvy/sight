@@ -66,24 +66,34 @@ addTemplateNode({
     // used for context menu
     __meta_address: "test/math",
     __meta_func: {
-        // this function will be to string(only function body.).
-        generateCodeWork($, $options) {
+        // If only 1 param, and it called '$',
+        // then the whole function body will be convert to string,unless the return value is a function.
+        // If return value is a function, then the function only can have 1 param called '$'. And the function's body will convert to string.
+        // If the param is called '$$', then generateCodeWork will be eval, and you can
+        //   return a statement or expr or function, if you do like this, the `return` keyword will be omitted, and the other part will convert to string.
+        // If has 2 param, it's '$' and '$$'.
+        // In this case, you should return a function. the function's behavior will be like above.
+        // Or you can return a statement or expr, if you do like this, the `return` keyword will be omitted, and the other part
+        //   will be convert to string.
+        // The `onReverseActive` will have similar behavior.
+        // Zero param will be as 1 param.
+        generateCodeWork($, $$) {
             print($.msg);
         },
 
-        // this function will be eval
+        // this function will be eval, has similar behavior with generateCodeWork
         // the result function will be to string.
         onReverseActive(nodePort, $options){
             if (nodePort.name === "number") {
                 $options.isPart = true;
-                return [function ($){
+                return function ($){
                     // In here, do not use `this` keyword to get property. Use `$` var.
                     // If you has some dynamic var, you should use `$.self.x`. Replace `x` to your property name.
                     // If you want to call some functions, `$.self` is ok.
                     return $.number1 + $.number2;
                     // If $options.isPart = true, then it will be omitted `return` keyword.
                     // We will process this to `${$.number1} + ${$.number2}`
-                }, true];     // Second result is same as $options.isPart = true
+                };
             }
         },
     },

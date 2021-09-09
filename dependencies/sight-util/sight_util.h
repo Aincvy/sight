@@ -18,10 +18,19 @@ namespace sight {
     bool endsWith(std::string const& fullString, std::string const& ending);
 
     /**
+     *
+     * @param fullString
+     * @param substring
+     * @return
+     */
+    inline bool startsWith(std::string const&fullString, std::string const& substring){
+        return fullString.size() >= substring.size() && fullString.find(substring) == 0;
+    }
+
+    /**
      * All trim function are from https://stackoverflow.com/a/217605/11226492
      * @param s
      */
-
 
     inline void ltrim(std::string &s) {
         s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) {
@@ -54,5 +63,12 @@ namespace sight {
         trim(s);
         return s;
     }
+
+    /**
+     *
+     * @param code
+     * @return
+     */
+    std::string removeComment(std::string const& code);
 
 }
