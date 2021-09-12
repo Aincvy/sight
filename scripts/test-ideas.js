@@ -116,6 +116,40 @@ addTemplateNode({
 
 });
 
+
+addTemplateNode({
+    // meta info, start with __meta
+
+    __meta_name: "VarDeclare",
+    // used for context menu
+    __meta_address: "test/var",
+    __meta_func: {
+        // this function will be to string(only function body.).
+        generateCodeWork($) {
+            $.varName.value = $.number();
+        },
+
+        // If object do not has `onReverseActive` function, then it will be call generateCodeWork when this function is needed.
+        // onReverseActive(nodePort, $options){
+        //
+        // },
+    },
+    __meta_inputs: {
+        chainIn: 'Process',
+        number: 'Number',
+    },
+    __meta_outputs: {
+        chainOut: 'Process',
+    },
+
+    varName: {
+        type: 'String',
+        defaultValue: 'varName',
+    },
+
+});
+
+
 addTemplateNode({
     // meta info, start with __meta
 

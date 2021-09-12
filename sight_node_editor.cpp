@@ -150,6 +150,13 @@ namespace sight {
             // ImGui::Separator();
             ImGui::Dummy(ImVec2(0,3));
 
+            // fields
+            for (auto &item: node->fields) {
+                ImGui::Text("%s", item.portName.c_str());
+                ImGui::SameLine();
+                showNodePortValue(&item);
+            }
+
             auto color = ImColor(0,99,160,255);
             // inputPorts
             ImGuiEx_BeginColumn();
@@ -322,16 +329,17 @@ namespace sight {
         }
 
         /**
-         * Only sync id. From src to dst.
+         * Sync id, value. From src to dst.
          * @param src
          * @param dst
          */
-        void syncNodePortId(std::vector<SightNodePort> & src,std::vector<SightNodePort> & dst){
+        void syncNodePort(std::vector<SightNodePort> & src, std::vector<SightNodePort> & dst){
             for (auto &item : dst) {
                 for (const auto &srcItem : src) {
                     if (srcItem.portName == item.portName) {
                         // same port.
                         item.id = srcItem.id;
+                        item.value = srcItem.value;
                         break;
                     }
                 }
@@ -354,6 +362,17 @@ namespace sight {
         delete g_NodeEditorStatus;
         g_NodeEditorStatus = nullptr;
         return 0;
+    }
+
+    void showNodePortValue(SightNodePort *port) {
+        char labelBuf[NAME_BUF_SIZE];
+        sprintf(labelBuf, "## %d", port->id);
+        if (port->getType() == "Number") {
+
+        } else if (port->getType() == "String") {
+            ImGui::SetNextItemWidth(230);
+            ImGui::InputText(labelBuf, port->value.string, std::size(port->value.string));
+        }
     }
 
     int showNodeEditorGraph(const UIStatus &uiStatus) {
@@ -456,7 +475,13 @@ namespace sight {
         } else if (port.kind == NodePortType::Output) {
             this->outputPorts.push_back(port);
         } else if (port.kind == NodePortType::Both) {
-            // todo
+            this->inputPorts.push_back(port);
+
+            // need change id
+            this->outputPorts.push_back(port);
+            this->outputPorts.back().id = nextNodeOrPortId();
+        } else if (port.kind == NodePortType::Field) {
+            this->fields.push_back(port);
         }
     }
 
@@ -479,13 +504,16 @@ namespace sight {
         }
 
         // generate id
+        auto genIdFunc = [](std::vector<SightNodePort> & list) {
+            for (auto &item : list) {
+                item.id = nextNodeOrPortId();
+            }
+        };
+
         p->nodeId = nextNodeOrPortId();
-        for (auto &item : p->inputPorts) {
-            item.id = nextNodeOrPortId();
-        }
-        for (auto &item : p->outputPorts) {
-            item.id = nextNodeOrPortId();
-        }
+        genIdFunc(p->inputPorts);
+        genIdFunc(p->outputPorts);
+        genIdFunc(p->fields);
 
         return p;
     }
@@ -499,24 +527,21 @@ namespace sight {
             this->templateNode = node->templateNode;
         }
 
-        for (const auto &item : node->inputPorts) {
-            this->inputPorts.push_back(item);
-            if (isTemplate) {
-                this->inputPorts.back().templatePort = &item;
-            } else {
-                this->inputPorts.back().templatePort = item.templatePort;
+        auto copyFunc = [isTemplate](std::vector<SightNodePort> const &src, std::vector<SightNodePort> & dst){
+            for (const auto &item : src) {
+                dst.push_back(item);
+                if (isTemplate) {
+                    dst.back().templatePort = &item;
+                } else {
+                    dst.back().templatePort = item.templatePort;
+                }
             }
-        }
+        };
 
-        for (const auto &item : node->outputPorts) {
-            this->outputPorts.push_back(item);
+        copyFunc(node->inputPorts, this->inputPorts);
+        copyFunc(node->outputPorts, this->outputPorts);
+        copyFunc(node->fields, this->fields);
 
-            if (isTemplate) {
-                this->outputPorts.back().templatePort = &item;
-            } else {
-                this->outputPorts.back().templatePort = item.templatePort;
-            }
-        }
     }
 
     SightNodePortConnection SightNode::findConnectionByProcess() {
@@ -587,9 +612,12 @@ namespace sight {
         return this->right;
     }
 
-    int SightNodeGraph::saveToFile(const char *path, bool set) {
+    int SightNodeGraph::saveToFile(const char *path, bool set,bool saveAnyway) {
         if (set) {
             this->setFilePath(path);
+        }
+        if (!saveAnyway && isBroken()) {
+            return 1;
         }
 
         // ctor yaml object
@@ -611,7 +639,6 @@ namespace sight {
                     out << YAML::Key << "template" << YAML::Value << address->fullTemplateAddress;
                 }
             }
-            out << YAML::Key << "fields" << YAML::Value << "not impl";
 
             auto portWork = [&out](SightNodePort const& item) {
                 out << YAML::Key << item.portName;
@@ -622,6 +649,9 @@ namespace sight {
                     out << YAML::Key << "type" << YAML::Value << item.type;
                 } else {
                     // write values to file.
+                    if (item.getType() == "String") {
+                        out << YAML::Key << "value" << YAML::Value << item.value.string;
+                    }
                 }
                 out << YAML::EndMap;
             };
@@ -633,9 +663,17 @@ namespace sight {
                 portWork(item);
             }
             out << YAML::EndMap;
+
             out << YAML::Key << "outputs";
             out << YAML::Value << YAML::BeginMap;
             for (const auto &item : node.outputPorts) {
+                portWork(item);
+            }
+            out << YAML::EndMap;
+
+            out << YAML::Key << "fields";
+            out << YAML::Value << YAML::BeginMap;
+            for (const auto &item : node.fields) {
                 portWork(item);
             }
             out << YAML::EndMap;
@@ -700,12 +738,19 @@ namespace sight {
                         type = typeNode.as<std::string>();
                     }
 
-                    return {
-                        portName,
-                        id,
-                        nodePortType,
-                        type,
+                    SightNodePort port = {
+                            portName,
+                            id,
+                            nodePortType,
+                            type,
                     };
+
+                    auto valueNode = values["value"];
+                    if (valueNode.IsDefined()) {
+                        sprintf(port.value.string, "%s", valueNode.as<std::string>().c_str());
+                    }
+
+                    return port;
                 };
 
                 auto inputs = yamlNode["inputs"];
@@ -716,6 +761,11 @@ namespace sight {
                 auto outputs = yamlNode["outputs"];
                 for (const auto &output : outputs) {
                     sightNode.outputPorts.push_back(portWork(output, NodePortType::Output));
+                }
+
+                auto fields = yamlNode["fields"];
+                for (const auto &field : fields) {
+                    sightNode.fields.push_back(portWork(field, NodePortType::Field));
                 }
 
                 auto templateNodeAddress = yamlNode["template"].as<std::string>("");
@@ -732,13 +782,15 @@ namespace sight {
                     auto templateNode = g_NodeEditorStatus->findTemplateNode(templateNodeAddress.c_str());
                     if (!templateNode) {
                         dbg(templateNodeAddress, " template not found.");
+                        broken = true;
                         status = 1;
                     } else {
                         // use template node init.
                         auto nodePointer = templateNode->instantiate(false);
                         nodePointer->nodeId = sightNode.nodeId;
-                        syncNodePortId(sightNode.inputPorts,nodePointer->inputPorts);
-                        syncNodePortId(sightNode.outputPorts,nodePointer->outputPorts);
+                        syncNodePort(sightNode.inputPorts, nodePointer->inputPorts);
+                        syncNodePort(sightNode.outputPorts, nodePointer->outputPorts);
+                        syncNodePort(sightNode.fields, nodePointer->fields);
                         sightNode = *nodePointer;
                         delete nodePointer;
                     }
@@ -800,22 +852,34 @@ namespace sight {
                 p
         };
 
-        for (auto &item : p->inputPorts) {
-            item.node = p;
-            idMap[item.id] = {
-                    SightAnyThingType::Port,
-                    p,
-                    item.id
-            };
-        }
-        for (auto &item : p->outputPorts) {
-            item.node = p;
-            idMap[item.id] =  {
-                    SightAnyThingType::Port,
-                    p,
-                    item.id
-            };
-        }
+        auto nodeFunc = [p, this](std::vector<SightNodePort> & list){
+            for (auto &item : list) {
+                item.node = p;
+                idMap[item.id] = {
+                        SightAnyThingType::Port,
+                        p,
+                        item.id
+                };
+            }
+        };
+        CALL_NODE_FUNC(p);
+
+//        for (auto &item : p->inputPorts) {
+//            item.node = p;
+//            idMap[item.id] = {
+//                    SightAnyThingType::Port,
+//                    p,
+//                    item.id
+//            };
+//        }
+//        for (auto &item : p->outputPorts) {
+//            item.node = p;
+//            idMap[item.id] =  {
+//                    SightAnyThingType::Port,
+//                    p,
+//                    item.id
+//            };
+//        }
     }
 
     SightNode *SightNodeGraph::findNode(int id) {
@@ -854,7 +918,7 @@ namespace sight {
     }
 
     uint SightNodeGraph::createConnection(uint leftPortId, uint rightPortId, uint connectionId) {
-        dbg(leftPortId, rightPortId);
+//        dbg(leftPortId, rightPortId);
         if (leftPortId == rightPortId) {
             return -2;
         }
@@ -868,7 +932,7 @@ namespace sight {
             return -3;
         }
 
-        dbg(left, right);
+//        dbg(left, right);
         auto id = connectionId > 0 ? connectionId : nextNodeOrPortId();
         SightNodeConnection connection = {
                 id,
@@ -963,6 +1027,10 @@ namespace sight {
 
     SightArray<SightNode> &SightNodeGraph::getNodes() {
         return this->nodes;
+    }
+
+    bool SightNodeGraph::isBroken() const {
+        return this->broken;
     }
 
     int NodeEditorStatus::createGraph(const char *path) {

@@ -174,6 +174,8 @@ namespace sight {
 
         std::vector<SightNodePort> inputPorts;
         std::vector<SightNodePort> outputPorts;
+        // no input/output ports.
+        std::vector<SightNodePort> fields;
 
         /**
          *
@@ -395,9 +397,10 @@ namespace sight {
          * Save graph data to file.
          * @param path
          * @param set       if true, then set this->filepath to path
-         * @return
+         * @param saveAnyway  if true, broken flag will be omitted.
+         * @return  0 success, 1 graph is broken.
          */
-        int saveToFile(const char *path = nullptr, bool set = false);
+        int saveToFile(const char *path = nullptr, bool set = false, bool saveAnyway = false);
 
 
         void setFilePath(const char* path);
@@ -407,10 +410,13 @@ namespace sight {
         const SightArray <SightNode> & getNodes() const;
         const SightArray <SightNodeConnection> & getConnections() const;
 
+        bool isBroken() const;
+
     private:
 
         // save and read path.
         std::string filepath;
+        bool broken;
 
         // real nodes
         SightArray<SightNode> nodes;
@@ -487,6 +493,8 @@ namespace sight {
     int destroyNodeEditor();
 
     int showNodeEditorGraph(const UIStatus & uiStatus);
+
+    void showNodePortValue(SightNodePort *port);
 
     uint nextNodeOrPortId();
 

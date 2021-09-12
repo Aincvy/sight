@@ -22,7 +22,12 @@
 
 #define TYPE_PROCESS "Process"
 
-#define SET_INT_VALUE(p, v) if (p)  { *p = v; }
+#define SET_INT_VALUE(p, v) if (p)  { *(p) = v; }
+
+#define CALL_NODE_FUNC(p) nodeFunc((p)->inputPorts); \
+        nodeFunc((p)->outputPorts);                  \
+        nodeFunc((p)->fields)
+
 
 
 namespace sight {

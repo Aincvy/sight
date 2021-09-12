@@ -71,4 +71,19 @@ namespace sight {
      */
     std::string removeComment(std::string const& code);
 
+    /**
+     * https://stackoverflow.com/a/313990/11226492
+     * @param data
+     */
+    inline void lowerCase(std::string & data){
+        std::transform(data.begin(), data.end(), data.begin(),
+                       [](unsigned char c){ return std::tolower(c); });
+    }
+
+    inline void upperCase(std::string & data){
+        std::transform(data.begin(), data.end(), data.begin(),
+                       [](unsigned char c){ return std::toupper(c); });
+    }
+
+
 }
