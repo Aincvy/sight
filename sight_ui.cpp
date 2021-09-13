@@ -311,7 +311,6 @@ namespace sight {
     }
 
     void runUICommand(UICommand *command){
-        printf("runUICommand...");
         switch (command->type) {
             case UICommandType::UICommandHolder:
                 break;
@@ -362,7 +361,7 @@ namespace sight {
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // Required on Mac
 
         // Create window with graphics context
-        GLFWwindow* window = glfwCreateWindow(1280, 720, "sight - a low-code tool", NULL, NULL);
+        GLFWwindow* window = glfwCreateWindow(1600, 900, "sight - a low-code tool", NULL, NULL);
         if (window == NULL)
             return 1;
         glfwMakeContextCurrent(window);
@@ -403,6 +402,8 @@ namespace sight {
 
         g_UIStatus->languageKeys = loadLanguage("");
         g_UIStatus->uiColors = new UIColors();
+
+        initTypeMap();
 
         // load plugins
         std::promise<int> promise;
@@ -708,7 +709,7 @@ namespace sight {
 
             auto p = lastField();
             sprintf(p->name, "%s", item.portName.c_str());
-            sprintf(p->type, "%s", item.getType().c_str());
+            sprintf(p->type, "%s", getTypeName(item.type).c_str());
             sprintf(p->defaultValue, "%s", item.getDefaultValue());
         }
 

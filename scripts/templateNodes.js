@@ -194,13 +194,41 @@ addTemplateNode({
 
     },
 
+});
+
+addTemplateNode({
+    // meta info, start with __meta
+
+    __meta_name: "TestTypes",
+    // used for context menu
+    __meta_address: "process",
+    __meta_options: {
+        enter: true,
+    },
+    __meta_func: {
+        generateCodeWork($$) {
+            $$.options.isPart = true;
+            print('TestTypes generateCodeWork.');
+        },
+
+    },
+
+    // other ideas
+    __meta_inputs: {
+
+    },
+    __meta_outputs: {
+        next: 'Process',           //
+    },
+
+    _float: 'float',
+    _int: 'int',
+    _double: 'double',
+    _string: 'String',
+    _bool: 'bool',
+    _color: 'Color',
 
 });
 
 
-function a($){
-    return $.number1 + $.number2;
-}
-
-print("" + a);
 print('template node file end ');

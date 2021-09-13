@@ -181,7 +181,7 @@ namespace sight {
 
                 if (IS_V8_STRING(value)) {
                     // type
-                    port.type = v8pp::from_v8<std::string>(isolate, value);
+                    port.type = getIntType(v8pp::from_v8<std::string>(isolate, value), true);
                 } else if (value->IsObject()) {
                     // object
                     auto option = value.As<Object>();
@@ -190,7 +190,7 @@ namespace sight {
 
                     if (!temp.IsEmpty() && IS_V8_STRING((tempVal= temp.ToLocalChecked()))) {
                         // has type
-                        port.type = v8pp::from_v8<std::string>(isolate, tempVal);
+                        port.type = getIntType(v8pp::from_v8<std::string>(isolate, tempVal), true);
                     }
 
                     temp = option->Get(context, v8pp::to_v8(isolate, "showValue"));
@@ -215,7 +215,9 @@ namespace sight {
                         temp = option->Get(context, v8pp::to_v8(isolate, "kind"));
                         if (!temp.IsEmpty()) {
                             tempVal = temp.ToLocalChecked();
-                            if (tempVal->IsNumber() || tempVal->IsNumberObject()) {
+                            if (tempVal->IsNullOrUndefined()) {
+
+                            } else if (tempVal->IsNumber() || tempVal->IsNumberObject()) {
                                 int i = v8pp::from_v8<int>(isolate, tempVal);
                                 if (i >= static_cast<int>(NodePortType::Input) && i <= static_cast<int>(NodePortType::Field)) {
                                     //
@@ -357,7 +359,6 @@ namespace sight {
 
                 else {
                     // fields
-//                    std::string portName = v8pp::from_v8<std::string>(isolate, localKey);
                     auto port = nodePortWork(localKey, localVal, NodePortType::Field, true);
                     sightNode.addPort(port);
                 }
@@ -504,6 +505,54 @@ namespace sight {
         return 0;
     }
 
+    // Extracts a C string from a V8 Utf8Value.
+    const char* ToCString(const v8::String::Utf8Value& value) {
+        return *value ? *value : "<string conversion failed>";
+    }
+
+    void ReportException(v8::Isolate* isolate, v8::TryCatch* try_catch) {
+        v8::HandleScope handle_scope(isolate);
+        v8::String::Utf8Value exception(isolate, try_catch->Exception());
+        const char* exception_string = ToCString(exception);
+        v8::Local<v8::Message> message = try_catch->Message();
+        if (message.IsEmpty()) {
+            // V8 didn't provide any extra information about this error; just
+            // print the exception.
+            fprintf(stderr, "%s\n", exception_string);
+        } else {
+            // Print (filename):(line number): (message).
+            v8::String::Utf8Value filename(isolate,
+                                           message->GetScriptOrigin().ResourceName());
+            v8::Local<v8::Context> context(isolate->GetCurrentContext());
+            const char* filename_string = ToCString(filename);
+            int linenum = message->GetLineNumber(context).FromJust();
+            fprintf(stderr, "%s:%i: %s\n", filename_string, linenum, exception_string);
+            // Print line of source code.
+            v8::String::Utf8Value sourceline(
+                    isolate, message->GetSourceLine(context).ToLocalChecked());
+            const char* sourceline_string = ToCString(sourceline);
+            fprintf(stderr, "%s\n", sourceline_string);
+            // Print wavy underline (GetUnderline is deprecated).
+            int start = message->GetStartColumn(context).FromJust();
+            for (int i = 0; i < start; i++) {
+                fprintf(stderr, " ");
+            }
+            int end = message->GetEndColumn(context).FromJust();
+            for (int i = start; i < end; i++) {
+                fprintf(stderr, "^");
+            }
+            fprintf(stderr, "\n");
+            v8::Local<v8::Value> stack_trace_string;
+            if (try_catch->StackTrace(context).ToLocal(&stack_trace_string) &&
+                stack_trace_string->IsString() &&
+                v8::Local<v8::String>::Cast(stack_trace_string)->Length() > 0) {
+                v8::String::Utf8Value stack_trace(isolate, stack_trace_string);
+                const char* stack_trace_string = ToCString(stack_trace);
+                fprintf(stderr, "%s\n", stack_trace_string);
+            }
+        }
+    }
+
     /**
      * run a js file.
      * @param filepath
@@ -520,6 +569,8 @@ namespace sight {
 //        auto context = v8::Context::New(isolate);
 //        v8::Context::Scope contextScope(context);
 //        printf(context.IsEmpty() ? "empty\n" : "not empty\n");
+
+        TryCatch tryCatch(isolate);
 
         v8::Local<v8::String> sourceCode = readFile(isolate, filepath).ToLocalChecked();
 
@@ -540,7 +591,17 @@ namespace sight {
         args[0] = Object::New(isolate);
         args[1] = Object::New(isolate);
         args[2] = Object::New(isolate);
-        MaybeLocal<Value> result = function->Call(context, recv, 3, args);
+        function->Call(context, recv, 3, args);
+        if (tryCatch.HasCaught()) {
+            dbg("js file has error", filepath);
+            if (promise) {
+                promise->set_value(0);
+            }
+
+            //
+            ReportException(isolate, &tryCatch);
+            return 1;
+        }
 
         // send nodes to ui thread.
         if (!g_NodeCache.empty()) {
@@ -721,9 +782,9 @@ namespace sight {
                     };
 
                     auto functionObject = v8pp::wrap_function(isolate, name, t);
-                    if (item.getType() == "Number") {
+                    if (item.getType() == IntTypeFloat) {
                         functionObject->Set(context, v8pp::to_v8(isolate, "value"), v8pp::to_v8(isolate, item.value.f));
-                    } else if (item.getType() == "String") {
+                    } else if (item.getType() == IntTypeString) {
                         functionObject->Set(context, v8pp::to_v8(isolate, "value"), v8pp::to_v8(isolate, item.value.string));
                     }
                     functionObject->Set(context, v8pp::to_v8(isolate, "isConnect"), v8pp::to_v8(isolate, item.isConnect()));

@@ -14,6 +14,7 @@
 #include "sight_memory.h"
 
 #include "v8.h"
+#include "absl/container/btree_map.h"
 
 namespace ed = ax::NodeEditor;
 
@@ -41,7 +42,7 @@ namespace sight {
         double d;
         bool b;
         char string[NAME_BUF_SIZE] = {0};
-        char* largeString;
+        char* largeString;     // todo largeString
     };
 
     struct SightNodePortOptions {
@@ -56,9 +57,9 @@ namespace sight {
         uint id;
         // input/output ...
         NodePortType kind;
-        // int/long/String/float ...
-        // use getType() function, do not use this field directly.
-        std::string type;
+
+        // IntTypeValues ...
+        uint type;
         SightNodeValue value;
         SightNodePortOptions options;
 
@@ -87,10 +88,10 @@ namespace sight {
         int connectionsSize() const;
 
         /**
-         * int/long/String/float ...
+         * IntTypeValues
          * @return
          */
-        std::string const& getType() const;
+        uint getType() const;
 
         /**
          *
@@ -439,6 +440,23 @@ namespace sight {
         void reset();
     };
 
+    enum TypeIntValues{
+        IntTypeProcess = 1,
+
+        IntTypeInt = 100,
+        IntTypeFloat,
+        IntTypeDouble,
+        IntTypeChar,
+        IntTypeString,
+        IntTypeBool,
+        IntTypeLong,
+        IntTypeColor,
+        IntTypeVector3,
+        IntTypeVector4,
+
+        IntTypeNext = 3000,
+    };
+
     /**
      * sight  node editor status
      */
@@ -477,6 +495,8 @@ namespace sight {
          */
         SightNode* findTemplateNode(const char* path);
 
+    private:
+
     };
 
     /**
@@ -484,6 +504,8 @@ namespace sight {
      * @return
      */
     int initNodeEditor();
+
+    void initTypeMap();
 
     /**
      * destroy and free
@@ -557,5 +579,26 @@ namespace sight {
      * @return
      */
     SightJsNode* findTemplateNode(const SightNode *node);
+
+    /**
+     * todo multiple thread test.
+     * @param str
+     * @return -1 if not found.
+     */
+    uint getIntType(std::string const& str, bool addIfNotFound = false);
+
+    /**
+     *
+     * @param type
+     * @return full name
+     */
+    std::string const & getTypeName(int type);
+
+    /**
+     *
+     * @param name need type's full name
+     * @return
+     */
+    uint addType(std::string const& name);
 
 }

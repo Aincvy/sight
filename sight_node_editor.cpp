@@ -34,6 +34,7 @@ namespace ed = ax::NodeEditor;
 // node editor status
 static sight::NodeEditorStatus* g_NodeEditorStatus;
 
+static std::string emptyString("");
 
 namespace sight {
 
@@ -59,6 +60,11 @@ namespace sight {
 
     namespace {
         // private members and functions
+        std::atomic<uint> typeIdIncr(IntTypeNext);
+        // todo this need to serialization and deserialization. And bind to project.
+        absl::btree_map<std::string, uint> typeMap;
+        absl::btree_map<uint, std::string> reverseTypeMap;
+
 
         void showContextMenu(const ImVec2& openPopupPosition){
             ed::Suspend();
@@ -173,13 +179,13 @@ namespace sight {
             ImGuiEx_NextColumn();
             for (SightNodePort &item : node->outputPorts) {
                 // test value
-                if (item.type == "Process" || !item.options.showValue){
+                if (item.type == IntTypeProcess || !item.options.showValue){
 
                 } else {
                     char buf[LITTLE_NAME_BUF_SIZE];
                     sprintf(buf, "## %d", item.id);
                     ImGui::SetNextItemWidth(120);
-                    if (item.type == "Number") {
+                    if (item.type == IntTypeFloat) {
                         ImGui::DragFloat(buf, &item.value.f, 0.5f);
                     }
                     else {
@@ -367,12 +373,32 @@ namespace sight {
     void showNodePortValue(SightNodePort *port) {
         char labelBuf[NAME_BUF_SIZE];
         sprintf(labelBuf, "## %d", port->id);
-        if (port->getType() == "Number") {
 
-        } else if (port->getType() == "String") {
-            ImGui::SetNextItemWidth(230);
-            ImGui::InputText(labelBuf, port->value.string, std::size(port->value.string));
+        ImGui::SetNextItemWidth(160);
+        switch (port->getType()) {
+            case IntTypeFloat:
+                ImGui::DragFloat(labelBuf, &port->value.f, 0.5f);
+                break;
+            case IntTypeDouble:
+                ImGui::InputDouble(labelBuf, &port->value.d);
+                break;
+            case IntTypeInt:
+                ImGui::DragInt(labelBuf, &port->value.i);
+                break;
+            case IntTypeString:
+                ImGui::InputText(labelBuf, port->value.string, std::size(port->value.string));
+                break;
+            case IntTypeBool:
+                ImGui::Checkbox(labelBuf, &port->value.b);
+                break;
+            case IntTypeColor:
+                ImGui::ColorEdit3(labelBuf, &port->value.f);
+                break;
+            default:
+                ImGui::LabelText(labelBuf, "Unknown type of %d", port->getType());
+                break;
         }
+
     }
 
     int showNodeEditorGraph(const UIStatus &uiStatus) {
@@ -461,10 +487,7 @@ namespace sight {
         return this->value.string;
     }
 
-    std::string const& SightNodePort::getType() const {
-        if (templatePort) {
-            return templatePort->getType();
-        }
+    uint SightNodePort::getType() const {
         return this->type;
     }
 
@@ -552,7 +575,7 @@ namespace sight {
                 continue;
             }
 
-            if (outputPort.getType() == "Process") {
+            if (outputPort.getType() == IntTypeProcess) {
                 //
                 connection = outputPort.connections.front();
                 break;
@@ -648,10 +671,29 @@ namespace sight {
                     // this is template port
                     out << YAML::Key << "type" << YAML::Value << item.type;
                 } else {
-                    // write values to file.
-                    if (item.getType() == "String") {
-                        out << YAML::Key << "value" << YAML::Value << item.value.string;
+                    // todo write values to file.
+                    out << YAML::Key << "value" << YAML::Value;
+                    switch (item.type) {
+                        case IntTypeFloat:
+                            out << item.value.f;
+                            break;
+                        case IntTypeDouble:
+                            out << item.value.d;
+                            break;
+                        case IntTypeInt:
+                            out << item.value.i;
+                            break;
+                        case IntTypeString:
+                            out << item.value.string;
+                            break;
+                        case IntTypeBool:
+                            out << item.value.b;
+                            break;
+                        default:
+                            out << YAML::Null;
+                            break;
                     }
+
                 }
                 out << YAML::EndMap;
             };
@@ -733,9 +775,9 @@ namespace sight {
                     auto values = item.second;
                     auto id = values["id"].as<uint>();
                     auto typeNode = values["type"];
-                    std::string type;
+                    uint type = 0;
                     if (typeNode.IsDefined()) {
-                        type = typeNode.as<std::string>();
+                        type = typeNode.as<uint>();
                     }
 
                     SightNodePort port = {
@@ -747,7 +789,26 @@ namespace sight {
 
                     auto valueNode = values["value"];
                     if (valueNode.IsDefined()) {
-                        sprintf(port.value.string, "%s", valueNode.as<std::string>().c_str());
+                        switch (type) {
+                            case IntTypeFloat:
+                                port.value.f = valueNode.as<float>();
+                                break;
+                            case IntTypeDouble:
+                                port.value.d = valueNode.as<double>();
+                                break;
+                            case IntTypeInt:
+                                port.value.i = valueNode.as<int>();
+                                break;
+                            case IntTypeString:
+                                sprintf(port.value.string, "%s", valueNode.as<std::string>().c_str());
+                                break;
+                            case IntTypeBool:
+                                port.value.b = valueNode.as<bool>();
+                                break;
+                            default:
+                                port.value.i = 0;
+                                break;
+                        }
                     }
 
                     return port;
@@ -1091,11 +1152,41 @@ namespace sight {
     }
 
     NodeEditorStatus::NodeEditorStatus() {
+        initTypeMap();
 
     }
 
     NodeEditorStatus::~NodeEditorStatus() {
         // todo free memory.
+
+    }
+
+    void initTypeMap() {
+        std::string process = "Process";
+        std::string _string = "String";
+        const char* number = "Number";
+
+        typeMap[process] = IntTypeProcess;
+        lowerCase(process);
+        typeMap[process] = IntTypeProcess;
+
+        typeMap[_string] = IntTypeString;
+        lowerCase(_string);
+        typeMap[_string] = IntTypeString;
+
+        typeMap[number] = IntTypeFloat;
+        typeMap["int"] = IntTypeInt;
+        typeMap["float"] = IntTypeFloat;
+        typeMap["double"] = IntTypeDouble;
+        typeMap["long"] = IntTypeLong;
+        typeMap["bool"] = IntTypeBool;
+        typeMap["Color"] = IntTypeColor;
+        typeMap["Vector3"] = IntTypeVector3;
+        typeMap["Vector4"] = IntTypeVector4;
+
+        for (auto & item: typeMap) {
+            reverseTypeMap[item.second] = item.first;
+        }
 
     }
 
@@ -1266,13 +1357,15 @@ namespace sight {
         node->nodeId = id++;         // All node and port's ids need to be initialized.
 
         auto c = createEntityData.first;
+        auto type = getIntType(c->type, true);
+
         while (c) {
             // input
             SightNodePort port = {
                     c->name,
                     id++,
                     NodePortType::Input,
-                    c->type,
+                    type,
                     {},
                     {},
                     std::vector<SightNodeConnection*>(),
@@ -1389,5 +1482,34 @@ namespace sight {
     SightNodePortConnection::SightNodePortConnection(SightNodePort *self, SightNodePort *target,
                                                      SightNodeConnection *connection) : self(self), target(target),
                                                                                         connection(connection) {}
+
+
+
+    uint getIntType(const std::string &str, bool addIfNotFound) {
+        auto a = typeMap.find(str);
+        if (a != typeMap.end()) {
+            return a->second;
+        } else if (addIfNotFound) {
+            return addType(str);
+        }
+
+        return -1;
+    }
+
+    std::string const &getTypeName(int type) {
+        auto a = reverseTypeMap.find(type);
+        if (a != reverseTypeMap.end()) {
+            return a->second;
+        }
+        return emptyString;
+    }
+
+    uint addType(const std::string &name) {
+        uint a = ++ (typeIdIncr);
+        typeMap[name] = a;
+        reverseTypeMap[a] = name;
+        return a;
+    }
+
 
 }
