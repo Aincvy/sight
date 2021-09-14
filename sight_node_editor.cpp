@@ -66,12 +66,18 @@ namespace sight {
         absl::btree_map<uint, std::string> reverseTypeMap;
 
 
-        void showContextMenu(const ImVec2& openPopupPosition){
+        void showContextMenu(const ImVec2& openPopupPosition, uint nodeId, uint linkId, uint pinId){
             ed::Suspend();
 
             if (ImGui::BeginPopup(NODE_CONTEXT_MENU)) {
                 if (ImGui::MenuItem("itemA")) {
                     dbg("item a");
+                }
+                if (ImGui::MenuItem("debugInfo")) {
+                    // show debug info.
+                    dbg(nodeId);
+                    auto nodePointer = CURRENT_GRAPH->findNode(nodeId);
+                    dbg(nodePointer);
                 }
                 ImGui::EndPopup();
             }
@@ -103,7 +109,7 @@ namespace sight {
             ed::Resume();
         }
 
-        void showNodePortIcon(ImColor color, bool isConnected = false){
+        void showNodePortIcon(uint type, ImColor color, bool isConnected = false){
             auto cursorPos = ImGui::GetCursorScreenPos();
             auto drawList  = ImGui::GetWindowDrawList();
             const int iconSize = 20;
@@ -121,20 +127,92 @@ namespace sight {
             // auto color = ImColor(0,99,160,255);
             const auto c = rect_center;
             auto triangleStart = rect_center_x + 0.32f * rect_w;
+            auto alpha = 255;
+            auto innerColor = ImColor(32, 32, 32, alpha);
 
-            if (isConnected) {
-                drawList->AddCircleFilled(c, 0.5f * rect_w / 2.0f, color, 12 + extra_segments);
-            } else {
-                drawList->AddCircle(c, 0.5f * rect_w / 2.0f, color, 12 + extra_segments,1.35f);
+            bool drawTriangle = true;
+            switch (type) {
+                case IntTypeProcess:
+                {
+                    drawTriangle = false;
+                    const auto origin_scale = rect_w / 24.0f;
+
+                    const auto offset_x  = 1.0f * origin_scale;
+                    const auto offset_y  = 0.0f * origin_scale;
+                    const auto margin     = (isConnected ? 2.0f : 2.0f) * origin_scale;
+                    const auto rounding   = 0.1f * origin_scale;
+                    const auto tip_round  = 0.7f; // percentage of triangle edge (for tip)
+                    //const auto edge_round = 0.7f; // percentage of triangle edge (for corner)
+                    const auto canvas = ImRect(
+                            rect.Min.x + margin + offset_x,
+                            rect.Min.y + margin + offset_y,
+                            rect.Max.x - margin + offset_x,
+                            rect.Max.y - margin + offset_y);
+                    const auto canvas_x = canvas.Min.x;
+                    const auto canvas_y = canvas.Min.y;
+                    const auto canvas_w = canvas.Max.x - canvas.Min.x;
+                    const auto canvas_h = canvas.Max.y - canvas.Min.y;
+
+                    const auto left   = canvas_x + canvas_w            * 0.5f * 0.3f;
+                    const auto right  = canvas_x + canvas_w - canvas_w * 0.5f * 0.3f;
+                    const auto top    = canvas_y + canvas_h            * 0.5f * 0.2f;
+                    const auto bottom = canvas_y + canvas_h - canvas_h * 0.5f * 0.2f;
+                    const auto center_y = (top + bottom) * 0.5f;
+                    //const auto angle = AX_PI * 0.5f * 0.5f * 0.5f;
+
+                    const auto tip_top    = ImVec2(canvas_x + canvas_w * 0.5f, top);
+                    const auto tip_right  = ImVec2(right, center_y);
+                    const auto tip_bottom = ImVec2(canvas_x + canvas_w * 0.5f, bottom);
+
+                    drawList->PathLineTo(ImVec2(left, top) + ImVec2(0, rounding));
+                    drawList->PathBezierCurveTo(
+                            ImVec2(left, top),
+                            ImVec2(left, top),
+                            ImVec2(left, top) + ImVec2(rounding, 0));
+                    drawList->PathLineTo(tip_top);
+                    drawList->PathLineTo(tip_top + (tip_right - tip_top) * tip_round);
+                    drawList->PathBezierCurveTo(
+                            tip_right,
+                            tip_right,
+                            tip_bottom + (tip_right - tip_bottom) * tip_round);
+                    drawList->PathLineTo(tip_bottom);
+                    drawList->PathLineTo(ImVec2(left, bottom) + ImVec2(rounding, 0));
+                    drawList->PathBezierCurveTo(
+                            ImVec2(left, bottom),
+                            ImVec2(left, bottom),
+                            ImVec2(left, bottom) - ImVec2(0, rounding));
+
+                    if (!isConnected)
+                    {
+                        if (innerColor & 0xFF000000)
+                            drawList->AddConvexPolyFilled(drawList->_Path.Data, drawList->_Path.Size, innerColor);
+
+                        drawList->PathStroke(color, true, 2.0f * outline_scale);
+                    }
+                    else
+                        drawList->PathFillConvex(color);
+                    break;
+                }
+                default:
+                {
+                    if (isConnected) {
+                        drawList->AddCircleFilled(c, 0.5f * rect_w / 2.0f, color, 12 + extra_segments);
+                    } else {
+                        drawList->AddCircle(c, 0.5f * rect_w / 2.0f, color, 12 + extra_segments,1.35f);
+                    }
+                    break;
+                }
+
             }
 
-            const auto triangleTip = triangleStart + rect_w * (0.45f - 0.32f);
-
-            drawList->AddTriangleFilled(
-                    ImVec2(ceilf(triangleTip), rect_y + rect_h * 0.5f),
-                    ImVec2(triangleStart, rect_center_y + 0.15f * rect_h),
-                    ImVec2(triangleStart, rect_center_y - 0.15f * rect_h),
-                    color);
+            if (drawTriangle) {
+                const auto triangleTip = triangleStart + rect_w * (0.45f - 0.32f);
+                drawList->AddTriangleFilled(
+                        ImVec2(ceilf(triangleTip), rect_y + rect_h * 0.5f),
+                        ImVec2(triangleStart, rect_center_y + 0.15f * rect_h),
+                        ImVec2(triangleStart, rect_center_y - 0.15f * rect_h),
+                        color);
+            }
 
             ImGui::Dummy(size);
         }
@@ -149,11 +227,27 @@ namespace sight {
                 return -1;
             }
 
+            auto color = ImColor(0,99,160,255);
+
             ed::BeginNode(node->nodeId);
             ImGui::Dummy(ImVec2(7,5));
-            ImGui::SameLine();
+            auto chainInPort = node->chainInPort;
+            if (chainInPort) {
+                ed::BeginPin(chainInPort->id, ed::PinKind::Input);
+                showNodePortIcon(IntTypeProcess, color, false);
+                ed::EndPin();
+                ImGui::SameLine();
+            }
+
             ImGui::TextColored(ImVec4(0,106,113,255),"%s", node->nodeName.c_str());
-            // ImGui::Separator();
+
+            auto chainOutPort = node->chainOutPort;
+            if (chainOutPort) {
+                ImGui::SameLine();
+                ed::BeginPin(chainOutPort->id, ed::PinKind::Output);
+                showNodePortIcon(IntTypeProcess, color, false);
+                ed::EndPin();
+            }
             ImGui::Dummy(ImVec2(0,3));
 
             // fields
@@ -163,14 +257,17 @@ namespace sight {
                 showNodePortValue(&item);
             }
 
-            auto color = ImColor(0,99,160,255);
             // inputPorts
             ImGuiEx_BeginColumn();
             for (auto &item : node->inputPorts) {
+                if (item.portName.empty()) {
+                    continue;       // do not show the chain port. (Process port)
+                }
+
                 ed::BeginPin(item.id, ed::PinKind::Input);
                 ed::PinPivotAlignment(ImVec2(0, 0.5f));
                 ed::PinPivotSize(ImVec2(0, 0));
-                showNodePortIcon(color, item.isConnect());
+                showNodePortIcon(item.type, color, item.isConnect());
                 ImGui::SameLine();
                 ImGui::Text("%s", item.portName.c_str());
                 ed::EndPin();
@@ -178,6 +275,10 @@ namespace sight {
 
             ImGuiEx_NextColumn();
             for (SightNodePort &item : node->outputPorts) {
+                if (item.portName.empty()) {
+                    continue;       // do not show the chain port. (Process port)
+                }
+
                 // test value
                 if (item.type == IntTypeProcess || !item.options.showValue){
 
@@ -199,7 +300,7 @@ namespace sight {
                 ed::PinPivotSize(ImVec2(0, 0));
                 ImGui::Text("%s", item.portName.c_str());
                 ImGui::SameLine();
-                showNodePortIcon(color, item.isConnect());
+                showNodePortIcon(item.type, color, item.isConnect());
                 ed::EndPin();
             }
 
@@ -322,7 +423,8 @@ namespace sight {
             }
             ed::Resume();
 
-            showContextMenu(openPopupPosition);
+            showContextMenu(openPopupPosition, static_cast<uint>(contextNodeId.Get()),
+                            static_cast<uint>(contextLinkId.Get()),static_cast<uint>(contextPinId.Get()));
             // End of interaction with editor.
             ed::End();
 
@@ -506,6 +608,7 @@ namespace sight {
         } else if (port.kind == NodePortType::Field) {
             this->fields.push_back(port);
         }
+
     }
 
     SightNode *SightNode::clone() const{
@@ -515,28 +618,28 @@ namespace sight {
     }
 
     SightNode *SightNode::instantiate(bool generateId) const {
+        dbg("instantiate", this->nodeName);
         if (this->templateNode) {
             return this->templateNode->instantiate();
         }
 
         auto p = new SightNode();
         p->copyFrom(this, true);
+        p->tryAddChainPorts();
 
         if (!generateId) {
             return p;
         }
 
         // generate id
-        auto genIdFunc = [](std::vector<SightNodePort> & list) {
+        auto nodeFunc = [](std::vector<SightNodePort> & list) {
             for (auto &item : list) {
                 item.id = nextNodeOrPortId();
             }
         };
 
         p->nodeId = nextNodeOrPortId();
-        genIdFunc(p->inputPorts);
-        genIdFunc(p->outputPorts);
-        genIdFunc(p->fields);
+        CALL_NODE_FUNC(p);
 
         return p;
     }
@@ -550,14 +653,9 @@ namespace sight {
             this->templateNode = node->templateNode;
         }
 
-        auto copyFunc = [isTemplate](std::vector<SightNodePort> const &src, std::vector<SightNodePort> & dst){
+        auto copyFunc = [](std::vector<SightNodePort> const &src, std::vector<SightNodePort> & dst){
             for (const auto &item : src) {
                 dst.push_back(item);
-                if (isTemplate) {
-                    dst.back().templatePort = &item;
-                } else {
-                    dst.back().templatePort = item.templatePort;
-                }
             }
         };
 
@@ -596,6 +694,48 @@ namespace sight {
         return {};
     }
 
+    void SightNode::updateChainPortPointer() {
+        for (auto &item : inputPorts) {
+            if (item.portName.empty()) {
+                // let empty name port to chain port.
+                chainInPort = &item;
+                break;
+            }
+        }
+
+        for (auto &item : outputPorts) {
+            if (item.portName.empty()) {
+                // let empty name port to chain port.
+                chainOutPort = &item;
+                break;
+            }
+        }
+        
+    }
+
+    void SightNode::tryAddChainPorts() {
+        auto nodeFunc = [](std::vector<SightNodePort> & list, NodePortType kind){
+            bool find = false;
+            for (const auto &item : list) {
+                if (item.portName.empty()) {
+                    find = true;
+                    break;
+                }
+            }
+
+            if (!find) {
+                list.push_back({
+                    .kind = kind,
+                    .type = IntTypeProcess,
+                });
+            }
+        };
+
+        nodeFunc(this->inputPorts, NodePortType::Input);
+        nodeFunc(this->outputPorts, NodePortType::Output);
+
+        updateChainPortPointer();
+    }
 
     void SightJsNode::callFunction(const char *name) {
 
@@ -664,37 +804,33 @@ namespace sight {
             }
 
             auto portWork = [&out](SightNodePort const& item) {
-                out << YAML::Key << item.portName;
+                out << YAML::Key << item.id;
                 out << YAML::Value << YAML::BeginMap;
-                out << YAML::Key << "id" << YAML::Value << item.id;
-                if (!item.templatePort) {
-                    // this is template port
-                    out << YAML::Key << "type" << YAML::Value << item.type;
-                } else {
-                    // todo write values to file.
-                    out << YAML::Key << "value" << YAML::Value;
-                    switch (item.type) {
-                        case IntTypeFloat:
-                            out << item.value.f;
-                            break;
-                        case IntTypeDouble:
-                            out << item.value.d;
-                            break;
-                        case IntTypeInt:
-                            out << item.value.i;
-                            break;
-                        case IntTypeString:
-                            out << item.value.string;
-                            break;
-                        case IntTypeBool:
-                            out << item.value.b;
-                            break;
-                        default:
-                            out << YAML::Null;
-                            break;
-                    }
+                out << YAML::Key << "name" << YAML::Value << item.portName;
+                out << YAML::Key << "type" << YAML::Value << item.type;
 
+                out << YAML::Key << "value" << YAML::Value;
+                switch (item.type) {
+                    case IntTypeFloat:
+                        out << item.value.f;
+                        break;
+                    case IntTypeDouble:
+                        out << item.value.d;
+                        break;
+                    case IntTypeInt:
+                        out << item.value.i;
+                        break;
+                    case IntTypeString:
+                        out << item.value.string;
+                        break;
+                    case IntTypeBool:
+                        out << item.value.b;
+                        break;
+                    default:
+                        out << YAML::Null;
+                        break;
                 }
+
                 out << YAML::EndMap;
             };
 
@@ -763,56 +899,61 @@ namespace sight {
             // nodes
             auto nodeRoot = root["nodes"];
             dbg(nodeRoot.size());
+
+            auto portWork = [](YAML::detail::iterator_value const& item, NodePortType nodePortType) -> SightNodePort {
+                auto id = item.first.as<uint>();
+                auto values = item.second;
+                auto portName = values["name"].as<std::string>();
+                auto typeNode = values["type"];
+                uint type = 0;
+                if (typeNode.IsDefined()) {
+                    type = typeNode.as<uint>();
+                }
+
+                SightNodePort port = {
+                        portName,
+                        id,
+                        nodePortType,
+                        type,
+                };
+
+                auto valueNode = values["value"];
+                if (valueNode.IsDefined()) {
+                    switch (type) {
+                        case IntTypeFloat:
+                            port.value.f = valueNode.as<float>();
+                            break;
+                        case IntTypeDouble:
+                            port.value.d = valueNode.as<double>();
+                            break;
+                        case IntTypeInt:
+                            port.value.i = valueNode.as<int>();
+                            break;
+                        case IntTypeString:
+                            sprintf(port.value.string, "%s", valueNode.as<std::string>().c_str());
+                            break;
+                        case IntTypeBool:
+                            port.value.b = valueNode.as<bool>();
+                            break;
+                        case IntTypeProcess:
+                            dbg("IntTypeProcess" , portName);
+                            break;
+                        default:
+                            dbg("type error", type);
+                            port.value.i = 0;
+                            break;
+                    }
+                }
+
+                return port;
+            };
+
             for (const auto &nodeKeyPair : nodeRoot) {
                 auto yamlNode = nodeKeyPair.second;
 
                 SightNode sightNode;
                 sightNode.nodeId = yamlNode["id"].as<int>();
                 sightNode.nodeName = yamlNode["name"].as<std::string>();
-
-                auto portWork = [](YAML::detail::iterator_value const& item, NodePortType nodePortType) -> SightNodePort {
-                    auto portName = item.first.as<std::string>();
-                    auto values = item.second;
-                    auto id = values["id"].as<uint>();
-                    auto typeNode = values["type"];
-                    uint type = 0;
-                    if (typeNode.IsDefined()) {
-                        type = typeNode.as<uint>();
-                    }
-
-                    SightNodePort port = {
-                            portName,
-                            id,
-                            nodePortType,
-                            type,
-                    };
-
-                    auto valueNode = values["value"];
-                    if (valueNode.IsDefined()) {
-                        switch (type) {
-                            case IntTypeFloat:
-                                port.value.f = valueNode.as<float>();
-                                break;
-                            case IntTypeDouble:
-                                port.value.d = valueNode.as<double>();
-                                break;
-                            case IntTypeInt:
-                                port.value.i = valueNode.as<int>();
-                                break;
-                            case IntTypeString:
-                                sprintf(port.value.string, "%s", valueNode.as<std::string>().c_str());
-                                break;
-                            case IntTypeBool:
-                                port.value.b = valueNode.as<bool>();
-                                break;
-                            default:
-                                port.value.i = 0;
-                                break;
-                        }
-                    }
-
-                    return port;
-                };
 
                 auto inputs = yamlNode["inputs"];
                 for (const auto &input : inputs) {
@@ -908,6 +1049,7 @@ namespace sight {
 
     void SightNodeGraph::addNode(const SightNode &node) {
         auto p = this->nodes.add(node);
+        p->updateChainPortPointer();
         idMap[node.nodeId] = {
                 SightAnyThingType::Node,
                 p
@@ -925,22 +1067,6 @@ namespace sight {
         };
         CALL_NODE_FUNC(p);
 
-//        for (auto &item : p->inputPorts) {
-//            item.node = p;
-//            idMap[item.id] = {
-//                    SightAnyThingType::Port,
-//                    p,
-//                    item.id
-//            };
-//        }
-//        for (auto &item : p->outputPorts) {
-//            item.node = p;
-//            idMap[item.id] =  {
-//                    SightAnyThingType::Port,
-//                    p,
-//                    item.id
-//            };
-//        }
     }
 
     SightNode *SightNodeGraph::findNode(int id) {

@@ -782,11 +782,24 @@ namespace sight {
                     };
 
                     auto functionObject = v8pp::wrap_function(isolate, name, t);
-                    if (item.getType() == IntTypeFloat) {
-                        functionObject->Set(context, v8pp::to_v8(isolate, "value"), v8pp::to_v8(isolate, item.value.f));
-                    } else if (item.getType() == IntTypeString) {
-                        functionObject->Set(context, v8pp::to_v8(isolate, "value"), v8pp::to_v8(isolate, item.value.string));
+                    switch (item.type) {
+                        case IntTypeFloat:
+                            functionObject->Set(context, v8pp::to_v8(isolate, "value"), v8pp::to_v8(isolate, item.value.f));
+                            break;
+                        case IntTypeDouble:
+                            functionObject->Set(context, v8pp::to_v8(isolate, "value"), v8pp::to_v8(isolate, item.value.d));
+                            break;
+                        case IntTypeString:
+                            functionObject->Set(context, v8pp::to_v8(isolate, "value"), v8pp::to_v8(isolate, item.value.string));
+                            break;
+                        case IntTypeInt:
+                            functionObject->Set(context, v8pp::to_v8(isolate, "value"), v8pp::to_v8(isolate, item.value.i));
+                            break;
+                        case IntTypeBool:
+                            functionObject->Set(context, v8pp::to_v8(isolate, "value"), v8pp::to_v8(isolate, item.value.b));
+                            break;
                     }
+
                     functionObject->Set(context, v8pp::to_v8(isolate, "isConnect"), v8pp::to_v8(isolate, item.isConnect()));
 
                     arg$->Set(context, v8pp::to_v8(isolate, name), functionObject);

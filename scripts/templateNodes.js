@@ -102,11 +102,9 @@ addTemplateNode({
         // },
     },
     __meta_inputs: {
-        chainIn: 'Process',
         number: 'Number',
     },
     __meta_outputs: {
-        chainOut: 'Process',
     },
 
     varName: {
@@ -128,12 +126,10 @@ addTemplateNode({
     },
     // other ideas
     __meta_inputs: {
-        chainIn: 'Process',
         number1: 'Number',
         number2: 'Number',
     },
     __meta_outputs: {
-        chainOut: 'Process',
         number: 'Number',
     },
 
@@ -147,9 +143,9 @@ addTemplateNode({
     __meta_address: "test/math/literal",
     __meta_func: {
         // this function will be to string(only function body.).
-        generateCodeWork($$) {
+        generateCodeWork($, $$) {
             $$.options.isPart = true;
-            return 1;       // When a output node is returned, it will be map to node's value.
+            return $.number.value;       // When a output node is returned, it will be map to node's value.
             //print('Number generateCodeWork.');
         },
 
@@ -190,7 +186,6 @@ addTemplateNode({
 
     },
     __meta_outputs: {
-        next: 'Process',           //
 
     },
 

@@ -66,7 +66,6 @@ namespace sight {
         // connections
         std::vector<SightNodeConnection*> connections;
         SightNode* node = nullptr;
-        SightNodePort const* templatePort = nullptr;
 
         /**
          * Set kind from int.
@@ -173,6 +172,11 @@ namespace sight {
         SightNode const* templateNode = nullptr;
         SightNodeGraph* graph = nullptr;
 
+        // chainInPort and chainOutPort are point to inputPorts and outputPorts
+        // do not need free them. `updateChainPortPointer` will update value.
+        SightNodePort* chainInPort = nullptr;
+        SightNodePort* chainOutPort = nullptr;
+
         std::vector<SightNodePort> inputPorts;
         std::vector<SightNodePort> outputPorts;
         // no input/output ports.
@@ -208,6 +212,16 @@ namespace sight {
          * @return
          */
         SightNodePortConnection findConnectionByProcess();
+
+        /**
+         *
+         */
+        void updateChainPortPointer();
+
+        /**
+         * add chain ports, if not exist.
+         */
+        void tryAddChainPorts();
 
     protected:
 
