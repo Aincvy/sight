@@ -27,10 +27,34 @@ namespace sight {
 
     namespace {
 
+        struct TreeSitterFields {
+            TSFieldId _operator;
+            TSFieldId left;
+            TSFieldId right;
+            TSFieldId argument;
+        };
+
+        TreeSitterFields fields;
+
         /**
          * Used for tree-sitter node parse.
          */
         absl::flat_hash_map<std::string,std::function<GeneratedElement*(GeneratedCode &,TSNode &)>> nodeHandlerMap;
+
+        void initTreeSitterFields(TSLanguage* language){
+
+            constexpr const char* fieldOperator = "operator";
+            constexpr const char* fieldLeft = "left";
+            constexpr const char* fieldRight = "right";
+            constexpr const char* fieldArgument = "argument";
+
+            fields._operator = ts_language_field_id_for_name(language, fieldOperator, strlen(fieldOperator));
+            fields.left = ts_language_field_id_for_name(language, fieldLeft, strlen(fieldLeft));
+            fields.right = ts_language_field_id_for_name(language, fieldRight, strlen(fieldRight));
+            fields.argument = ts_language_field_id_for_name(language, fieldArgument, strlen(fieldArgument));
+
+
+        }
 
         /**
          * Generate this node to GeneratedElement
@@ -94,14 +118,9 @@ namespace sight {
                 return;
             }
 
-            // generate(generatedCode, node);
-            dbg(ts_node_type(node));
-
-            auto childCount = ts_node_child_count(node);
-            for (int i = 0; i < childCount; ++i) {
-                TSNode temp = ts_node_named_child(node, i);
-                showNodeHierarchy(generatedCode, temp);
-            }
+            char *string = ts_node_string(node);
+            dbg(string);
+            free(string);
         }
 
         void initCaseMap(){
@@ -111,7 +130,12 @@ namespace sight {
                     // may need to do something.
                 }
 
-                return generatedCode.addElement(IntLiteral(token.asInt()));
+                auto f = token.asFloat();
+                if (f == static_cast<int>(f) ) {
+                    return generatedCode.addElement(IntLiteral(token.asInt()));
+                }
+
+                return generatedCode.addElement(FloatLiteral(f));
             };
 
             nodeHandlerMap["identifier"] = [](GeneratedCode &generatedCode,TSNode &node) {
@@ -128,12 +152,9 @@ namespace sight {
 
                 dbg(ts_node_child_count(node));
                 // 3 children.
-                const char* $left = "left";
-                const char* $operator = "operator";
-                const char* $right = "right";
-                auto a = ts_node_child_by_field_name(node, $left, strlen($left));
-                auto b = ts_node_child_by_field_name(node, $operator, strlen($operator));
-                auto c = ts_node_child_by_field_name(node, $right, strlen($right));
+                auto a = ts_node_child_by_field_id(node, fields.left);
+                auto b = ts_node_child_by_field_id(node, fields._operator);
+                auto c = ts_node_child_by_field_id(node, fields.right);
                 auto left = generate(generatedCode, a);
                 auto symbol = generatedCode.addElement(generatedCode.getToken(&b));
                 auto right = generate(generatedCode, c);
@@ -152,6 +173,11 @@ namespace sight {
                 return generatedCode.addElement(AssignValueStmt(left, right));
             };
 
+            nodeHandlerMap["unary_expression"] = [](GeneratedCode &generatedCode,TSNode &node){
+
+                return nullptr;
+            };
+
             nodeHandlerMap["program"] = generateChildrenNode;
             nodeHandlerMap["expression_statement"] = generateChildrenNode;
             nodeHandlerMap[";"] = generateEmpty;
@@ -167,7 +193,9 @@ namespace sight {
 
         g_parser = ts_parser_new();
         // Set the parser's language
-        ts_parser_set_language(g_parser, tree_sitter_javascript());
+        auto language = tree_sitter_javascript();
+        ts_parser_set_language(g_parser, language);
+        initTreeSitterFields(language);
 
         initCaseMap();
         return 0;
@@ -181,6 +209,8 @@ namespace sight {
     }
 
     void parseSource(const char *source) {
+        dbg(source);
+
         TSTree *tree = ts_parser_parse_string(
                 g_parser,
                 NULL,
@@ -472,4 +502,15 @@ namespace sight {
     AssignValueStmt::AssignValueStmt(GeneratedElement *left, GeneratedElement *right) : left(left), right(right) {}
 
 
+    FloatLiteral::FloatLiteral(float value) : Literal(value) {
+
+    }
+
+    FloatLiteral::~FloatLiteral() {
+
+    }
+
+    GeneratedElementType FloatLiteral::getElementType() const {
+        return GeneratedElementType::FloatLiteral;
+    }
 }

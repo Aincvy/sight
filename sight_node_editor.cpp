@@ -234,7 +234,7 @@ namespace sight {
             auto chainInPort = node->chainInPort;
             if (chainInPort) {
                 ed::BeginPin(chainInPort->id, ed::PinKind::Input);
-                showNodePortIcon(IntTypeProcess, color, false);
+                showNodePortIcon(IntTypeProcess, color, chainInPort->isConnect());
                 ed::EndPin();
                 ImGui::SameLine();
             }
@@ -245,7 +245,7 @@ namespace sight {
             if (chainOutPort) {
                 ImGui::SameLine();
                 ed::BeginPin(chainOutPort->id, ed::PinKind::Output);
-                showNodePortIcon(IntTypeProcess, color, false);
+                showNodePortIcon(IntTypeProcess, color, chainOutPort->isConnect());
                 ed::EndPin();
             }
             ImGui::Dummy(ImVec2(0,3));
@@ -710,7 +710,7 @@ namespace sight {
                 break;
             }
         }
-        
+
     }
 
     void SightNode::tryAddChainPorts() {

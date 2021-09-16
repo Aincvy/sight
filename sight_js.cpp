@@ -736,6 +736,9 @@ namespace sight {
     MaybeLocal<Value> runGenerateCode(std::string const &functionCode ,Isolate* isolate, Local<Context> & context, SightNode* node,
                                       GenerateOptions* options = nullptr, GenerateFunctionStatus* status = nullptr){
         dbg(functionCode.c_str());
+        if (status) {
+            dbg(status->need$, status->need$$);
+        }
         auto sourceCode = v8pp::to_v8(isolate, functionCode);
         ScriptCompiler::Source source(sourceCode);
         Local<Object> contextExt[0];
@@ -749,10 +752,18 @@ namespace sight {
         auto arg$$ = Object::New(isolate);
 
         if (!status || status->need$) {
-            auto nodeFunc = [node, isolate, &context, &arg$](std::vector<SightNodePort> & list) {
+            auto nodeFunc = [node, isolate, &context, &arg$](std::vector<SightNodePort> & list, bool isOutput = false) {
 
                 for (const auto &item : list) {
+                    if (item.portName.empty()) {
+                        continue;
+                    }
+
                     std::string name = item.portName;
+                    auto emptyFunc = [](){
+                        return std::string();
+                    };
+
                     auto t = [&item,node,isolate]() -> std::string  {
                         // reverseActive this port.
                         //
@@ -781,7 +792,7 @@ namespace sight {
                         return "";
                     };
 
-                    auto functionObject = v8pp::wrap_function(isolate, name, t);
+                    auto functionObject = isOutput ? v8pp::wrap_function(isolate, name, emptyFunc) : v8pp::wrap_function(isolate, name, t);
                     switch (item.type) {
                         case IntTypeFloat:
                             functionObject->Set(context, v8pp::to_v8(isolate, "value"), v8pp::to_v8(isolate, item.value.f));
@@ -790,13 +801,16 @@ namespace sight {
                             functionObject->Set(context, v8pp::to_v8(isolate, "value"), v8pp::to_v8(isolate, item.value.d));
                             break;
                         case IntTypeString:
-                            functionObject->Set(context, v8pp::to_v8(isolate, "value"), v8pp::to_v8(isolate, item.value.string));
+                            functionObject->Set(context, v8pp::to_v8(isolate, "value"), v8pp::to_v8(isolate, (const char*)item.value.string));
                             break;
                         case IntTypeInt:
                             functionObject->Set(context, v8pp::to_v8(isolate, "value"), v8pp::to_v8(isolate, item.value.i));
                             break;
                         case IntTypeBool:
                             functionObject->Set(context, v8pp::to_v8(isolate, "value"), v8pp::to_v8(isolate, item.value.b));
+                            break;
+                        default:
+                            dbg("type error", item.type);
                             break;
                     }
 
@@ -810,6 +824,7 @@ namespace sight {
             nodeFunc(node->inputPorts);
             nodeFunc(node->fields);
 
+            nodeFunc(node->outputPorts, true);
         }
 
         if (!status || status->need$$) {
@@ -906,7 +921,6 @@ namespace sight {
                 dbg("result is empty", ss.str());
             } else {
                 auto resultString = v8pp::from_v8<std::string>(isolate, result.ToLocalChecked());
-                dbg(resultString.c_str());
                 return resultString;
             }
         }
@@ -921,7 +935,10 @@ namespace sight {
 
 
         // generateCodeWork
-        finalSource << runGenerateFunction(jsNode->generateCodeWork, isolate, node);
+        std::string tmp = runGenerateFunction(jsNode->generateCodeWork, isolate, node);
+        if (!tmp.empty()) {
+            finalSource << tmp;
+        }
 
         // active the next.
         auto connection = node->findConnectionByProcess();
@@ -969,11 +986,21 @@ namespace sight {
             parseNode(list, isolate, finalSourceStream);
         }
 
-        std::string finalSource = trimCopy(finalSourceStream.str());
+        std::string finalSource = finalSourceStream.str();
+        trim(finalSource);
         dbg(finalSource);
+//        dbg(finalSource.length(), finalSource.size());
+//        dbg(finalSource.data());
+        dbg(finalSource.c_str());
+//
+//        printf("%s\n", finalSource.c_str());
+//        for (const auto &item : finalSource) {
+//            printf("%d",item);
+//        }
+//        printf("\n");
 
         // maybe need split parseGraph and parseSource
-        parseSource(finalSource.c_str());
+//        parseSource(finalSource.c_str());
 
         return 0;
     }

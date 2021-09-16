@@ -19,6 +19,7 @@ namespace sight {
     enum class GeneratedElementType {
         Token,
         IntLiteral,
+        FloatLiteral,
         StringLiteral,
         BoolLiteral,
         CharLiteral,
@@ -110,6 +111,14 @@ namespace sight {
         IntLiteral() = default;
         explicit IntLiteral(int value);
         ~IntLiteral() override;
+
+        GeneratedElementType getElementType() const override;
+    };
+
+    struct FloatLiteral : Literal<float>{
+        FloatLiteral() =default;
+        explicit FloatLiteral(float value);
+        ~FloatLiteral() override;
 
         GeneratedElementType getElementType() const override;
     };
