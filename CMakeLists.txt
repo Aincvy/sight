@@ -29,6 +29,7 @@ target_sources(sight PRIVATE
         sight_js_parser.cpp
         sight_project.cpp
         sight.cpp
+        sight_plugin.cpp
 )
 
 # depend
@@ -76,3 +77,8 @@ find_package(yaml-cpp REQUIRED)
 target_include_directories(sight PRIVATE YAML_CPP_INCLUDE_DIR)
 target_link_libraries(sight PRIVATE ${YAML_CPP_LIBRARIES})
 MESSAGE(STATUS "Found yaml-cpp at: ${YAML_CPP_INCLUDE_DIR}")
+
+
+add_custom_command(TARGET sight POST_BUILD
+        COMMAND echo "copy plugins folder ..." && cp -fR "${CMAKE_CURRENT_LIST_DIR}/plugins" "${CMAKE_BINARY_DIR}"
+        )

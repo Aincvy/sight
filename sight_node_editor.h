@@ -14,7 +14,6 @@
 #include "sight_memory.h"
 
 #include "v8.h"
-#include "absl/container/btree_map.h"
 
 namespace ed = ax::NodeEditor;
 
@@ -253,13 +252,6 @@ namespace sight {
 
     };
 
-    /**
-     * todo colors
-     */
-    struct SightNodeStyles {
-
-    };
-
     enum class SightAnyThingType {
         Node,
         Port,
@@ -454,23 +446,6 @@ namespace sight {
         void reset();
     };
 
-    enum TypeIntValues{
-        IntTypeProcess = 1,
-
-        IntTypeInt = 100,
-        IntTypeFloat,
-        IntTypeDouble,
-        IntTypeChar,
-        IntTypeString,
-        IntTypeBool,
-        IntTypeLong,
-        IntTypeColor,
-        IntTypeVector3,
-        IntTypeVector4,
-
-        IntTypeNext = 3000,
-    };
-
     /**
      * sight  node editor status
      */
@@ -518,8 +493,6 @@ namespace sight {
      * @return
      */
     int initNodeEditor();
-
-    void initTypeMap();
 
     /**
      * destroy and free
@@ -594,25 +567,5 @@ namespace sight {
      */
     SightJsNode* findTemplateNode(const SightNode *node);
 
-    /**
-     * todo multiple thread test.
-     * @param str
-     * @return -1 if not found.
-     */
-    uint getIntType(std::string const& str, bool addIfNotFound = false);
-
-    /**
-     *
-     * @param type
-     * @return full name
-     */
-    std::string const & getTypeName(int type);
-
-    /**
-     *
-     * @param name need type's full name
-     * @return
-     */
-    uint addType(std::string const& name);
 
 }

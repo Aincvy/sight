@@ -12,15 +12,14 @@
 #include "sight_ui.h"
 #include "sight_util.h"
 #include "sight_js_parser.h"
+#include "sight_project.h"
+#include "sight_plugin.h"
 
 #include "v8.h"
 #include "libplatform/libplatform.h"
 
 #include "v8pp/module.hpp"
 #include "v8pp/class.hpp"
-
-
-#define IS_V8_STRING(localVal) (localVal)->IsString() || (localVal)->IsStringObject()
 
 using namespace v8;
 
@@ -39,6 +38,42 @@ static std::vector<sight::SightNodeTemplateAddress> g_TemplateNodeCache;
 namespace sight {
 
     std::string runGenerateFunction(v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function>> & persistent, Isolate* isolate, SightNode* node);
+
+
+    /**
+     *
+     * @from https://github.com/danbev/learning-v8/blob/master/run-script.cc
+     * @param isolate
+     * @param name
+     * @return
+     */
+    v8::MaybeLocal<v8::String> readFile(v8::Isolate *isolate, const char *name) {
+        FILE *file = fopen(name, "rb");
+        if (file == NULL) {
+            return {};
+        }
+
+        fseek(file, 0, SEEK_END);
+        size_t size = ftell(file);
+        rewind(file);
+
+        char *chars = new char[size + 1];
+        chars[size] = '\0';
+        for (size_t i = 0; i < size;) {
+            i += fread(&chars[i], 1, size - i, file);
+            if (ferror(file)) {
+                fclose(file);
+                return {};
+            }
+        }
+        fclose(file);
+        v8::MaybeLocal<v8::String> result = v8::String::NewFromUtf8(isolate,
+                                                                    chars,
+                                                                    v8::NewStringType::kNormal,
+                                                                    static_cast<int>(size));
+        delete[] chars;
+        return result;
+    }
 
 
     namespace {
@@ -100,41 +135,6 @@ namespace sight {
             }
 #pragma clang diagnostic pop
         };
-
-        /**
-         *
-         * @from https://github.com/danbev/learning-v8/blob/master/run-script.cc
-         * @param isolate
-         * @param name
-         * @return
-         */
-        v8::MaybeLocal<v8::String> readFile(v8::Isolate *isolate, const char *name) {
-            FILE *file = fopen(name, "rb");
-            if (file == NULL) {
-                return {};
-            }
-
-            fseek(file, 0, SEEK_END);
-            size_t size = ftell(file);
-            rewind(file);
-
-            char *chars = new char[size + 1];
-            chars[size] = '\0';
-            for (size_t i = 0; i < size;) {
-                i += fread(&chars[i], 1, size - i, file);
-                if (ferror(file)) {
-                    fclose(file);
-                    return {};
-                }
-            }
-            fclose(file);
-            v8::MaybeLocal<v8::String> result = v8::String::NewFromUtf8(isolate,
-                                                                        chars,
-                                                                        v8::NewStringType::kNormal,
-                                                                        static_cast<int>(size));
-            delete[] chars;
-            return result;
-        }
 
 
         //
@@ -382,6 +382,7 @@ namespace sight {
 
     }
 
+
     /**
      * init js engine (v8)
      *
@@ -426,6 +427,7 @@ namespace sight {
             return -1;
         }
 
+        clearJsNodeCache();
         dbg("destroy js engine..");
         g_V8Runtime->isolateScope.reset();
         if (g_V8Runtime->isolate) {
@@ -553,12 +555,50 @@ namespace sight {
         }
     }
 
+    void flushJsNodeCache(std::promise<int>* promise /*= nullptr */){
+        // send nodes to ui thread.
+        if (!g_NodeCache.empty()) {
+            auto size = g_NodeCache.size();
+            auto *nodePointer = (SightNode **) malloc(size * sizeof(void *));
+            int index = 0;
+            for (const auto &item : g_NodeCache) {
+                // copy item to array
+                nodePointer[index++] = item.clone();
+            }
+            g_NodeCache.clear();
+
+            addUICommand(UICommandType::AddNode, nodePointer, size);
+        }
+
+        if (!g_TemplateNodeCache.empty()) {
+            auto size = g_TemplateNodeCache.size();
+            auto *pointer = (SightNodeTemplateAddress **) malloc(size * sizeof(void *));
+            int index = 0;
+
+            for (const auto &item : g_TemplateNodeCache) {
+                pointer[index++] = new SightNodeTemplateAddress(item.name, item.templateNode);
+            }
+            g_TemplateNodeCache.clear();
+
+            addUICommand(UICommandType::AddTemplateNode, pointer, size);
+        }
+
+        if (promise) {
+            promise->set_value(1);
+        }
+    }
+
+    void clearJsNodeCache(){
+        g_NodeCache.clear();
+        g_TemplateNodeCache.clear();
+    }
+
     /**
      * run a js file.
      * @param filepath
      * @return
      */
-    int runJsFile(const char *filepath, std::promise<int>* promise = nullptr) {
+    int runJsFile(const char *filepath, std::promise<int>* promise /* = nullptr */) {
         if (!g_V8Runtime) {
             return -1;
         }
@@ -601,33 +641,6 @@ namespace sight {
             //
             ReportException(isolate, &tryCatch);
             return 1;
-        }
-
-        // send nodes to ui thread.
-        if (!g_NodeCache.empty()) {
-            auto size = g_NodeCache.size();
-            auto *nodePointer = (SightNode **) malloc(size * sizeof(void *));
-            int index = 0;
-            for (const auto &item : g_NodeCache) {
-                // copy item to array
-                nodePointer[index++] = item.clone();
-            }
-            g_NodeCache.clear();
-
-            addUICommand(UICommandType::AddNode, nodePointer, size);
-        }
-
-        if (!g_TemplateNodeCache.empty()) {
-            auto size = g_TemplateNodeCache.size();
-            auto *pointer = (SightNodeTemplateAddress **) malloc(size * sizeof(void *));
-            int index = 0;
-
-            for (const auto &item : g_TemplateNodeCache) {
-                pointer[index++] = new SightNodeTemplateAddress(item.name, item.templateNode);
-            }
-            g_TemplateNodeCache.clear();
-
-            addUICommand(UICommandType::AddTemplateNode, pointer, size);
         }
 
         if (promise) {
@@ -1018,13 +1031,29 @@ namespace sight {
                 case JsCommandType::Destroy:
                     goto break_commands_loop;
                 case JsCommandType::File:
-                    runJsFile(command.args.argString, command.args.promise);
+                    runJsFile(command.args.argString, nullptr);
+                    flushJsNodeCache(command.args.promise);
                     break;
                 case JsCommandType::JsCommandHolder:
                     // do nothing.
                     break;
                 case JsCommandType::ParseGraph:
                     parseGraph(command.args.argString);
+                    break;
+                case JsCommandType::InitPluginManager:
+                {
+                    pluginManager()->init(g_V8Runtime->isolate);
+                    pluginManager()->loadPlugins();
+                    break;
+                }
+                case JsCommandType::RunFile:
+                    runJsFile(command.args.argString, command.args.promise);
+                    break;
+                case JsCommandType::FlushNodeCache:
+                    flushJsNodeCache(command.args.promise);
+                    break;
+                case JsCommandType::InitParser:
+                    initParser();
                     break;
             }
 

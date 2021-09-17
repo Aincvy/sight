@@ -29,8 +29,20 @@
         nodeFunc((p)->fields)
 
 
+#define IS_V8_STRING(localVal) (localVal)->IsString() || (localVal)->IsStringObject()
+
+
+#define CHECK_CODE(func, i) if (( (i) = (func)) != CODE_OK){ \
+    return i;                                                      \
+}
+
+
+
 
 namespace sight {
+
+    extern std::string emptyString;
+
 
     /**
      *

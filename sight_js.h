@@ -13,12 +13,19 @@ namespace sight{
 
     enum class JsCommandType {
         JsCommandHolder,
-        // run a file
+        // run a file and flush node cache
         File,
+        // just run a js file.
+        RunFile,
+        // flush node cache to ui thread.
+        FlushNodeCache,
         // destroy js engine
         Destroy,
         //
         ParseGraph,
+        InitPluginManager,
+        InitParser,
+
     };
 
     struct JsCommand {
@@ -55,6 +62,24 @@ namespace sight{
      * js thread run function.
      */
     void jsThreadRun(const char * exeName);
+
+    /**
+     * run a js file. | only call this function from js thread.
+     * @param filepath
+     * @return
+     */
+    int runJsFile(const char *filepath, std::promise<int>* promise = nullptr);
+
+    /**
+     * only call this function from js thread.
+     * @param promise
+     */
+    void flushJsNodeCache(std::promise<int>* promise = nullptr);
+
+    /**
+     *
+     */
+    void clearJsNodeCache();
 
 }
 

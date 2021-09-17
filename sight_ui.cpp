@@ -3,6 +3,7 @@
 #include "sight.h"
 #include "sight_js.h"
 #include "sight_js_parser.h"
+#include "sight_project.h"
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -92,13 +93,13 @@ namespace sight {
 
         void showMainBuildMenu(){
             if (ImGui::MenuItem("Build")) {
-
+                currentProject()->build();
             }
             if (ImGui::MenuItem("Rebuild")) {
-
+                currentProject()->rebuild();
             }
             if (ImGui::MenuItem("Clean")) {
-
+                currentProject()->clean();
             }
             if (ImGui::MenuItem("Parse Graph")) {
                 addJsCommand(JsCommandType::ParseGraph, "./simple.yaml");
@@ -403,22 +404,14 @@ namespace sight {
         g_UIStatus->languageKeys = loadLanguage("");
         g_UIStatus->uiColors = new UIColors();
 
-        initTypeMap();
-
         // load plugins
-        std::promise<int> promise;
-        addJsCommand(JsCommandType::File, "/Volumes/mac_extend/Project/sight/scripts/templateNodes.js", 0,false, &promise);
-        int t = promise.get_future().get();
-        dbg(t);
+        addJsCommand(JsCommandType::InitPluginManager);
+        addJsCommand(JsCommandType::InitParser);
 
         // init node editor.
         initNodeEditor();
         // load template nodes.
         uv_run(uvLoop,UV_RUN_NOWAIT);
-        changeGraph("./simple");
-
-        // todo  initParser should be in js thread.
-        initParser();
 
         // Main loop
         while (!glfwWindowShouldClose(window) && !uiStatus.closeWindow)

@@ -1,24 +1,22 @@
-#include <stdio.h>
-#include <execinfo.h>
 #include <signal.h>
-#include <unistd.h>
 #include <thread>
 
 #include "sight.h"
 #include "sight_ui.h"
 #include "sight_js.h"
 #include "sight_node_editor.h"
+#include "sight_project.h"
 
 #ifdef SIGHT_DEBUG
-#define BACKWARD_HAS_BFD 1
-#define BACKWARD_HAS_DW 1
 #include "backward.hpp"
 #endif
 
 using namespace sight;
 
 void handler(int sig) {
-
+    if (sig == SIGABRT) {
+        exitSight(1);
+    }
 }
 
 int main(int argc, char* argv[]){
@@ -28,6 +26,8 @@ int main(int argc, char* argv[]){
     backward::SignalHandling sh;
 #endif
     signal(SIGSEGV, handler);
+
+    initProject("./project", true);
 
     dbg("start js thread!");
     std::thread jsThread(sight::jsThreadRun, argv[0]);

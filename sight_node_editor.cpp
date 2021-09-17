@@ -12,6 +12,7 @@
 #include "sight_node_editor.h"
 #include "sight_address.h"
 #include "sight_util.h"
+#include "sight_project.h"
 
 #include "imgui.h"
 
@@ -33,8 +34,6 @@ namespace ed = ax::NodeEditor;
 
 // node editor status
 static sight::NodeEditorStatus* g_NodeEditorStatus;
-
-static std::string emptyString("");
 
 namespace sight {
 
@@ -60,11 +59,6 @@ namespace sight {
 
     namespace {
         // private members and functions
-        std::atomic<uint> typeIdIncr(IntTypeNext);
-        // todo this need to serialization and deserialization. And bind to project.
-        absl::btree_map<std::string, uint> typeMap;
-        absl::btree_map<uint, std::string> reverseTypeMap;
-
 
         void showContextMenu(const ImVec2& openPopupPosition, uint nodeId, uint linkId, uint pinId){
             ed::Suspend();
@@ -1278,7 +1272,6 @@ namespace sight {
     }
 
     NodeEditorStatus::NodeEditorStatus() {
-        initTypeMap();
 
     }
 
@@ -1287,34 +1280,6 @@ namespace sight {
 
     }
 
-    void initTypeMap() {
-        std::string process = "Process";
-        std::string _string = "String";
-        const char* number = "Number";
-
-        typeMap[process] = IntTypeProcess;
-        lowerCase(process);
-        typeMap[process] = IntTypeProcess;
-
-        typeMap[_string] = IntTypeString;
-        lowerCase(_string);
-        typeMap[_string] = IntTypeString;
-
-        typeMap[number] = IntTypeFloat;
-        typeMap["int"] = IntTypeInt;
-        typeMap["float"] = IntTypeFloat;
-        typeMap["double"] = IntTypeDouble;
-        typeMap["long"] = IntTypeLong;
-        typeMap["bool"] = IntTypeBool;
-        typeMap["Color"] = IntTypeColor;
-        typeMap["Vector3"] = IntTypeVector3;
-        typeMap["Vector4"] = IntTypeVector4;
-
-        for (auto & item: typeMap) {
-            reverseTypeMap[item.second] = item.first;
-        }
-
-    }
 
     SightNode *SightAnyThingWrapper::asNode() const {
         if (type != SightAnyThingType::Node) {
@@ -1608,34 +1573,6 @@ namespace sight {
     SightNodePortConnection::SightNodePortConnection(SightNodePort *self, SightNodePort *target,
                                                      SightNodeConnection *connection) : self(self), target(target),
                                                                                         connection(connection) {}
-
-
-
-    uint getIntType(const std::string &str, bool addIfNotFound) {
-        auto a = typeMap.find(str);
-        if (a != typeMap.end()) {
-            return a->second;
-        } else if (addIfNotFound) {
-            return addType(str);
-        }
-
-        return -1;
-    }
-
-    std::string const &getTypeName(int type) {
-        auto a = reverseTypeMap.find(type);
-        if (a != reverseTypeMap.end()) {
-            return a->second;
-        }
-        return emptyString;
-    }
-
-    uint addType(const std::string &name) {
-        uint a = ++ (typeIdIncr);
-        typeMap[name] = a;
-        reverseTypeMap[a] = name;
-        return a;
-    }
 
 
 }
