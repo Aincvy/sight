@@ -32,7 +32,10 @@ int main(int argc, char* argv[]){
     dbg("start js thread!");
     std::thread jsThread(sight::jsThreadRun, argv[0]);
 
+    sight::initOpenGL();
+    sight::showLoadingWindow();
     sight::showMainWindow();
+    sight::destroyWindows();
 
     jsThread.join();
     return 0;

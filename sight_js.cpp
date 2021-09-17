@@ -423,6 +423,9 @@ namespace sight {
      * @return
      */
     int destroyJsEngine() {
+
+        freeParser();
+
         if (!g_V8Runtime) {
             return -1;
         }

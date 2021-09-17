@@ -121,6 +121,7 @@ namespace sight {
         uv_loop_t *uvLoop = nullptr;
         uv_async_t* uvAsync = nullptr;
 
+        ~UIStatus();
     };
 
     /**
@@ -133,11 +134,20 @@ namespace sight {
 
     };
 
+    int initOpenGL();
+
+    int showLoadingWindow();
+
     /**
      * init window function.
      * @return
      */
     int showMainWindow();
+
+    /**
+     * this will stop glfw
+     */
+    void destroyWindows();
 
     /**
      * add a ui command

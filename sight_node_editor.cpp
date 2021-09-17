@@ -454,7 +454,6 @@ namespace sight {
     int initNodeEditor() {
         g_NodeEditorStatus = new NodeEditorStatus();
 
-        loadEntities();
         return 0;
     }
 

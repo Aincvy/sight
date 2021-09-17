@@ -348,22 +348,33 @@ namespace sight {
         free(command);
     }
 
-    int showMainWindow(){
+    int initOpenGL() {
 
         glfwSetErrorCallback(glfw_error_callback);
         if (!glfwInit())
-            return 1;
+            return CODE_FAIL;
 
         // GL 3.2 + GLSL 150
-        const char* glsl_version = "#version 150";
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
-        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // Required on Mac
 
+#ifdef __APPLE__
+        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // Required on Mac
+#endif
+
+        return CODE_OK;
+    }
+
+    int showLoadingWindow(){
+        dbg("start loading");
         // Create window with graphics context
-        GLFWwindow* window = glfwCreateWindow(1600, 900, "sight - a low-code tool", NULL, NULL);
-        if (window == NULL)
+        const int width = 640;
+        const int height = 360;
+
+        glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+        GLFWwindow* window = glfwCreateWindow(width, height, "sight - loading", nullptr, NULL);
+        if (window == nullptr)
             return 1;
         glfwMakeContextCurrent(window);
         glfwSwapInterval(1); // Enable vsync
@@ -377,23 +388,23 @@ namespace sight {
 
         // Setup Dear ImGui style
         ImGui::StyleColorsDark();
-        //ImGui::StyleColorsClassic();
 
         // Setup Platform/Renderer backends
         ImGui_ImplGlfw_InitForOpenGL(window, true);
+        const char* glsl_version = "#version 150";
         ImGui_ImplOpenGL3_Init(glsl_version);
 
         // Our state
         ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-        UIStatus uiStatus = {
-            true,
-            io,
-            false,
-        };
-        g_UIStatus = &uiStatus;
-        uv_async_t uvAsync;
-        uiStatus.uvAsync = &uvAsync;
+        // init ...
+        g_UIStatus = new UIStatus({
+                                          true,
+                                          io,
+                                          false,
+                                  });
+        UIStatus & uiStatus = *g_UIStatus;
+        uiStatus.uvAsync = new uv_async_t();
 
         // uv loop init
         auto uvLoop = (uv_loop_t*)malloc(sizeof(uv_loop_t));
@@ -405,16 +416,16 @@ namespace sight {
         g_UIStatus->uiColors = new UIColors();
 
         // load plugins
-        addJsCommand(JsCommandType::InitPluginManager);
         addJsCommand(JsCommandType::InitParser);
+        addJsCommand(JsCommandType::InitPluginManager);
 
         // init node editor.
         initNodeEditor();
-        // load template nodes.
-        uv_run(uvLoop,UV_RUN_NOWAIT);
 
+        uint progress = 0;
+        bool close = false;
         // Main loop
-        while (!glfwWindowShouldClose(window) && !uiStatus.closeWindow)
+        while (!glfwWindowShouldClose(window) && !close)
         {
             // Poll and handle events (inputs, window resize, etc.)
             // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
@@ -428,7 +439,93 @@ namespace sight {
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
 
-            mainWindowFrame(uiStatus);
+
+            ImGui::SetNextWindowPos(ImVec2(0,0));
+            ImGui::SetNextWindowSize(ImVec2(width, height));
+            ImGui::Begin("loading", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize);
+            ImGui::Text("sight is loading...");
+            ImGui::Text("progress: %d", ++progress);
+            if (ImGui::Button("Close")) {
+                close = true;
+            }
+            ImGui::End();
+
+            // Rendering
+            ImGui::Render();
+            int display_w, display_h;
+            glfwGetFramebufferSize(window, &display_w, &display_h);
+            glViewport(0, 0, display_w, display_h);
+            glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
+            glClear(GL_COLOR_BUFFER_BIT);
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+            glfwSwapBuffers(window);
+        }
+
+        // load template nodes.
+        for (int i = 0; i < 30; ++i) {
+            uv_run(uvLoop, UV_RUN_NOWAIT);
+        }
+
+        // Cleanup
+        ImGui_ImplOpenGL3_Shutdown();
+        ImGui_ImplGlfw_Shutdown();
+        ImGui::DestroyContext();
+
+        glfwDestroyWindow(window);
+
+
+
+        dbg("end loading");
+    }
+
+    int showMainWindow(){
+        if (!g_UIStatus) {
+            return CODE_FAIL;
+        }
+
+        // Create window with graphics context
+        glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
+        GLFWwindow* window = glfwCreateWindow(1600, 900, "sight - a low-code tool", nullptr, NULL);
+        if (window == nullptr)
+            return 1;
+        glfwMakeContextCurrent(window);
+        glfwSwapInterval(1); // Enable vsync
+
+        // Setup Dear ImGui context
+        ImGui::CreateContext();
+
+        // Setup Dear ImGui style
+        ImGui::StyleColorsDark();
+        //ImGui::StyleColorsClassic();
+
+        // Setup Platform/Renderer backends
+        ImGui_ImplGlfw_InitForOpenGL(window, true);
+        const char* glsl_version = "#version 150";
+        ImGui_ImplOpenGL3_Init(glsl_version);
+
+        // Our state
+        ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+        changeGraph("./simple");
+
+        auto uvLoop = g_UIStatus->uvLoop;
+        // Main loop
+        while (!glfwWindowShouldClose(window) && !g_UIStatus->closeWindow)
+        {
+            // Poll and handle events (inputs, window resize, etc.)
+            // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
+            // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
+            // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
+            // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
+            glfwPollEvents();
+
+            // Start the Dear ImGui frame
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
+
+            mainWindowFrame(*g_UIStatus);
 
 
             // Rendering
@@ -442,12 +539,10 @@ namespace sight {
 
             glfwSwapBuffers(window);
 
-            uiStatus.needInit = false;
+            g_UIStatus->needInit = false;
             // printf("before uv run\n");
             uv_run(uvLoop, UV_RUN_NOWAIT);
         }
-
-        destroyNodeEditor();
 
         // Cleanup
         ImGui_ImplOpenGL3_Shutdown();
@@ -455,17 +550,18 @@ namespace sight {
         ImGui::DestroyContext();
 
         glfwDestroyWindow(window);
-        glfwTerminate();
-
-        uv_loop_close(uvLoop);
-        free(uvLoop);
-        uiStatus.uvLoop = nullptr;
-        exitSight();
-
-        // todo  freeParser should be in js thread.
-        freeParser();
 
         return 0;
+    }
+
+    void destroyWindows() {
+        destroyNodeEditor();
+        glfwTerminate();
+
+        exitSight();
+
+        delete g_UIStatus;
+        g_UIStatus = nullptr;
     }
 
     void addUICommand(UICommandType type, int argInt) {
@@ -730,4 +826,27 @@ namespace sight {
         readonlyText = grey;
     }
 
+    UIStatus::~UIStatus() {
+        if (uvLoop) {
+            uv_loop_close(uvLoop);
+            free(uvLoop);
+            uvLoop = nullptr;
+        }
+
+        if (uvAsync) {
+            delete uvAsync;
+            uvAsync = nullptr;
+        }
+
+        if (uiColors) {
+            delete uiColors;
+            uiColors = nullptr;
+        }
+
+        if (languageKeys) {
+            delete languageKeys;
+            languageKeys = nullptr;
+        }
+
+    }
 }
