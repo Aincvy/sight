@@ -144,6 +144,11 @@ namespace sight {
             if (!it->path().has_extension() || it->path().extension() != ".js"){
                 continue;
             }
+            if (it->path().filename() == FILE_NAME_PACKAGE)
+            {
+                continue;
+            }
+            
 
             auto fullPath = std::filesystem::canonical(it->path());
             auto code = runJsFile(fullPath.c_str());

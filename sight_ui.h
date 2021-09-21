@@ -16,6 +16,7 @@ namespace sight {
 
         // common ui part
         COMMON = 100,
+        JsEndInit,
 
         // node editor part
         AddNode = 200,
@@ -108,12 +109,19 @@ namespace sight {
         UIColors();
     };
 
+    struct LoadingStatus {
+        bool jsThread = false;
+
+        bool isLoadingOver() const;
+    };
+
     struct UIStatus {
         bool needInit = false;
-        const ImGuiIO &io;
+        ImGuiIO* io;
         bool closeWindow = false;
         struct UIWindowStatus windowStatus;
         struct UICreateEntity createEntityData;
+        struct LoadingStatus loadingStatus;
 
         struct LanguageKeys* languageKeys = nullptr;
         struct UIColors* uiColors = nullptr;
@@ -122,6 +130,8 @@ namespace sight {
         uv_async_t* uvAsync = nullptr;
 
         ~UIStatus();
+
+        bool isLoadingOver() const;
     };
 
     /**

@@ -25,6 +25,9 @@ namespace sight{
         ParseGraph,
         InitPluginManager,
         InitParser,
+        // this command will nofity ui thread, js thread is init end.
+        // do not add this command twice.
+        EndInit,
 
     };
 
@@ -72,6 +75,7 @@ namespace sight{
 
     /**
      * only call this function from js thread.
+     * todo a sync flag with ui thread.
      * @param promise
      */
     void flushJsNodeCache(std::promise<int>* promise = nullptr);

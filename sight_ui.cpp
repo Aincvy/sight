@@ -1,4 +1,5 @@
 #include "sight_ui.h"
+#include "dbg.h"
 #include "sight_node_editor.h"
 #include "sight.h"
 #include "sight_js.h"
@@ -174,6 +175,21 @@ namespace sight {
             ImGui::End();
         }
 
+        void showProjectWindow(bool needInit){
+            if (needInit)
+            {
+                ImGui::SetNextWindowPos(ImVec2(0,605));
+                ImGui::SetNextWindowSize(ImVec2(300, 200));
+            }
+            
+            ImGui::Begin(WINDOW_LANGUAGE_KEYS.project);
+
+            // show project files.
+            
+
+            ImGui::End();
+        }
+
         void showCreateEntityWindow(){
             int inputTextId = 0;
 
@@ -300,6 +316,7 @@ namespace sight {
         // windows
         showHierarchyWindow(uiStatus.needInit);
         showInspectorWindow(uiStatus.needInit);
+        showProjectWindow(uiStatus.needInit);
         showNodeEditorGraph(uiStatus);
 
         if (uiStatus.windowStatus.createEntity) {
@@ -312,11 +329,17 @@ namespace sight {
     }
 
     void runUICommand(UICommand *command){
+        dbg(command->type);
         switch (command->type) {
             case UICommandType::UICommandHolder:
                 break;
             case UICommandType::COMMON:
                 break;
+            case UICommandType::JsEndInit: {
+                g_UIStatus->loadingStatus.jsThread = true;
+                dbg("js end init.");
+                break;
+            }
             case UICommandType::AddNode:
             {
                 // command->args.needFree = false;
@@ -336,7 +359,8 @@ namespace sight {
                     delete p;
                 }
                 break;
-            }
+            } 
+
         }
 
         command->args.dispose();
@@ -400,7 +424,7 @@ namespace sight {
         // init ...
         g_UIStatus = new UIStatus({
                                           true,
-                                          io,
+                                          &io,
                                           false,
                                   });
         UIStatus & uiStatus = *g_UIStatus;
@@ -418,15 +442,21 @@ namespace sight {
         // load plugins
         addJsCommand(JsCommandType::InitParser);
         addJsCommand(JsCommandType::InitPluginManager);
+        addJsCommand(JsCommandType::EndInit);
+
 
         // init node editor.
         initNodeEditor();
 
         uint progress = 0;
-        bool close = false;
+        
         // Main loop
-        while (!glfwWindowShouldClose(window) && !close)
+        while (!glfwWindowShouldClose(window))
         {
+            if (g_UIStatus->isLoadingOver()) {
+                break;
+            }
+
             // Poll and handle events (inputs, window resize, etc.)
             // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
             // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
@@ -444,10 +474,8 @@ namespace sight {
             ImGui::SetNextWindowSize(ImVec2(width, height));
             ImGui::Begin("loading", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize);
             ImGui::Text("sight is loading...");
-            ImGui::Text("progress: %d", ++progress);
-            if (ImGui::Button("Close")) {
-                close = true;
-            }
+            
+            ImGui::Text("past frame: %d", ++progress);
             ImGui::End();
 
             // Rendering
@@ -460,6 +488,8 @@ namespace sight {
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
             glfwSwapBuffers(window);
+
+            uv_run(uvLoop, UV_RUN_NOWAIT);
         }
 
         // load template nodes.
@@ -474,9 +504,8 @@ namespace sight {
 
         glfwDestroyWindow(window);
 
-
-
         dbg("end loading");
+        return 0;
     }
 
     int showMainWindow(){
@@ -495,9 +524,13 @@ namespace sight {
         // Setup Dear ImGui context
         ImGui::CreateContext();
 
+        ImGuiIO& io = ImGui::GetIO(); (void)io;
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+        g_UIStatus->io = &io;
+
         // Setup Dear ImGui style
         ImGui::StyleColorsDark();
-        //ImGui::StyleColorsClassic();
+        
 
         // Setup Platform/Renderer backends
         ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -506,6 +539,8 @@ namespace sight {
 
         // Our state
         ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+        
 
         changeGraph("./simple");
 
@@ -849,4 +884,13 @@ namespace sight {
         }
 
     }
+
+    bool UIStatus::isLoadingOver() const{
+        return this->loadingStatus.isLoadingOver();
+    }
+
+    bool LoadingStatus::isLoadingOver() const {
+        return jsThread;
+    }
+
 }

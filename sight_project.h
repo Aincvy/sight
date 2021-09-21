@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <cstring>
 #include "string"
 #include "atomic"
 #include "sys/types.h"

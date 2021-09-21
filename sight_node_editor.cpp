@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <fstream>
 
+#include "dbg.h"
 #include "sight.h"
 #include "sight_node_editor.h"
 #include "sight_address.h"
@@ -304,9 +305,9 @@ namespace sight {
         }
 
         int showNodes(const UIStatus &uiStatus) {
-            auto &io = uiStatus.io;
+            auto io = uiStatus.io;
 
-            ImGui::Text("FPS: %.2f (%.2gms)", io.Framerate, io.Framerate ? 1000.0f / io.Framerate : 0.0f);
+            ImGui::Text("FPS: %.2f (%.2gms)", io->Framerate, io->Framerate ? 1000.0f / io->Framerate : 0.0f);
             ImGui::Separator();
 
             ed::SetCurrentEditor(g_NodeEditorStatus->context);
@@ -501,7 +502,8 @@ namespace sight {
             ImVec2 startPos = {
                     300, 20
             };
-            auto windowSize = uiStatus.io.DisplaySize - startPos;
+            
+            auto windowSize = uiStatus.io->DisplaySize - startPos;
             ImGui::SetNextWindowPos(startPos);
             ImGui::SetNextWindowSize(windowSize);
         }
@@ -1397,6 +1399,7 @@ namespace sight {
     }
 
     int addTemplateNode(const SightNodeTemplateAddress &templateAddress) {
+        dbg(templateAddress.name);
         if (templateAddress.name.empty()) {
             return -1;
         }

@@ -3,7 +3,10 @@
 //
 #include <stdio.h>
 #include <sstream>
+#include "dbg.h"
 #include "functional"
+#include <thread>
+#include <chrono>
 
 #include "sight_js.h"
 #include "sight_node_editor.h"
@@ -144,7 +147,7 @@ namespace sight {
         // print func
         void v8rPrint(const char *msg) {
             printf("%s\n", msg);
-
+            
         }
 
         void v8AddNode(SightJsNode &node) {
@@ -435,6 +438,7 @@ namespace sight {
         g_V8Runtime->isolateScope.reset();
         if (g_V8Runtime->isolate) {
             g_V8Runtime->isolate->Dispose();
+            g_V8Runtime->isolate = nullptr;
         }
 
         v8::V8::Dispose();
@@ -558,6 +562,7 @@ namespace sight {
         }
     }
 
+
     void flushJsNodeCache(std::promise<int>* promise /*= nullptr */){
         // send nodes to ui thread.
         if (!g_NodeCache.empty()) {
@@ -589,6 +594,8 @@ namespace sight {
         if (promise) {
             promise->set_value(1);
         }
+
+        dbg("flush node cache over!");
     }
 
     void clearJsNodeCache(){
@@ -1057,6 +1064,12 @@ namespace sight {
                     break;
                 case JsCommandType::InitParser:
                     initParser();
+                    break;
+                case JsCommandType::EndInit:
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                    addUICommand(UICommandType::JsEndInit);
+                    break;
+                default:
                     break;
             }
 

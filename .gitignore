@@ -12,3 +12,6 @@ _deps
 
 cmake-build-debug/*
 build/*
+
+.cache/*
+.vscode/*
