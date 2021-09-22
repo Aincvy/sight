@@ -3,6 +3,8 @@
 //
 
 #include "sight_project.h"
+#include "sight_js_parser.h"
+#include "sight_ui.h"
 #include "sight_util.h"
 #include "sight.h"
 
@@ -151,6 +153,10 @@ namespace sight {
         return -1;
     }
 
+    std::string Project::getBaseDir() const {
+        return baseDir;
+    }
+
     std::string const &Project::getTypeName(int type) {
         auto a = reverseTypeMap.find(type);
         if (a != reverseTypeMap.end()) {
@@ -197,6 +203,16 @@ namespace sight {
         return g_Project;
     }
 
+    void onProjectLoadSuccess(Project* project){
+        auto status = currentUIStatus();
+        if (!status) {
+            return;
+        }
+
+        status->selection.projectPath = project->getBaseDir();
+        
+    }
+
     int initProject(const char* baseDir, bool createIfNotExist) {
         bool hasParent = true;
         if (!std::filesystem::exists(baseDir) || !std::filesystem::is_directory(baseDir)) {
@@ -209,7 +225,11 @@ namespace sight {
         }
 
         g_Project = new Project(baseDir, createIfNotExist);
-        return g_Project->load();
+        auto code = g_Project->load();
+        if (code == CODE_OK) {
+            onProjectLoadSuccess(g_Project);
+        }
+        return code;
     }
 
 
@@ -224,7 +244,5 @@ namespace sight {
     uint addType(const std::string &name) {
         return g_Project->addType(name);
     }
-
-
-
+    
 }

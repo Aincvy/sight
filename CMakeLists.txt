@@ -31,6 +31,7 @@ target_sources(sight PRIVATE
         sight_project.cpp
         sight.cpp
         sight_plugin.cpp
+        sight_widgets.cpp
 )
 
 # depend
@@ -68,9 +69,6 @@ target_link_libraries(sight PRIVATE ${EXTRA_LIBS})
 
 # backward-cpp
 target_include_directories(sight PRIVATE dependencies/backward-cpp)
-# SET(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "/usr/local/include/libelf")
-#add_subdirectory(dependencies/backward-cpp)
-#add_backward(sight)
 
 
 # yaml-cpp

@@ -1,5 +1,5 @@
-#include "sight_ui.h"
 #include "dbg.h"
+#include "sight_ui.h"
 #include "sight_node_editor.h"
 #include "sight.h"
 #include "sight_js.h"
@@ -9,8 +9,14 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include "sight_util.h"
+#include "sight_widgets.h"
+
+#include <cstring>
 #include <stdio.h>
 #include <future>
+
+#include <filesystem>
 
 #include <GLFW/glfw3.h>
 
@@ -26,6 +32,8 @@ static void glfw_error_callback(int error, const char* description)
 static sight::UIStatus* g_UIStatus = nullptr;
 
 namespace sight {
+
+    using directory_iterator = std::filesystem::directory_iterator;
 
     namespace {
         // private members and functions.
@@ -159,7 +167,27 @@ namespace sight {
                 ImGui::SetNextWindowSize(ImVec2(300, 285));
             }
             ImGui::Begin(WINDOW_LANGUAGE_KEYS.hierarchy);
-            // it's should be what ?
+            
+            uint selectedNodeId = 0;
+            if (g_UIStatus->selection.node) {
+                selectedNodeId = g_UIStatus->selection.node->nodeId;
+            }
+            auto graph = getCurrentGraph();
+            for (const auto & node : graph->getNodes()) {
+                ImGui::TextColored(g_UIStatus->uiColors->nodeIdText, "%d ", node.nodeId);
+                ImGui::SameLine();
+
+                if (Selectable(static_cast<int>(node.nodeId), node.nodeName.c_str())/* , selectedNodeId == node.nodeId */) {
+                    dbg(node.nodeName);
+                    auto pointer = graph->findNode(node.nodeId);
+                    if (!pointer) {
+                        dbg("error" , node.nodeId);
+                    } else {
+                        g_UIStatus->selection.node = pointer;
+                    }
+                }
+            }
+
             ImGui::End();
         }
 
@@ -172,7 +200,60 @@ namespace sight {
             ImGui::Begin(WINDOW_LANGUAGE_KEYS.inspector);
             // what's here?
             // it's should be show what user selected.
+            auto node = g_UIStatus->selection.node;
+            if (node) {
+                // show node info 
+                ImGui::TextColored(g_UIStatus->uiColors->nodeIdText, "%d ", node->nodeId);
+                ImGui::Text("showing a node %s", node->nodeName.c_str());
+            }
+
             ImGui::End();
+        }
+
+        void showProjectFolder(const char* path) {
+            if (strcmp(path, "") == 0) {
+                dbg("path is empty...");
+                return;
+            }
+
+            // todo use cache maybe better.
+            auto & selection = g_UIStatus->selection;
+            
+            for (auto& item : directory_iterator{path}) {
+                if (isFileHidden(item.path().filename().c_str())) {
+                    continue;
+                }
+
+                auto filename = item.path().filename().c_str();
+                auto fullPath = std::filesystem::canonical(item.path()).generic_string();
+
+                if (item.is_directory()) {
+                    if (ImGui::TreeNode(fullPath.c_str(), "<dir> %s", filename)) {
+                        showProjectFolder(fullPath.c_str());
+                        ImGui::TreePop();
+                    }
+                } else if (item.is_regular_file()) {
+                    bool selected = selection.selectedFiles.contains(fullPath);
+                    if (ImGui::Selectable(filename, selected, ImGuiSelectableFlags_AllowDoubleClick)  ) {
+                        dbg(fullPath);
+
+                        if (ImGui::IsMouseDoubleClicked(0)) {
+                            selection.selectedFiles.clear();
+                            dbg("double click, open file");
+                        } else {
+                            
+                            if (!g_UIStatus->io->KeyCtrl) {
+                                selection.selectedFiles.clear();
+                            }
+
+                            if (!selected || !g_UIStatus->io->KeyCtrl) {
+                                selection.selectedFiles.insert(fullPath);
+                            }
+                        }
+                        
+                    }
+                }
+            }
         }
 
         void showProjectWindow(bool needInit){
@@ -183,9 +264,10 @@ namespace sight {
             }
             
             ImGui::Begin(WINDOW_LANGUAGE_KEYS.project);
-
-            // show project files.
-            
+            std::string path = g_UIStatus->selection.getProjectPath();
+            if (!path.empty()) {
+                showProjectFolder(path.c_str());
+            }
 
             ImGui::End();
         }
@@ -430,6 +512,12 @@ namespace sight {
         UIStatus & uiStatus = *g_UIStatus;
         uiStatus.uvAsync = new uv_async_t();
 
+        // project path 
+        auto project = currentProject();
+        if (project) {
+            onProjectLoadSuccess(project);
+        }
+
         // uv loop init
         auto uvLoop = (uv_loop_t*)malloc(sizeof(uv_loop_t));
         uiStatus.uvLoop = uvLoop;
@@ -636,6 +724,10 @@ namespace sight {
         ImGui::Text("%s", label);
         ImGui::SameLine();
         return ImGui::InputText("", buf, bufSize);
+    }
+
+    UIStatus* currentUIStatus() {
+        return g_UIStatus;
     }
 
 
@@ -856,9 +948,7 @@ namespace sight {
 
 
     UIColors::UIColors() {
-        grey = IM_COL32(128,128,128,255);
 
-        readonlyText = grey;
     }
 
     UIStatus::~UIStatus() {
@@ -891,6 +981,10 @@ namespace sight {
 
     bool LoadingStatus::isLoadingOver() const {
         return jsThread;
+    }
+
+    std::string Selection::getProjectPath() const {
+        return this->projectPath;
     }
 
 }

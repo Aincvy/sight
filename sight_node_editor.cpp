@@ -397,7 +397,7 @@ namespace sight {
                 }
             }
             ed::EndDelete(); // Wrap up deletion action
-
+            
 
             auto openPopupPosition = ImGui::GetMousePos();
             ed::Suspend();
@@ -502,7 +502,7 @@ namespace sight {
             ImVec2 startPos = {
                     300, 20
             };
-            
+
             auto windowSize = uiStatus.io->DisplaySize - startPos;
             ImGui::SetNextWindowPos(startPos);
             ImGui::SetNextWindowSize(windowSize);
@@ -613,7 +613,7 @@ namespace sight {
     }
 
     SightNode *SightNode::instantiate(bool generateId) const {
-        dbg("instantiate", this->nodeName);
+        dbg( this->nodeName);
         if (this->templateNode) {
             return this->templateNode->instantiate();
         }
@@ -1064,7 +1064,7 @@ namespace sight {
 
     }
 
-    SightNode *SightNodeGraph::findNode(int id) {
+    SightNode *SightNodeGraph::findNode(uint id) {
         return findSightAnyThing(id).asNode();
     }
 

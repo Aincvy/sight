@@ -7,9 +7,20 @@
 #include "sight.h"
 #include "sight_language.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace sight {
 
     struct SightNode;
+    struct SightNodeConnection;
+
+    inline ImVec4 rgba(int r, int g, int b, int a){
+        return ImVec4{ static_cast<float>(r) / 255.f, static_cast<float>(g) / 255.f, static_cast<float>(b) / 255.f, static_cast<float>(a) / 255.f };
+    }
+
+    inline ImVec4 rgb(int r, int g,int b){
+        return rgba(r,g,b, 255);
+    }
 
     enum class UICommandType{
         UICommandHolder,
@@ -102,9 +113,12 @@ namespace sight {
 
     struct UIColors {
 
-        ImU32 grey;
+        ImU32 grey = IM_COL32(128,128,128,255);
+        ImU32 white = IM_COL32(255,255,255,255);
 
-        ImU32 readonlyText ;
+        ImU32 readonlyText = grey;
+        // ImU32 nodeIdText = IM_COL32(40,56,69,255);
+        ImVec4 nodeIdText = rgb(51, 184, 255);
 
         UIColors();
     };
@@ -115,6 +129,29 @@ namespace sight {
         bool isLoadingOver() const;
     };
 
+    class Project;
+
+    /**
+     * @brief select items, path
+     * Not thread safe.
+     */
+    class Selection {
+        // selected project path, default is project root path.
+        std::string projectPath;
+        
+    public:
+        absl::flat_hash_set<std::string> selectedFiles;
+        // selected node 
+        SightNode* node = nullptr;
+        SightNodeConnection* connection = nullptr;
+
+        std::string getProjectPath() const;
+
+
+        friend void onProjectLoadSuccess(Project* project);
+    };
+
+
     struct UIStatus {
         bool needInit = false;
         ImGuiIO* io;
@@ -122,6 +159,7 @@ namespace sight {
         struct UIWindowStatus windowStatus;
         struct UICreateEntity createEntityData;
         struct LoadingStatus loadingStatus;
+        class Selection selection;
 
         struct LanguageKeys* languageKeys = nullptr;
         struct UIColors* uiColors = nullptr;
@@ -134,15 +172,6 @@ namespace sight {
         bool isLoadingOver() const;
     };
 
-    /**
-     *
-     */
-    class Selection{
-    public:
-
-    private:
-
-    };
 
     int initOpenGL();
 
@@ -191,5 +220,12 @@ namespace sight {
      * @return
      */
     bool LeftLabeledInput(const char* label, char* buf, size_t bufSize);
+
+    /**
+     * @brief 
+     * 
+     * @return UIStatus*  current active global ui status
+     */
+    UIStatus* currentUIStatus();
 
 }

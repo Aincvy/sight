@@ -361,7 +361,7 @@ namespace sight {
          * @param id
          * @return The element of vector, you should not free the result. If not find, nullptr.
          */
-        SightNode* findNode(int id);
+        SightNode* findNode(uint id);
 
         /**
          *

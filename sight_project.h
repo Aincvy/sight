@@ -98,6 +98,8 @@ namespace sight {
          */
         uint addType(std::string const& name);
 
+        std::string getBaseDir() const;
+
 
     private:
         std::string baseDir;
@@ -124,8 +126,16 @@ namespace sight {
 
     };
 
-    int initProject(const char* baseDir, bool createIfNotExist = false);
+    /**
+     * @brief Called if project is load success.
+     * If ui status is not ready, then this function will be do nothing.
+     *  And when ui status is ready, this function will be called.
+     * 
+     * @param project 
+     */
+    void onProjectLoadSuccess(Project* project);
 
+    int initProject(const char* baseDir, bool createIfNotExist = false);
 
     Project* currentProject();
 

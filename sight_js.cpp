@@ -1022,9 +1022,6 @@ namespace sight {
 //        }
 //        printf("\n");
 
-        // maybe need split parseGraph and parseSource
-//        parseSource(finalSource.c_str());
-
         return 0;
     }
 

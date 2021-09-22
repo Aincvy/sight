@@ -85,5 +85,13 @@ namespace sight {
                        [](unsigned char c){ return std::toupper(c); });
     }
 
+    /**
+     * @brief 
+     * 
+     * @param path 
+     * @return true if file is hidden
+     * @return false 
+     */
+    bool isFileHidden(const char* path);
 
 }

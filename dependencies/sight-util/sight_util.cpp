@@ -7,6 +7,9 @@
 #include <algorithm>
 #include "sstream"
 
+#include <cstring>
+#include <sys/stat.h>
+
 namespace sight {
 
     std::string emptyString("");
@@ -68,6 +71,15 @@ namespace sight {
         }
 
         return ss.str();
+    }
+
+    bool isFileHidden(const char* path) {
+        // I don't know how to impl this ... 
+        if (std::strcmp(path, ".DS_Store") == 0) {
+            return true;
+        }
+        
+        return false;
     }
 
 }
