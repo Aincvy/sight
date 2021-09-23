@@ -158,27 +158,27 @@ namespace sight {
         }
 
         void showDemoWindow(bool needInit){
-            static SightImage sightImage;
-            if (needInit) {
-                auto b = loadImage("/Volumes/mac_extend/extDocuments/图片/82411909_p0.png", &sightImage);
-                dbg(b);
-            }
+            // static SightImage sightImage;
+            // if (needInit) {
+            //     auto b = loadImage("/Volumes/mac_extend/extDocuments/图片/82411909_p0.png", &sightImage);
+            //     dbg(b);
+            // }
 
             ImGui::Begin("Test Window");
             ImGui::Text("this is first line.");
 
-            if (sightImage.ready()) {
-                ImGui::Image(sightImage.textureId, ImVec2(sightImage.width, sightImage.height));
-            }
+            // if (sightImage.ready()) {
+            //     ImGui::Image(sightImage.textureId, ImVec2(sightImage.width, sightImage.height));
+            // }
 
             ImGui::End();
         }
 
-        void showHierarchyWindow(bool needInit){
-            if (needInit) {
-                ImGui::SetNextWindowPos(ImVec2(0,20));
-                ImGui::SetNextWindowSize(ImVec2(300, 285));
-            }
+        void showHierarchyWindow(){
+            // if (needInit) {
+            //     ImGui::SetNextWindowPos(ImVec2(0,20));
+            //     ImGui::SetNextWindowSize(ImVec2(300, 285));
+            // }
 
             uint selectedNodeId = 0;
             if (g_UIStatus->selection.node) {
@@ -209,11 +209,11 @@ namespace sight {
             ImGui::End();
         }
 
-        void showInspectorWindow(bool needInit){
-            if (needInit) {
-                ImGui::SetNextWindowPos(ImVec2(0,305));
-                ImGui::SetNextWindowSize(ImVec2(300, 300));
-            }
+        void showInspectorWindow(){
+            // if (needInit) {
+            //     ImGui::SetNextWindowPos(ImVec2(0,305));
+            //     ImGui::SetNextWindowSize(ImVec2(300, 300));
+            // }
 
             ImGui::Begin(WINDOW_LANGUAGE_KEYS.inspector);
             // what's here?
@@ -283,12 +283,12 @@ namespace sight {
             }
         }
 
-        void showProjectWindow(bool needInit){
-            if (needInit)
-            {
-                ImGui::SetNextWindowPos(ImVec2(0,605));
-                ImGui::SetNextWindowSize(ImVec2(300, 200));
-            }
+        void showProjectWindow(){
+            // if (needInit)
+            // {
+            //     ImGui::SetNextWindowPos(ImVec2(0,605));
+            //     ImGui::SetNextWindowSize(ImVec2(300, 200));
+            // }
             
             ImGui::Begin(WINDOW_LANGUAGE_KEYS.project);
             std::string path = g_UIStatus->selection.getProjectPath();
@@ -421,11 +421,10 @@ namespace sight {
     void mainWindowFrame(UIStatus & uiStatus) {
         showMainMenuBar(uiStatus);
 
-        showDemoWindow(uiStatus.needInit);
         // windows
-        showHierarchyWindow(uiStatus.needInit);
-        showInspectorWindow(uiStatus.needInit);
-        showProjectWindow(uiStatus.needInit);
+        showHierarchyWindow();
+        showInspectorWindow();
+        showProjectWindow();
         showNodeEditorGraph(uiStatus);
 
         if (uiStatus.windowStatus.createEntity) {
@@ -641,6 +640,9 @@ namespace sight {
 
         ImGuiIO& io = ImGui::GetIO(); (void)io;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;           // Enable Docking
+        // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;         // Enable Multi-Viewport / Platform Windows
+        io.ConfigWindowsMoveFromTitleBarOnly = true;
         g_UIStatus->io = &io;
 
         // Setup Dear ImGui style

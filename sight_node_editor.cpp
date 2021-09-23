@@ -509,7 +509,7 @@ namespace sight {
         }
 
         ImGui::Begin("Node Editor Graph", nullptr,
-                     ImGuiWindowFlags_NoMove |
+                     ImGuiWindowFlags_NoCollapse |
                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
                      ImGuiWindowFlags_NoSavedSettings);
         if (CURRENT_GRAPH) {
