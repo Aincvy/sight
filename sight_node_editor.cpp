@@ -512,15 +512,18 @@ namespace sight {
                      ImGuiWindowFlags_NoMove |
                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
                      ImGuiWindowFlags_NoSavedSettings);
-        showNodes(uiStatus);
-
+        if (CURRENT_GRAPH) {
+            //return CODE_FAIL;
+            showNodes(uiStatus);
+        }
+    
         ImGui::End();
 
         return 0;
     }
 
     uint nextNodeOrPortId() {
-        return CURRENT_GRAPH->nodeOrPortId++;
+        return currentProject()->nextNodeOrPortId();
     }
 
     int addNode(SightNode *node) {
@@ -552,7 +555,7 @@ namespace sight {
         disposeGraph();
 
         ed::Config config;
-        char* configFilePath = g_NodeEditorStatus->contextConfigFile;
+        char* configFilePath = g_NodeEditorStatus->contextConfigFileBuf;
         sprintf(configFilePath, "%s.json", pathWithoutExt);
         config.SettingsFile = configFilePath;
         g_NodeEditorStatus->context = ed::CreateEditor(&config);
@@ -781,6 +784,8 @@ namespace sight {
         // ctor yaml object
         YAML::Emitter out;
         out << YAML::BeginMap;
+        // file header
+        out << YAML::Key << "who-am-i" << YAML::Value << "sight-graph";
         // nodes
         out << YAML::Key << "nodes";
         out << YAML::Value << YAML::BeginMap;

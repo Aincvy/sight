@@ -5,14 +5,16 @@
 #include "sight_js.h"
 #include "sight_js_parser.h"
 #include "sight_project.h"
+#include "sight_util.h"
+#include "sight_widgets.h"
+#include "sight_image.h"
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
-#include "sight_util.h"
-#include "sight_widgets.h"
 
 #include <cstring>
+#include <iterator>
 #include <stdio.h>
 #include <future>
 
@@ -44,7 +46,7 @@ namespace sight {
 
                 }
                 if (ImGui::MenuItem("Graph")) {
-
+                    currentProject()->createGraph("graph1");
                 }
                 ImGui::Separator();
                 if (ImGui::MenuItem("Entity")) {
@@ -60,7 +62,7 @@ namespace sight {
 
             if (ImGui::MenuItem("Open", "Ctrl+O")) {
                 dbg("open graph file");
-                changeGraph("./simple1");
+                // changeGraph("./simple1");
             }
             if (ImGui::MenuItem("Save", "Ctrl+S")){
                 getCurrentGraph()->save();
@@ -155,9 +157,20 @@ namespace sight {
             }
         }
 
-        void showDemoWindow(){
+        void showDemoWindow(bool needInit){
+            static SightImage sightImage;
+            if (needInit) {
+                auto b = loadImage("/Volumes/mac_extend/extDocuments/图片/82411909_p0.png", &sightImage);
+                dbg(b);
+            }
+
             ImGui::Begin("Test Window");
             ImGui::Text("this is first line.");
+
+            if (sightImage.ready()) {
+                ImGui::Image(sightImage.textureId, ImVec2(sightImage.width, sightImage.height));
+            }
+
             ImGui::End();
         }
 
@@ -166,24 +179,29 @@ namespace sight {
                 ImGui::SetNextWindowPos(ImVec2(0,20));
                 ImGui::SetNextWindowSize(ImVec2(300, 285));
             }
-            ImGui::Begin(WINDOW_LANGUAGE_KEYS.hierarchy);
-            
+
             uint selectedNodeId = 0;
             if (g_UIStatus->selection.node) {
                 selectedNodeId = g_UIStatus->selection.node->nodeId;
             }
-            auto graph = getCurrentGraph();
-            for (const auto & node : graph->getNodes()) {
-                ImGui::TextColored(g_UIStatus->uiColors->nodeIdText, "%d ", node.nodeId);
-                ImGui::SameLine();
 
-                if (Selectable(static_cast<int>(node.nodeId), node.nodeName.c_str())/* , selectedNodeId == node.nodeId */) {
-                    dbg(node.nodeName);
-                    auto pointer = graph->findNode(node.nodeId);
-                    if (!pointer) {
-                        dbg("error" , node.nodeId);
-                    } else {
-                        g_UIStatus->selection.node = pointer;
+            ImGui::Begin(WINDOW_LANGUAGE_KEYS.hierarchy);
+
+            auto graph = getCurrentGraph();
+            if (graph) {
+                for (const auto & node : graph->getNodes()) {
+                    ImGui::TextColored(g_UIStatus->uiColors->nodeIdText, "%d ", node.nodeId);
+                    ImGui::SameLine();
+                
+                    if (Selectable(static_cast<int>(node.nodeId), node.nodeName.c_str(), selectedNodeId == node.nodeId)) {
+                        dbg(node.nodeName);
+                        auto pointer = graph->findNode(node.nodeId);
+                        if (!pointer) {
+                            dbg("error" , node.nodeId);
+                        } else {
+                            g_UIStatus->selection.node = pointer;
+                            sprintf(g_UIStatus->buffer.inspectorNodeName, "%s", node.nodeName.c_str());
+                        }
                     }
                 }
             }
@@ -203,8 +221,17 @@ namespace sight {
             auto node = g_UIStatus->selection.node;
             if (node) {
                 // show node info 
+                ImGui::Text("node id: ");
+                ImGui::SameLine();
                 ImGui::TextColored(g_UIStatus->uiColors->nodeIdText, "%d ", node->nodeId);
-                ImGui::Text("showing a node %s", node->nodeName.c_str());
+                ImGui::Text("name: " );
+                ImGui::SameLine();
+                auto & nameBuf = g_UIStatus->buffer.inspectorNodeName;
+                if (ImGui::InputText("## Inspector.node.name", nameBuf, std::size(nameBuf))) {
+                    dbg("InputText");
+                    node->nodeName = nameBuf;
+                }
+
             }
 
             ImGui::End();
@@ -394,7 +421,7 @@ namespace sight {
     void mainWindowFrame(UIStatus & uiStatus) {
         showMainMenuBar(uiStatus);
 
-        //showDemoWindow();
+        showDemoWindow(uiStatus.needInit);
         // windows
         showHierarchyWindow(uiStatus.needInit);
         showInspectorWindow(uiStatus.needInit);
@@ -405,7 +432,7 @@ namespace sight {
             showCreateEntityWindow();
         }
         if (uiStatus.windowStatus.testWindow) {
-            showDemoWindow();
+            showDemoWindow(false);
         }
 
     }
@@ -628,9 +655,7 @@ namespace sight {
         // Our state
         ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-        
-
-        changeGraph("./simple");
+        // changeGraph("./simple");
 
         auto uvLoop = g_UIStatus->uvLoop;
         // Main loop
@@ -649,7 +674,6 @@ namespace sight {
             ImGui::NewFrame();
 
             mainWindowFrame(*g_UIStatus);
-
 
             // Rendering
             ImGui::Render();

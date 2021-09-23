@@ -41,6 +41,16 @@ namespace sight {
         std::atomic<uint> nodeOrPortId = 3000;
     };
 
+    class SightNodeGraph;
+
+    /**
+     * @brief build target settings
+     * May include programming language, application type.
+     */
+    struct BuildTarget {
+
+    };
+
     /**
      * project class.
      *
@@ -100,6 +110,14 @@ namespace sight {
 
         std::string getBaseDir() const;
 
+        /**
+         * @brief Create a Graph object
+         * 
+         * @param path it will be add baseDir as prefix. `openGraph` is same.
+         * @return SightNodeGraph* 
+         */
+        SightNodeGraph* createGraph(const char* path);
+        SightNodeGraph* openGraph(const char* path);
 
     private:
         std::string baseDir;

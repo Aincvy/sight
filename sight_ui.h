@@ -2,6 +2,7 @@
 //
 #pragma once
 #include "imgui.h"
+#include "sight_defines.h"
 #include "uv.h"
 
 #include "sight.h"
@@ -151,6 +152,9 @@ namespace sight {
         friend void onProjectLoadSuccess(Project* project);
     };
 
+    struct UIBuffer {
+        char inspectorNodeName[LITTLE_NAME_BUF_SIZE]{0};
+    };
 
     struct UIStatus {
         bool needInit = false;
@@ -160,6 +164,7 @@ namespace sight {
         struct UICreateEntity createEntityData;
         struct LoadingStatus loadingStatus;
         class Selection selection;
+        struct UIBuffer buffer;
 
         struct LanguageKeys* languageKeys = nullptr;
         struct UIColors* uiColors = nullptr;

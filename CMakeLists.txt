@@ -32,12 +32,14 @@ target_sources(sight PRIVATE
         sight.cpp
         sight_plugin.cpp
         sight_widgets.cpp
+        sight_image.cpp
 )
 
 # depend
 target_include_directories(
     sight PRIVATE
         dependencies/v8pp
+        dependencies/stb
 )
 
 target_sources(sight PRIVATE

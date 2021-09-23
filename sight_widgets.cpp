@@ -11,7 +11,7 @@ namespace sight {
 
     bool Selectable(int id, const char* text, bool selected, ImU32 color) {
         char labelBuf[LITTLE_NAME_BUF_SIZE] = {0};
-        sprintf(labelBuf, "## %d", id);
+        sprintf(labelBuf, "## selectable.%d", id);
         ImGuiWindow* window = ImGui::GetCurrentWindow();
         auto pos = window->DC.CursorPos;
         auto size = ImGui::CalcTextSize(text);

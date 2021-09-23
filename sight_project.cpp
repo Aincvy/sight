@@ -3,15 +3,18 @@
 //
 
 #include "sight_project.h"
+#include "dbg.h"
 #include "sight_js_parser.h"
 #include "sight_ui.h"
 #include "sight_util.h"
 #include "sight.h"
+#include "sight_node_editor.h"
 
 #include "yaml-cpp/yaml.h"
 
 #include "filesystem"
 #include "fstream"
+#include <string>
 
 namespace sight {
 
@@ -32,6 +35,13 @@ namespace sight {
 
     Project::Project(const char *baseDir,bool createIfNotExist) : baseDir(baseDir),
         createIfNotExist(createIfNotExist), typeIdIncr(IntTypeNext) {
+
+        auto path = std::filesystem::path(this->baseDir);
+        if (!path.is_absolute()) {
+            // 
+            this->baseDir = std::filesystem::canonical(path).generic_string();
+            dbg(this->baseDir);
+        }
         if (!endsWith(this->baseDir, "/")) {
             this->baseDir += "/";
         }
@@ -155,6 +165,21 @@ namespace sight {
 
     std::string Project::getBaseDir() const {
         return baseDir;
+    }
+
+    SightNodeGraph* Project::createGraph(const char* path) {
+        std::string targetPath = pathGraphFolder() + path;
+        std::filesystem::path temp(targetPath);
+        if (temp.has_extension()) {
+            targetPath = std::string(targetPath, 0, targetPath.rfind('.') - 1);
+        }
+        dbg(targetPath);
+        changeGraph(targetPath.c_str());
+        return getCurrentGraph();
+    }
+
+    SightNodeGraph* Project::openGraph(const char* path) {
+        return createGraph(path);
     }
 
     std::string const &Project::getTypeName(int type) {

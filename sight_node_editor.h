@@ -454,8 +454,8 @@ namespace sight {
         SightNodeGraph* graph = nullptr;
         SightNodeGraph* entityGraph = nullptr;
         ed::EditorContext* context = nullptr;
-        //
-        char contextConfigFile[NAME_BUF_SIZE * 2] = {0};
+        // file path buf.
+        char contextConfigFileBuf[NAME_BUF_SIZE * 2] = {0};
         // node template | for render
         std::vector<SightNodeTemplateAddress> templateAddressList;
 
@@ -534,8 +534,10 @@ namespace sight {
     void disposeGraph(bool context = true);
 
     /**
-     * change graph to another one.
+     * change graph to another one.  
+     * !!DO NOT USE THIS FUNCTION DIRECTLY, USE `Project` CLASS !!
      * @param pathWithoutExt   like './simple'  without dot.
+     * @param loadEntityGraph  is pathWithoutExt a entity graph?  may deprecated.
      */
     void changeGraph(const char* pathWithoutExt, bool loadEntityGraph = false);
 
