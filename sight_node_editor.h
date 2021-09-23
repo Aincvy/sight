@@ -501,6 +501,10 @@ namespace sight {
      */
     int destroyNodeEditor();
 
+    void nodeEditorFrameBegin();
+
+    void nodeEditorFrameEnd();
+
     int showNodeEditorGraph(const UIStatus & uiStatus);
 
     void showNodePortValue(SightNodePort *port);
@@ -569,5 +573,12 @@ namespace sight {
      */
     SightJsNode* findTemplateNode(const SightNode *node);
 
+    /**
+     * @brief 
+     * 
+     * @return true  a graph is opened.
+     * @return false 
+     */
+    bool isNodeEditorReady();
 
 }

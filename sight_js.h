@@ -11,6 +11,8 @@
 
 namespace sight{
 
+    struct SightJsNode;
+
     enum class JsCommandType {
         JsCommandHolder,
         // run a file and flush node cache
@@ -85,5 +87,13 @@ namespace sight{
      */
     void clearJsNodeCache();
 
+    /**
+     * @brief convert SightJsNode to `addTemplateNode` call
+     * 
+     * @param node 
+     * @return std::string 
+     */
+    std::string serializeJsNode(SightJsNode const& node);
+    
 }
 

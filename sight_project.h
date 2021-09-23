@@ -5,6 +5,7 @@
 #pragma once
 
 #include <cstring>
+#include <string>
 #include "string"
 #include "atomic"
 #include "sys/types.h"
@@ -57,6 +58,7 @@ namespace sight {
      */
     class Project {
     public:
+        bool isLoadCallbackCalled = false;
 
         Project() = default;
         Project(const char* baseDir, bool createIfNotExist);
@@ -119,6 +121,12 @@ namespace sight {
         SightNodeGraph* createGraph(const char* path);
         SightNodeGraph* openGraph(const char* path);
 
+        /**
+         * @brief if has last open graph, then open it.
+         * 
+         */
+        void checkOpenLastGraph();
+
     private:
         std::string baseDir;
         bool createIfNotExist;
@@ -128,6 +136,8 @@ namespace sight {
         // todo this need to serialization and deserialization
         absl::btree_map<std::string, uint> typeMap;
         absl::btree_map<uint, std::string> reverseTypeMap;
+
+        std::string lastOpenGraph{};
 
         // file locations
         std::string pathConfigFile() const;
@@ -151,8 +161,15 @@ namespace sight {
      * 
      * @param project 
      */
-    void onProjectLoadSuccess(Project* project);
+    void onProjectAndUILoadSuccess(Project* project);
 
+    /**
+     * @brief 
+     * 
+     * @param baseDir 
+     * @param createIfNotExist 
+     * @return int 
+     */
     int initProject(const char* baseDir, bool createIfNotExist = false);
 
     Project* currentProject();

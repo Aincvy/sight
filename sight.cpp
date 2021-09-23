@@ -8,11 +8,14 @@
 #include "sight.h"
 #include "sight_js.h"
 
+#include "sight_project.h"
+
 namespace sight {
 
     void exitSight(int v) {
-
+        
         addJsCommand(JsCommandType::Destroy);
+        currentProject()->save();
         // exit(v);
     }
 

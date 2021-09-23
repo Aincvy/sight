@@ -12,6 +12,7 @@
 #include "sight.h"
 #include "sight_node_editor.h"
 #include "sight_address.h"
+#include "sight_ui.h"
 #include "sight_util.h"
 #include "sight_project.h"
 
@@ -308,9 +309,11 @@ namespace sight {
             auto io = uiStatus.io;
 
             ImGui::Text("FPS: %.2f (%.2gms)", io->Framerate, io->Framerate ? 1000.0f / io->Framerate : 0.0f);
+            ImGui::SameLine();
+            if (ImGui::Button("test## 133")) {
+                dbg("test");
+            }
             ImGui::Separator();
-
-            ed::SetCurrentEditor(g_NodeEditorStatus->context);
 
             // Start interaction with editor.
             ed::Begin("My Editor", ImVec2(0.0, 0.0f));
@@ -426,7 +429,6 @@ namespace sight {
             if (uiStatus.needInit)
                 ed::NavigateToContent(0.0f);
 
-            ed::SetCurrentEditor(nullptr);
 
             return 0;
         }
@@ -464,6 +466,14 @@ namespace sight {
         delete g_NodeEditorStatus;
         g_NodeEditorStatus = nullptr;
         return 0;
+    }
+
+    void nodeEditorFrameBegin() {
+        ed::SetCurrentEditor(g_NodeEditorStatus->context);
+    }
+
+    void nodeEditorFrameEnd() {
+        ed::SetCurrentEditor(nullptr);
     }
 
     void showNodePortValue(SightNodePort *port) {
@@ -1539,6 +1549,10 @@ namespace sight {
         auto temp = const_cast<SightNode*>(templateNode);
         auto jsNode = (SightJsNode*) temp;
         return jsNode;
+    }
+
+    bool isNodeEditorReady() {
+        return g_NodeEditorStatus->context;
     }
 
     SightAnyThingData::SightAnyThingData() {

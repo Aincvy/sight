@@ -80,6 +80,7 @@ namespace sight {
 
         out << YAML::BeginMap;
         out << YAML::Key << "nodeOrPortId" << YAML::Value << projectConfig.nodeOrPortId.load();
+        out << YAML::Key << "lastOpenGraph" << YAML::Value << lastOpenGraph;
 
         out << YAML::EndMap;
 
@@ -104,6 +105,11 @@ namespace sight {
         try {
             auto root = YAML::Load(fin);
             projectConfig.nodeOrPortId = root["nodeOrPortId"].as<uint>();
+
+            auto temp = root["lastOpenGraph"];
+            if (temp.IsDefined()) {
+                this->lastOpenGraph = temp.as<std::string>();
+            }
 
         } catch (const YAML::BadConversion & e){
             dbg("load project config error.", path.c_str(), e.what());
@@ -175,11 +181,20 @@ namespace sight {
         }
         dbg(targetPath);
         changeGraph(targetPath.c_str());
+        lastOpenGraph = path;
         return getCurrentGraph();
     }
 
     SightNodeGraph* Project::openGraph(const char* path) {
         return createGraph(path);
+    }
+
+    void Project::checkOpenLastGraph() {
+        if (lastOpenGraph.empty()) {
+            return;
+        }
+
+        openGraph(lastOpenGraph.c_str());
     }
 
     std::string const &Project::getTypeName(int type) {
@@ -228,14 +243,20 @@ namespace sight {
         return g_Project;
     }
 
-    void onProjectLoadSuccess(Project* project){
+    void onProjectAndUILoadSuccess(Project* project){
+        if (!project || project->isLoadCallbackCalled) {
+            return;
+        }
+
         auto status = currentUIStatus();
         if (!status) {
             return;
         }
 
+        project->isLoadCallbackCalled = true;
         status->selection.projectPath = project->getBaseDir();
         
+        project->checkOpenLastGraph();
     }
 
     int initProject(const char* baseDir, bool createIfNotExist) {
@@ -252,7 +273,7 @@ namespace sight {
         g_Project = new Project(baseDir, createIfNotExist);
         auto code = g_Project->load();
         if (code == CODE_OK) {
-            onProjectLoadSuccess(g_Project);
+            onProjectAndUILoadSuccess(g_Project);
         }
         return code;
     }

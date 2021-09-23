@@ -1,4 +1,5 @@
 #include "dbg.h"
+#include "imgui_node_editor.h"
 #include "sight_ui.h"
 #include "sight_node_editor.h"
 #include "sight.h"
@@ -13,6 +14,8 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
+#include <algorithm>
+#include <cstddef>
 #include <cstring>
 #include <iterator>
 #include <stdio.h>
@@ -21,6 +24,8 @@
 #include <filesystem>
 
 #include <GLFW/glfw3.h>
+#include <sys/types.h>
+#include <vector>
 
 #define COMMON_LANGUAGE_KEYS g_UIStatus->languageKeys->commonKeys
 #define WINDOW_LANGUAGE_KEYS g_UIStatus->languageKeys->windowNames
@@ -100,9 +105,16 @@ namespace sight {
                 }
                 ImGui::EndMenu();
             }
+
+            if (ImGui::BeginMenu("Layout")) {
+                if (ImGui::MenuItem("Reset")) {
+                    g_UIStatus->windowStatus.layoutReset = true;
+                }
+                ImGui::EndMenu();
+            }
         }
 
-        void showMainBuildMenu(){
+        void showMainProjectMenu(){
             if (ImGui::MenuItem("Build")) {
                 currentProject()->build();
             }
@@ -112,15 +124,17 @@ namespace sight {
             if (ImGui::MenuItem("Clean")) {
                 currentProject()->clean();
             }
+            ImGui::Separator();
             if (ImGui::MenuItem("Parse Graph")) {
                 addJsCommand(JsCommandType::ParseGraph, "./simple.yaml");
+            }
+            if (ImGui::MenuItem("Save Config")) {
+                currentProject()->saveConfigFile();
             }
         }
 
         void showMainCustomMenu(){
             if (ImGui::MenuItem("Trigger")) {
-                // addJsCommand(JsCommandType::File, "/Volumes/mac_extend/Project/sight/scripts/nodes.js");
-//                testParser();
                 parseSource("a = 99 + 102;");
             }
             if (ImGui::MenuItem("Crash")) {
@@ -144,8 +158,8 @@ namespace sight {
                     showMainViewMenu();
                     ImGui::EndMenu();
                 }
-                if (ImGui::BeginMenu("Build")) {
-                    showMainBuildMenu();
+                if (ImGui::BeginMenu("Project")) {
+                    showMainProjectMenu();
                     ImGui::EndMenu();
                 }
                 if (ImGui::BeginMenu("Custom")) {
@@ -175,32 +189,80 @@ namespace sight {
         }
 
         void showHierarchyWindow(){
-            // if (needInit) {
-            //     ImGui::SetNextWindowPos(ImVec2(0,20));
-            //     ImGui::SetNextWindowSize(ImVec2(300, 285));
-            // }
-
-            uint selectedNodeId = 0;
-            if (g_UIStatus->selection.node) {
-                selectedNodeId = g_UIStatus->selection.node->nodeId;
+            if (g_UIStatus->windowStatus.layoutReset) {
+                ImGui::SetNextWindowPos(ImVec2(0,20));
+                ImGui::SetNextWindowSize(ImVec2(300, 285));
             }
 
-            ImGui::Begin(WINDOW_LANGUAGE_KEYS.hierarchy);
+            auto & selection = g_UIStatus->selection;
 
+            ImGui::Begin(WINDOW_LANGUAGE_KEYS.hierarchy);
+            // check and update node editor status
+            if (!isNodeEditorReady()) {
+                ImGui::End();
+                return;
+            }
+
+            int selectedCount = ed::GetSelectedObjectCount();
+            if (selectedCount > 0) {
+                selection.selectedItems.clear();
+
+                std::vector<ed::NodeId> selectedNodes;
+                std::vector<ed::LinkId> selectedLinks;
+                selectedNodes.resize(selectedCount);
+                selectedLinks.resize(selectedCount);
+
+                int c = ed::GetSelectedNodes(selectedNodes.data(), selectedCount);
+                int d = ed::GetSelectedLinks(selectedLinks.data(), selectedCount);
+
+                selectedNodes.resize(c);
+                selectedLinks.resize(d);
+
+                if (c == 1) {
+                    selection.node = getCurrentGraph()->findNode(static_cast<uint>(selectedNodes[0].Get()));
+                }
+
+                for (const auto & item : selectedNodes) {
+                    selection.selectedItems.insert(static_cast<uint>(item.Get()));    
+                }
+                
+            } else {
+                selection.resetSelectedNodes();
+            }
+            
             auto graph = getCurrentGraph();
             if (graph) {
                 for (const auto & node : graph->getNodes()) {
                     ImGui::TextColored(g_UIStatus->uiColors->nodeIdText, "%d ", node.nodeId);
                     ImGui::SameLine();
                 
-                    if (Selectable(static_cast<int>(node.nodeId), node.nodeName.c_str(), selectedNodeId == node.nodeId)) {
+                    auto nodeId = node.nodeId;
+                    auto findResult = std::find(selection.selectedItems.begin(), selection.selectedItems.end(), nodeId);
+                    bool isSelected = findResult != selection.selectedItems.end();
+                    if (Selectable(static_cast<int>(nodeId), node.nodeName.c_str(), isSelected)) {
                         dbg(node.nodeName);
-                        auto pointer = graph->findNode(node.nodeId);
+                        auto pointer = graph->findNode(nodeId);
                         if (!pointer) {
-                            dbg("error" , node.nodeId);
+                            dbg("error" , nodeId);
                         } else {
-                            g_UIStatus->selection.node = pointer;
+                            bool anySelect = selection.node != nullptr;
+                            bool appendNode = false;
+                            if (anySelect) {
+                                if (!g_UIStatus->io->KeyCtrl) {
+                                    // not control
+                                    selection.selectedItems.clear();
+                                    ed::ClearSelection();
+                                }  else {
+                                    appendNode = true;
+                                }
+                            }
+                            
+                            selection.node = pointer;
+                            selection.selectedItems.insert(nodeId);
                             sprintf(g_UIStatus->buffer.inspectorNodeName, "%s", node.nodeName.c_str());
+
+                            ed::SelectNode(nodeId, appendNode);
+                            ed::NavigateToSelection();
                         }
                     }
                 }
@@ -210,29 +272,35 @@ namespace sight {
         }
 
         void showInspectorWindow(){
-            // if (needInit) {
-            //     ImGui::SetNextWindowPos(ImVec2(0,305));
-            //     ImGui::SetNextWindowSize(ImVec2(300, 300));
-            // }
+            if (g_UIStatus->windowStatus.layoutReset) {
+                ImGui::SetNextWindowPos(ImVec2(0,305));
+                ImGui::SetNextWindowSize(ImVec2(300, 300));
+            }
 
             ImGui::Begin(WINDOW_LANGUAGE_KEYS.inspector);
             // what's here?
             // it's should be show what user selected.
-            auto node = g_UIStatus->selection.node;
-            if (node) {
-                // show node info 
-                ImGui::Text("node id: ");
-                ImGui::SameLine();
-                ImGui::TextColored(g_UIStatus->uiColors->nodeIdText, "%d ", node->nodeId);
-                ImGui::Text("name: " );
-                ImGui::SameLine();
-                auto & nameBuf = g_UIStatus->buffer.inspectorNodeName;
-                if (ImGui::InputText("## Inspector.node.name", nameBuf, std::size(nameBuf))) {
-                    dbg("InputText");
-                    node->nodeName = nameBuf;
-                }
+            auto & selection = g_UIStatus->selection;
+            auto node = selection.node;
+            if (selection.selectedItems.size() > 1) {
+                ImGui::Text("%zu nodes is selected.", selection.selectedItems.size());
+            } else {
+                if (node) {
+                    // show node info 
+                    ImGui::Text("node id: ");
+                    ImGui::SameLine();
+                    ImGui::TextColored(g_UIStatus->uiColors->nodeIdText, "%d ", node->nodeId);
+                    ImGui::Text("name: " );
+                    ImGui::SameLine();
+                    auto & nameBuf = g_UIStatus->buffer.inspectorNodeName;
+                    if (ImGui::InputText("## Inspector.node.name", nameBuf, std::size(nameBuf))) {
+                        dbg("InputText");
+                        node->nodeName = nameBuf;
+                    }
 
+                }
             }
+            
 
             ImGui::End();
         }
@@ -284,11 +352,11 @@ namespace sight {
         }
 
         void showProjectWindow(){
-            // if (needInit)
-            // {
-            //     ImGui::SetNextWindowPos(ImVec2(0,605));
-            //     ImGui::SetNextWindowSize(ImVec2(300, 200));
-            // }
+            if (g_UIStatus->windowStatus.layoutReset)
+            {
+                ImGui::SetNextWindowPos(ImVec2(0,605));
+                ImGui::SetNextWindowSize(ImVec2(300, 200));
+            }
             
             ImGui::Begin(WINDOW_LANGUAGE_KEYS.project);
             std::string path = g_UIStatus->selection.getProjectPath();
@@ -421,6 +489,8 @@ namespace sight {
     void mainWindowFrame(UIStatus & uiStatus) {
         showMainMenuBar(uiStatus);
 
+        nodeEditorFrameBegin();
+
         // windows
         showHierarchyWindow();
         showInspectorWindow();
@@ -434,6 +504,11 @@ namespace sight {
             showDemoWindow(false);
         }
 
+        nodeEditorFrameEnd();
+
+        if (uiStatus.windowStatus.layoutReset) {
+            uiStatus.windowStatus.layoutReset = false;
+        }
     }
 
     void runUICommand(UICommand *command){
@@ -538,11 +613,8 @@ namespace sight {
         UIStatus & uiStatus = *g_UIStatus;
         uiStatus.uvAsync = new uv_async_t();
 
-        // project path 
-        auto project = currentProject();
-        if (project) {
-            onProjectLoadSuccess(project);
-        }
+        // init node editor.
+        initNodeEditor();
 
         // uv loop init
         auto uvLoop = (uv_loop_t*)malloc(sizeof(uv_loop_t));
@@ -557,10 +629,6 @@ namespace sight {
         addJsCommand(JsCommandType::InitParser);
         addJsCommand(JsCommandType::InitPluginManager);
         addJsCommand(JsCommandType::EndInit);
-
-
-        // init node editor.
-        initNodeEditor();
 
         uint progress = 0;
         
@@ -657,7 +725,11 @@ namespace sight {
         // Our state
         ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-        // changeGraph("./simple");
+        // project path 
+        auto project = currentProject();
+        if (project) {
+            onProjectAndUILoadSuccess(project);
+        }
 
         auto uvLoop = g_UIStatus->uvLoop;
         // Main loop
@@ -1011,6 +1083,12 @@ namespace sight {
 
     std::string Selection::getProjectPath() const {
         return this->projectPath;
+    }
+
+    void Selection::resetSelectedNodes() {
+        this->node = nullptr;
+        this->selectedItems.clear();
+
     }
 
 }

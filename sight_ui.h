@@ -9,6 +9,7 @@
 #include "sight_language.h"
 
 #include "absl/container/flat_hash_set.h"
+#include <sys/types.h>
 
 namespace sight {
 
@@ -110,6 +111,8 @@ namespace sight {
         bool nodeGraph = false;
         bool createEntity = false;
         bool testWindow = false;
+
+        bool layoutReset = false;
     };
 
     struct UIColors {
@@ -145,11 +148,14 @@ namespace sight {
         // selected node 
         SightNode* node = nullptr;
         SightNodeConnection* connection = nullptr;
+        // node or port or connection 
+        absl::flat_hash_set<uint> selectedItems;
 
         std::string getProjectPath() const;
 
+        void resetSelectedNodes();
 
-        friend void onProjectLoadSuccess(Project* project);
+        friend void onProjectAndUILoadSuccess(Project* project);
     };
 
     struct UIBuffer {

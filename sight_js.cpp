@@ -603,6 +603,12 @@ namespace sight {
         g_TemplateNodeCache.clear();
     }
 
+    std::string serializeJsNode(SightJsNode const& node) {
+        // generate a function call.
+        
+        return {};
+    }
+
     /**
      * run a js file.
      * @param filepath
