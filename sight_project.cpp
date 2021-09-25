@@ -14,11 +14,68 @@
 
 #include "filesystem"
 #include "fstream"
+#include <algorithm>
 #include <string>
 
 namespace sight {
 
+    using directory_iterator = std::filesystem::directory_iterator;
+
     static Project* g_Project = nullptr;
+
+    namespace  {
+        
+        void fillFiles(ProjectFile & parent){
+            parent.files.clear();
+
+            for (const auto& item : directory_iterator{parent.path}) {
+                if (item.is_directory()) {
+                    parent.files.push_back(
+                        {
+                            ProjectFileType::Directory,
+                            item.path().c_str(),
+                            item.path().filename().c_str(),
+                            {}
+                        }
+                    );
+                    fillFiles(parent.files.back());
+                    continue;
+                }
+                if (item.is_regular_file()) {
+                    auto filename = item.path().filename();
+                    if (filename == ".DS_Store") {
+                        continue;
+                    }
+
+                    parent.files.push_back({
+                        ProjectFileType::Regular,
+                        item.path().c_str(),
+                        item.path().filename().c_str(),
+                        {}
+                    });
+                }
+            }
+
+            // sort directory and file
+            std::sort(parent.files.begin(), parent.files.end(), [](ProjectFile const& f1, ProjectFile const& f2) {
+                if (f1.fileType == ProjectFileType::Directory && f2.fileType == ProjectFileType::Regular) {
+                    return true;
+                } else if ((f1.fileType == ProjectFileType::Directory && f2.fileType == ProjectFileType::Directory) 
+                            || (f1.fileType != ProjectFileType::Directory && f2.fileType != ProjectFileType::Directory)) {
+                    return f1.filename < f2.filename;    
+                }
+                
+                return false;
+            });
+
+            dbg("print file list");
+            std::for_each(parent.files.begin(), parent.files.end(), [](ProjectFile const & f) {
+                dbg(f.filename);
+            });
+
+        }
+
+    }
 
     int Project::build() {
         return 0;
@@ -47,8 +104,11 @@ namespace sight {
         }
 
         initTypeMap();
-
         initFolders();
+
+        fileCache.path = baseDir;
+        fileCache.filename = "";
+        fileCache.fileType = ProjectFileType::Directory;
     }
 
     uint Project::nextNodeOrPortId() {
@@ -173,8 +233,8 @@ namespace sight {
         return baseDir;
     }
 
-    SightNodeGraph* Project::createGraph(const char* path) {
-        std::string targetPath = pathGraphFolder() + path;
+    SightNodeGraph* Project::createGraph(const char* path, bool fixPath) {
+        std::string targetPath = fixPath ? pathGraphFolder() + path : path;
         std::filesystem::path temp(targetPath);
         if (temp.has_extension()) {
             targetPath = std::string(targetPath, 0, targetPath.rfind('.') - 1);
@@ -185,8 +245,8 @@ namespace sight {
         return getCurrentGraph();
     }
 
-    SightNodeGraph* Project::openGraph(const char* path) {
-        return createGraph(path);
+    SightNodeGraph* Project::openGraph(const char* path, bool fixPath) {
+        return createGraph(path, fixPath);
     }
 
     void Project::checkOpenLastGraph() {
@@ -195,6 +255,19 @@ namespace sight {
         }
 
         openGraph(lastOpenGraph.c_str());
+    }
+
+    ProjectFile const& Project::getFileCache() const {
+        return fileCache;
+    }
+
+    void Project::buildFilesCache() {
+        fillFiles(this->fileCache);
+    }
+
+    int Project::openFile(ProjectFile const& file) {
+
+        return CODE_OK;
     }
 
     std::string const &Project::getTypeName(int type) {
@@ -256,6 +329,7 @@ namespace sight {
         project->isLoadCallbackCalled = true;
         status->selection.projectPath = project->getBaseDir();
         
+        project->buildFilesCache();
         project->checkOpenLastGraph();
     }
 

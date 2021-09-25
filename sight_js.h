@@ -89,11 +89,11 @@ namespace sight{
 
     /**
      * @brief convert SightJsNode to `addTemplateNode` call
-     * 
+     * todo 
      * @param node 
      * @return std::string 
      */
     std::string serializeJsNode(SightJsNode const& node);
-    
+
 }
 

@@ -1,5 +1,6 @@
 #include "dbg.h"
 #include "imgui_node_editor.h"
+#include "sight_defines.h"
 #include "sight_ui.h"
 #include "sight_node_editor.h"
 #include "sight.h"
@@ -8,7 +9,6 @@
 #include "sight_project.h"
 #include "sight_util.h"
 #include "sight_widgets.h"
-#include "sight_image.h"
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdio>
 #include <cstring>
 #include <iterator>
 #include <stdio.h>
@@ -130,6 +131,9 @@ namespace sight {
             }
             if (ImGui::MenuItem("Save Config")) {
                 currentProject()->saveConfigFile();
+            }
+            if (ImGui::MenuItem("Reload")) {
+                currentProject()->buildFilesCache();
             }
         }
 
@@ -351,6 +355,41 @@ namespace sight {
             }
         }
 
+        void showProjectFolder(ProjectFile const& folder){
+            auto & selection = g_UIStatus->selection;
+
+            for (const auto& item : folder.files) {
+                if (item.fileType == ProjectFileType::Directory) {
+                    if (ImGui::TreeNode(item.path.c_str(), "<dir> %s", item.filename.c_str())) {
+                        selection.selectedFiles.clear();
+                        showProjectFolder(item);
+                        ImGui::TreePop();
+                    }
+                } else {
+
+                    // std::string tmp = strJoin(item.filename, item.path);
+                    bool selected = selection.selectedFiles.contains(item.path);
+                    if (ImGui::Selectable(strJoin(item.filename, item.path).c_str(), selected, ImGuiSelectableFlags_AllowDoubleClick)) {
+                        dbg(item.path);
+
+                        if (ImGui::IsMouseDoubleClicked(0)) {
+                            selection.selectedFiles.clear();
+                            dbg("double click, open file");
+                        } else {
+                            
+                            if (!g_UIStatus->io->KeyCtrl) {
+                                selection.selectedFiles.clear();
+                            }
+
+                            if (!selected || !g_UIStatus->io->KeyCtrl) {
+                                selection.selectedFiles.insert(item.path);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         void showProjectWindow(){
             if (g_UIStatus->windowStatus.layoutReset)
             {
@@ -359,10 +398,11 @@ namespace sight {
             }
             
             ImGui::Begin(WINDOW_LANGUAGE_KEYS.project);
-            std::string path = g_UIStatus->selection.getProjectPath();
-            if (!path.empty()) {
-                showProjectFolder(path.c_str());
-            }
+            // std::string path = g_UIStatus->selection.getProjectPath();
+            // if (!path.empty()) {
+            //     showProjectFolder(path.c_str());
+            // }
+            showProjectFolder(currentProject()->getFileCache());
 
             ImGui::End();
         }

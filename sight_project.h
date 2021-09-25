@@ -6,6 +6,8 @@
 
 #include <cstring>
 #include <string>
+#include <vector>
+#include "sight_plugin.h"
 #include "string"
 #include "atomic"
 #include "sys/types.h"
@@ -50,6 +52,28 @@ namespace sight {
      */
     struct BuildTarget {
 
+    };
+
+    enum class ProjectFileType {
+        Regular,
+        Directory,
+        Graph,
+        Plugin,
+    };
+
+    /**
+     * @brief A file or a direcotry.
+     * 
+     */
+    struct ProjectFile{
+        ProjectFileType fileType{ProjectFileType::Regular};
+        // base on project.baseDir
+        std::string path;
+        std::string filename;
+        // if this is a directory.
+        std::vector<ProjectFile> files;
+
+        
     };
 
     /**
@@ -115,11 +139,12 @@ namespace sight {
         /**
          * @brief Create a Graph object
          * 
-         * @param path it will be add baseDir as prefix. `openGraph` is same.
+         * @param path 
+         * @param fixPath if true it will be add pathGraphFolder as prefix. `openGraph` is same.
          * @return SightNodeGraph* 
          */
-        SightNodeGraph* createGraph(const char* path);
-        SightNodeGraph* openGraph(const char* path);
+        SightNodeGraph* createGraph(const char* path, bool fixPath = true);
+        SightNodeGraph* openGraph(const char* path, bool fixPath = true);
 
         /**
          * @brief if has last open graph, then open it.
@@ -127,10 +152,17 @@ namespace sight {
          */
         void checkOpenLastGraph();
 
+        void buildFilesCache();
+
+        int openFile(ProjectFile const& file);
+
+        ProjectFile const& getFileCache() const;
+    
     private:
         std::string baseDir;
         bool createIfNotExist;
         ProjectConfig projectConfig;
+        ProjectFile fileCache;
 
         std::atomic<uint> typeIdIncr;
         // todo this need to serialization and deserialization

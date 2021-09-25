@@ -94,4 +94,17 @@ namespace sight {
      */
     bool isFileHidden(const char* path);
 
+    inline std::string strJoin(const char* s1, const char* s2, const char* joiner = "##") {
+        std::string str(s1);
+        str += joiner;
+        str += s2;
+        return str;
+    }
+
+    inline std::string strJoin(std::string s1, std::string const& s2, std::string joiner = "##"){
+        s1 += joiner;
+        s1 += s2;
+        return s1;
+    }
+    
 }
