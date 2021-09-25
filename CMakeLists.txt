@@ -32,7 +32,7 @@ target_sources(sight PRIVATE
         sight.cpp
         sight_plugin.cpp
         sight_widgets.cpp
-        sight_image.cpp
+        
 )
 
 # depend

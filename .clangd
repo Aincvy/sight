@@ -6,6 +6,9 @@ CompileFlags: # Tweak the parse settings
 Index:
   Background: Build # Build a type + incoming reference index in the background
 
+If:                               # Apply this config conditionally
+  PathExclude: .history/.*  
+
 # Diagnostics:
 #   # https://clang.llvm.org/extra/clang-tidy/
 #   ClangTidy:
