@@ -113,6 +113,9 @@ namespace sight {
         bool testWindow = false;
 
         bool layoutReset = false;
+
+        // popups
+        bool popupGraphName = false;
     };
 
     struct UIColors {
@@ -160,6 +163,9 @@ namespace sight {
 
     struct UIBuffer {
         char inspectorNodeName[LITTLE_NAME_BUF_SIZE]{0};
+
+        char littleName[LITTLE_NAME_BUF_SIZE] {0};
+        char name[NAME_BUF_SIZE]{0};
     };
 
     struct UIStatus {

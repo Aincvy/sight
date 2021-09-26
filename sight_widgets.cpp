@@ -1,10 +1,12 @@
 #include "sight_widgets.h"
+#include "nfd.h"
 #include "sight.h"
 #include "sight_defines.h"
 
 #include "imgui.h"
 #include "imgui_internal.h"
 
+#include <cstddef>
 #include <cstdio>
 
 #include "GLFW/glfw3.h"
@@ -13,6 +15,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+#include "nfd.hpp"
 
 namespace sight {
 
@@ -71,6 +74,48 @@ namespace sight {
         return r;
     }
 
+    std::string openFileDialog(const char* basePath) {
+        // initialize NFD
+        NFD::Guard nfdGuard;
+        // auto-freeing memory
+        NFD::UniquePath outPath;
+
+        // prepare filters for the dialog
+        nfdfilteritem_t filterItem[2] = { { "Source code", "c,cpp,cc" }, { "Graphs", "yaml" } };
+
+        // show the dialog
+        std::string pathResult{};
+        
+        nfdresult_t result = NFD::OpenDialog(outPath, filterItem, 2, basePath);
+        if (result == NFD_OKAY) {
+            std::cout << "Success!" << std::endl
+                      << outPath.get() << std::endl;
+            pathResult = outPath.get();
+        } else if (result == NFD_CANCEL) {
+            std::cout << "User pressed cancel." << std::endl;
+        } else {
+            std::cout << "Error: " << NFD::GetError() << std::endl;
+        }
+
+        // NFD::Guard will automatically quit NFD.
+
+        return pathResult;
+    }
+
+    std::string saveFileDialog(const char* basePath) {
+        // initialize NFD
+        NFD::Guard nfdGuard;
+        // auto-freeing memory
+        NFD::UniquePath outPath;
+
+        auto result = NFD::SaveDialog(outPath, nullptr, 0, basePath, "graph");
+        if (result == NFD_OKAY) {
+            return outPath.get();
+        }
+
+        return {};
+    }
 
 
-}     // namespace sight
+
+}     

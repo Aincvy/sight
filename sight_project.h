@@ -157,7 +157,11 @@ namespace sight {
         int openFile(ProjectFile const& file);
 
         ProjectFile const& getFileCache() const;
-    
+
+        std::string pathGraphFolder() const;
+        std::string pathPluginsFolder() const;
+        std::string pathEntityFolder() const;
+
     private:
         std::string baseDir;
         bool createIfNotExist;
@@ -176,14 +180,13 @@ namespace sight {
 
         std::string pathSrcFolder() const;
         std::string pathTargetFolder() const;
-        std::string pathPluginsFolder() const;
-        std::string pathEntityFolder() const;
-        std::string pathGraphFolder() const;
+
 
         void initTypeMap();
 
         void initFolders();
 
+        uint addType(std::string const& name, uint v);
     };
 
     /**

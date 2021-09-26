@@ -53,7 +53,16 @@ namespace sight {
 
                 }
                 if (ImGui::MenuItem("Graph")) {
-                    currentProject()->createGraph("graph1");
+                    dbg("open popup");
+                    g_UIStatus->windowStatus.popupGraphName = true;
+                }
+
+                if (ImGui::MenuItem("GraphByPath")) {
+                    std::string path = saveFileDialog(currentProject()->pathGraphFolder().c_str());
+                    if (!path.empty()) {
+                        // create
+                        currentProject()->createGraph(path.c_str(), false);
+                    }
                 }
                 ImGui::Separator();
                 if (ImGui::MenuItem("Entity")) {
@@ -66,12 +75,13 @@ namespace sight {
 
                 ImGui::EndMenu();
             }
-
+            
             if (ImGui::MenuItem("Open", "Ctrl+O")) {
                 dbg("open graph file");
                 // changeGraph("./simple1");
             }
-            if (ImGui::MenuItem("Save", "Ctrl+S")){
+            if (ImGui::MenuItem("Save", "Super+S")){
+                dbg("save graph");
                 getCurrentGraph()->save();
             }
 
@@ -84,6 +94,7 @@ namespace sight {
             if (ImGui::MenuItem("Exit")){
                 uiStatus.closeWindow = true;
             }
+            
         }
 
         void showMainEditMenu(){
@@ -114,6 +125,13 @@ namespace sight {
                 }
                 ImGui::EndMenu();
             }
+            if (ImGui::BeginMenu("Windows")) {
+                if (ImGui::MenuItem("Demo")) {
+                    g_UIStatus->windowStatus.testWindow = true;
+                }
+
+                ImGui::EndMenu();
+            }
         }
 
         void showMainProjectMenu(){
@@ -140,7 +158,8 @@ namespace sight {
 
         void showMainCustomMenu(){
             if (ImGui::MenuItem("Trigger")) {
-                parseSource("a = 99 + 102;");
+                // parseSource("a = 99 + 102;");
+                dbg(openFileDialog("/Volumes/mac_extend/Project/sight/build/project/src/graph"));
             }
             if (ImGui::MenuItem("Crash")) {
                 // produce a crash for test.
@@ -174,6 +193,37 @@ namespace sight {
 
                 ImGui::EndMainMenuBar();
             }
+
+            // modals
+            if (g_UIStatus->windowStatus.popupGraphName) {
+                g_UIStatus->windowStatus.popupGraphName = false;
+                ImGui::OpenPopup("graphName");
+
+                // Always center this window when appearing
+                ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+                ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+            }
+            
+            if (ImGui::BeginPopupModal("graphName", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+                ImGui::Text("Please input a graph name");
+                ImGui::Separator();
+
+                ImGui::InputText("name", g_UIStatus->buffer.littleName, std::size(g_UIStatus->buffer.littleName));
+                if (ImGui::Button("OK") || ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter))) {
+                    // create
+                    
+                    if (strlen(g_UIStatus->buffer.littleName) > 0) {
+                        currentProject()->createGraph(g_UIStatus->buffer.littleName);
+                    }
+                    ImGui::CloseCurrentPopup();
+                }
+
+                if (ImGui::Button("Cancel")) {
+                    ImGui::CloseCurrentPopup();
+                }
+
+                ImGui::EndPopup();
+            }
         }
 
         void showDemoWindow(bool needInit){
@@ -183,12 +233,42 @@ namespace sight {
             //     dbg(b);
             // }
 
-            ImGui::Begin("Test Window");
+            ImGui::Begin("Test Window", &g_UIStatus->windowStatus.testWindow);
             ImGui::Text("this is first line.");
 
             // if (sightImage.ready()) {
             //     ImGui::Image(sightImage.textureId, ImVec2(sightImage.width, sightImage.height));
             // }
+
+            if (ImGui::Button("Delete.."))
+                ImGui::OpenPopup("Delete?");
+
+            // Always center this window when appearing
+            ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+            ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+
+            if (ImGui::BeginPopupModal("Delete?", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+                ImGui::Text("All those beautiful files will be deleted.\nThis operation cannot be undone!\n\n");
+                ImGui::Separator();
+
+                //static int unused_i = 0;
+                //ImGui::Combo("Combo", &unused_i, "Delete\0Delete harder\0");
+
+                static bool dont_ask_me_next_time = false;
+                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+                ImGui::Checkbox("Don't ask me next time", &dont_ask_me_next_time);
+                ImGui::PopStyleVar();
+
+                if (ImGui::Button("OK", ImVec2(120, 0))) {
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::SetItemDefaultFocus();
+                ImGui::SameLine();
+                if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndPopup();
+            }
 
             ImGui::End();
         }

@@ -950,7 +950,7 @@ namespace sight {
                             dbg("IntTypeProcess" , portName);
                             break;
                         default:
-                            dbg("type error", type);
+                            dbg("type error, unHandled", type, getTypeName(type));
                             port.value.i = 0;
                             break;
                     }

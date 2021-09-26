@@ -35,6 +35,7 @@ target_link_libraries(
         "-framework IOKit"
         "-framework CoreVideo"
         "-framework Cocoa"
+        "-framework AppKit"
 )
 
 
@@ -105,3 +106,7 @@ target_link_libraries(
         absl::btree
 
 )
+
+# nativefiledialog-extended
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/nativefiledialog-extended)
+target_link_libraries(sight-util PUBLIC nfd)

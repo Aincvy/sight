@@ -16,6 +16,7 @@
 #include "fstream"
 #include <algorithm>
 #include <string>
+#include <sys/types.h>
 
 namespace sight {
 
@@ -125,10 +126,12 @@ namespace sight {
     }
 
     int Project::build() {
+
         return 0;
     }
 
     int Project::clean() {
+
         return 0;
     }
 
@@ -189,6 +192,16 @@ namespace sight {
         out << YAML::Key << "nodeOrPortId" << YAML::Value << projectConfig.nodeOrPortId.load();
         out << YAML::Key << "lastOpenGraph" << YAML::Value << lastOpenGraph;
 
+        out << YAML::Key << "typeMap" << YAML::BeginMap;
+        for (const auto & item : this->typeMap) {
+            if (item.second < IntTypeNext) {
+                continue;
+            }
+
+            out << YAML::Key << item.first << YAML::Value << item.second;
+        }
+        out << YAML::EndMap;
+
         out << YAML::EndMap;
 
         // save file
@@ -216,6 +229,13 @@ namespace sight {
             auto temp = root["lastOpenGraph"];
             if (temp.IsDefined()) {
                 this->lastOpenGraph = temp.as<std::string>();
+            }
+
+            temp = root["typeMap"];
+            if (temp.IsDefined()) {
+                for (const auto & item : temp) {
+                    addType(item.first.as<std::string>(), item.second.as<uint>());
+                }
             }
 
         } catch (const YAML::BadConversion & e){
@@ -281,10 +301,19 @@ namespace sight {
     }
 
     SightNodeGraph* Project::createGraph(const char* path, bool fixPath) {
+        auto g = openGraph(path, fixPath);
+        buildFilesCache();
+        return g;
+    }
+
+    SightNodeGraph* Project::openGraph(const char* path, bool fixPath) {
         std::string targetPath = fixPath ? pathGraphFolder() + path : path;
         std::filesystem::path temp(targetPath);
         if (temp.has_extension()) {
-            targetPath = std::string(targetPath, 0, targetPath.rfind('.'));
+            std::string ext = temp.extension().generic_string();
+            if (ext == ".json" || ext == ".yaml") {
+                targetPath = std::string(targetPath, 0, targetPath.rfind('.'));
+            }
         }
         dbg(targetPath);
         changeGraph(targetPath.c_str());
@@ -292,16 +321,12 @@ namespace sight {
         return getCurrentGraph();
     }
 
-    SightNodeGraph* Project::openGraph(const char* path, bool fixPath) {
-        return createGraph(path, fixPath);
-    }
-
     void Project::checkOpenLastGraph() {
         if (lastOpenGraph.empty()) {
             return;
         }
 
-        openGraph(lastOpenGraph.c_str());
+        openGraph(lastOpenGraph.c_str(), false);
     }
 
     ProjectFile const& Project::getFileCache() const {
@@ -326,10 +351,7 @@ namespace sight {
     }
 
     uint Project::addType(const std::string &name) {
-        uint a = ++ (typeIdIncr);
-        typeMap[name] = a;
-        reverseTypeMap[a] = name;
-        return a;
+        return addType(name, ++(typeIdIncr));
     }
 
     std::string Project::pathSrcFolder() const {
@@ -353,6 +375,12 @@ namespace sight {
         std::filesystem::create_directories(pathTargetFolder());
         std::filesystem::create_directories(pathPluginsFolder());
         std::filesystem::create_directories(pathGraphFolder());
+    }
+
+    uint Project::addType(std::string const& name, uint v) {
+        typeMap[name] = v;
+        reverseTypeMap[v] = name;
+        return v;
     }
 
     std::string Project::pathGraphFolder() const {

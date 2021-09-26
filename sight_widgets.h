@@ -37,4 +37,23 @@ namespace sight {
 
     bool Selectable(int id, const char* text, bool selected = false, ImU32 color = IM_COL32(255, 255, 255, 255));
 
+    /**
+     * @brief use os native file dialog. 
+     * powered by https://github.com/btzy/nativefiledialog-extended
+     * 
+     * @param basePath 
+     * @return std::string 
+     */
+    std::string openFileDialog(const char* basePath);
+
+    /**
+     * @brief 
+     * powered by https://github.com/btzy/nativefiledialog-extended
+     * 
+     * @param basePath 
+     * @return std::string 
+     */
+    std::string saveFileDialog(const char* basePath);
+
+    
 }

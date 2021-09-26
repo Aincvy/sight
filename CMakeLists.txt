@@ -66,6 +66,9 @@ target_include_directories(sight PRIVATE ${LIBUV_INCLUDE_DIRS})
 # imgui and others library.
 INCLUDE(dependencies/CMakeLists.txt)
 
+# nativefiledialog-extended
+# SET(NFD_LIBRARIES "nfd")
+
 SET(EXTRA_LIBS ${V8_LIBRARIES} ${TREE_SITTER_LIBRARY} ${LIBUV_LIBRARIES} imgui imgui_node_editor sight-util)
 target_link_libraries(sight PRIVATE ${EXTRA_LIBS})
 
