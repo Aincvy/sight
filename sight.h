@@ -14,17 +14,17 @@ namespace sight {
      */
     struct CommandArgs {
         // string arg.
-        const char *argString = nullptr;
+        const char* argString = nullptr;
         int argStringLength = 0;
         bool needFree = false;
 
         int argInt = 0;
-        void *data = nullptr;
+        void* data = nullptr;
         // if data pointer to an array, this is the length.
         size_t dataLength = 0;
 
         // for simple thread sync.
-        std::promise<int> *promise = nullptr;
+        std::promise<int>* promise = nullptr;
 
         /**
          * dispose command
@@ -56,7 +56,7 @@ namespace sight {
      * @param from
      * @return
      */
-    void *copyObject(void *from, size_t size);
+    void* copyObject(void* from, size_t size);
 
 
-}
+}     // namespace sight

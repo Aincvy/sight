@@ -569,15 +569,16 @@ namespace sight {
         sprintf(configFilePath, "%s.json", pathWithoutExt);
         config.SettingsFile = configFilePath;
         g_NodeEditorStatus->context = ed::CreateEditor(&config);
-
+        
         if (loadEntityGraph) {
             g_NodeEditorStatus->graph = g_NodeEditorStatus->entityGraph;
         } else {
             char buf[NAME_BUF_SIZE];
             sprintf(buf, "%s.yaml", pathWithoutExt);
             g_NodeEditorStatus->loadOrCreateGraph(buf);
-            dbg("change over!");
         }
+        dbg("change over!");
+        
     }
 
     void SightNodePort::setKind(int intKind) {

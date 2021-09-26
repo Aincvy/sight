@@ -13,13 +13,13 @@
 namespace sight {
 
     void exitSight(int v) {
-        
+
         addJsCommand(JsCommandType::Destroy);
         currentProject()->save();
         // exit(v);
     }
 
-    void *copyObject(void *from, size_t size) {
+    void* copyObject(void* from, size_t size) {
         auto dst = calloc(1, size);
         memcpy(dst, from, size);
         return dst;
@@ -36,6 +36,5 @@ namespace sight {
                 free(data);
             }
         }
-
     }
-}
+}     // namespace sight

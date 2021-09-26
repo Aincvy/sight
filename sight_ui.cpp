@@ -25,6 +25,7 @@
 #include <filesystem>
 
 #include <GLFW/glfw3.h>
+#include <string>
 #include <sys/types.h>
 #include <vector>
 
@@ -132,7 +133,7 @@ namespace sight {
             if (ImGui::MenuItem("Save Config")) {
                 currentProject()->saveConfigFile();
             }
-            if (ImGui::MenuItem("Reload")) {
+            if (ImGui::MenuItem("Reload", "Ctrl+R")) {
                 currentProject()->buildFilesCache();
             }
         }
@@ -367,14 +368,32 @@ namespace sight {
                     }
                 } else {
 
-                    // std::string tmp = strJoin(item.filename, item.path);
                     bool selected = selection.selectedFiles.contains(item.path);
-                    if (ImGui::Selectable(strJoin(item.filename, item.path).c_str(), selected, ImGuiSelectableFlags_AllowDoubleClick)) {
+                    std::string name;
+                    switch (item.fileType) {
+                        case ProjectFileType::Graph:
+                            name = "<graph> ";
+                            name += item.filename;
+                            name += "##";
+                            name += item.path;
+                        break;
+                        case ProjectFileType::Regular:
+                        case ProjectFileType::Plugin:
+                        case ProjectFileType::Directory:
+                            name = strJoin(item.filename, item.path);
+                            break;
+                    }
+                    if (ImGui::Selectable(name.c_str(), selected, ImGuiSelectableFlags_AllowDoubleClick)) {
                         dbg(item.path);
 
                         if (ImGui::IsMouseDoubleClicked(0)) {
                             selection.selectedFiles.clear();
-                            dbg("double click, open file");
+                            dbg("double click, open file", item.path);
+                            if (item.fileType == ProjectFileType::Graph) {
+                                currentProject()->openGraph(item.path.c_str(), false);
+                            } else {
+                                dbg("unHandle file type", item.fileType);
+                            }
                         } else {
                             
                             if (!g_UIStatus->io->KeyCtrl) {
@@ -398,10 +417,6 @@ namespace sight {
             }
             
             ImGui::Begin(WINDOW_LANGUAGE_KEYS.project);
-            // std::string path = g_UIStatus->selection.getProjectPath();
-            // if (!path.empty()) {
-            //     showProjectFolder(path.c_str());
-            // }
             showProjectFolder(currentProject()->getFileCache());
 
             ImGui::End();
@@ -528,13 +543,14 @@ namespace sight {
 
     void mainWindowFrame(UIStatus & uiStatus) {
         showMainMenuBar(uiStatus);
+        showProjectWindow();
 
+        // HierarchyWindow and InspectorWindow will use node editor data.
         nodeEditorFrameBegin();
 
         // windows
         showHierarchyWindow();
         showInspectorWindow();
-        showProjectWindow();
         showNodeEditorGraph(uiStatus);
 
         if (uiStatus.windowStatus.createEntity) {

@@ -107,4 +107,8 @@ namespace sight {
         return s1;
     }
     
+    inline std::string removeExt(std::string const& str){
+        return std::string(str, 0, str.rfind('.'));
+    }
+
 }

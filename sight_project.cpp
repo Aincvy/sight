@@ -25,16 +25,36 @@ namespace sight {
 
     namespace  {
         
+        bool isGraphFile(std::string const& path){
+            std::ifstream fin(path);
+            if (!fin.is_open()) {
+                return false;
+            }
+
+            try {
+                auto root = YAML::Load(fin);
+                auto node = root["who-am-i"];
+                if (node.IsDefined()) {
+                    return node.as<std::string>() == "sight-graph";
+                }
+            } catch (const YAML::BadConversion & e){
+                return false;
+            }
+
+            return false;
+        }
+
         void fillFiles(ProjectFile & parent){
             parent.files.clear();
 
             for (const auto& item : directory_iterator{parent.path}) {
+                std::string fullpath = std::filesystem::canonical(item.path());
                 if (item.is_directory()) {
                     parent.files.push_back(
                         {
                             ProjectFileType::Directory,
-                            item.path().c_str(),
-                            item.path().filename().c_str(),
+                            fullpath,
+                            item.path().filename().generic_string(),
                             {}
                         }
                     );
@@ -47,10 +67,41 @@ namespace sight {
                         continue;
                     }
 
+                    if (item.path().has_extension()) {
+                        auto ext = item.path().extension();
+                        if (ext == ".yaml") {
+                            // check the is a graph or not.
+                            if (isGraphFile(item.path().generic_string())) {
+                                parent.files.push_back({
+                                    ProjectFileType::Graph,
+                                    fullpath,
+                                    removeExt(filename.generic_string()),
+                                    {}
+                                });
+
+                                continue;
+                            }
+                        } else if (ext == ".json") {
+                            // graph position file
+                            std::string nameWithoutExt = removeExt(filename);
+                            auto findResult = std::find_if(parent.files.begin(), parent.files.end(), [&nameWithoutExt](ProjectFile const& f){ 
+                                return f.fileType == ProjectFileType::Graph && f.filename == nameWithoutExt;
+                            });
+                            if (findResult != parent.files.end()) {
+                                // has graph, ignore this file.
+                                continue;
+                            }
+
+                            if (isGraphFile(removeExt(item.path().generic_string()) + ".yaml")) {
+                                continue;
+                            }
+                        }
+                    }
+
                     parent.files.push_back({
                         ProjectFileType::Regular,
-                        item.path().c_str(),
-                        item.path().filename().c_str(),
+                        fullpath,
+                        filename.generic_string(),
                         {}
                     });
                 }
@@ -68,11 +119,7 @@ namespace sight {
                 return false;
             });
 
-            dbg("print file list");
-            std::for_each(parent.files.begin(), parent.files.end(), [](ProjectFile const & f) {
-                dbg(f.filename);
-            });
-
+            
         }
 
     }
@@ -237,7 +284,7 @@ namespace sight {
         std::string targetPath = fixPath ? pathGraphFolder() + path : path;
         std::filesystem::path temp(targetPath);
         if (temp.has_extension()) {
-            targetPath = std::string(targetPath, 0, targetPath.rfind('.') - 1);
+            targetPath = std::string(targetPath, 0, targetPath.rfind('.'));
         }
         dbg(targetPath);
         changeGraph(targetPath.c_str());
