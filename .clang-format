@@ -2,6 +2,7 @@
 # https://www.bbsmax.com/A/VGzlMjexJb/
 # 内容从上面链接复制， 然后手动修改和添加的。 
 # 这里有一个问题， 那就是 if 语句的条件部分总是会合并成一行， 无论字符有多长， 所以我仅打算偶尔使用一下这个工具。
+# 还有不少别的风格， 不是作者喜欢的。。。 这个暂时不使用把。
 
 # 语言: None, Cpp, Java, JavaScript, ObjC, Proto, TableGen, TextProto
 Language: Cpp
@@ -77,7 +78,7 @@ AlwaysBreakBeforeMultilineStrings: false
 AlwaysBreakTemplateDeclarations: true
  
 # false表示函数实参要么都在同一行，要么都各自一行
-BinPackArguments: false
+BinPackArguments: true
  
 # false表示所有形参要么都在同一行，要么都各自一行
 BinPackParameters: true
@@ -193,7 +194,7 @@ IndentPPDirectives: AfterHash
 IndentWidth: 4
  
 # 函数返回类型换行时，缩进函数声明或函数定义的函数名
-IndentWrappedFunctionNames: true
+IndentWrappedFunctionNames: false
  
 # 保留在块开始处的空行
 KeepEmptyLinesAtTheStartOfBlocks: true
@@ -247,7 +248,7 @@ PointerAlignment: Left
 ReflowComments: false
  
 # 允许排序#include
-SortIncludes: Never
+SortIncludes: false
  
 # 允许排序 using 声明顺序
 SortUsingDeclarations: true
@@ -293,7 +294,7 @@ SpacesInContainerLiterals:  false
 SpacesInCStyleCastParentheses: false
  
 # 如果为true，将在If/for/switch/while条件括号前后插入空格。
-SpacesInConditionalStatement: true
+SpacesInConditionalStatement: false
  
 # 在圆括号的(后和)前添加空格
 SpacesInParentheses: false
@@ -311,5 +312,3 @@ TabWidth: 4
  
 # 使用tab字符: Never, ForIndentation, ForContinuationAndIndentation, Always
 UseTab: Never
-
-QualifierAlignment: Leave
