@@ -9,6 +9,8 @@
 #include "sight_language.h"
 
 #include "absl/container/flat_hash_set.h"
+#include <functional>
+#include <string>
 #include <sys/types.h>
 
 namespace sight {
@@ -34,6 +36,18 @@ namespace sight {
         // node editor part
         AddNode = 200,
         AddTemplateNode = 201,
+    };
+
+    /**
+     * @brief Imgui ids
+     * 
+     */
+    struct MyUILabels{
+        // static ids
+        static constexpr const char* modalAskData = "Ask ?###modalAskData";
+        static constexpr const char* modalSaveData = "###modalSaveData";
+
+        // dynamic ids, strcat on program load.
     };
 
     struct UICommand {
@@ -116,6 +130,8 @@ namespace sight {
 
         // popups
         bool popupGraphName = false;
+        bool popupAskModal = false;
+        bool popupSaveModal = false;
     };
 
     struct UIColors {
@@ -168,6 +184,29 @@ namespace sight {
         char name[NAME_BUF_SIZE]{0};
     };
 
+    struct ModalAskData {
+        std::string title;
+        std::string content;
+
+        std::function<void(bool)> callback;
+    };
+
+    enum class SaveOperationResult {
+        // save file
+        Save,
+        // do not do anything
+        Cancel,
+        // do not save file
+        Drop,
+    };
+
+    struct ModalSaveData {
+        std::string title;
+        std::string content;
+
+        std::function<void(SaveOperationResult)> callback;
+    };
+
     struct UIStatus {
         bool needInit = false;
         ImGuiIO* io;
@@ -177,8 +216,10 @@ namespace sight {
         struct LoadingStatus loadingStatus;
         class Selection selection;
         struct UIBuffer buffer;
+        struct ModalAskData modalAskData;
+        struct ModalSaveData modalSaveData;
 
-        struct LanguageKeys* languageKeys = nullptr;
+            struct LanguageKeys* languageKeys = nullptr;
         struct UIColors* uiColors = nullptr;
 
         uv_loop_t *uvLoop = nullptr;
@@ -244,5 +285,33 @@ namespace sight {
      * @return UIStatus*  current active global ui status
      */
     UIStatus* currentUIStatus();
+
+    /**
+     * @brief 
+     * 
+     * @param node 
+     * @param showField    if true, show all fields.
+     * @param showValue    if true, then node port config `showValue=true`'s port will be showed.
+     * @param showOutput   if true, show all output ports.
+     * @param showInput    if true, show all input ports.
+     */
+    void showNodePorts(SightNode* node, bool showField = true, bool showValue = true, bool showOutput = false, bool showInput = false);
+
+    /**
+     * @brief 
+     * 
+     * @return true 
+     * @return false 
+     */
+    void uiChangeGraph(const char* path );
+
+    /**
+     * @brief open a save modal on next frame.
+     * 
+     * @param title 
+     * @param content 
+     * @param callback 
+     */
+    void openSaveModal(const char* title, const char* content, std::function<void(SaveOperationResult)> const& callback);
 
 }

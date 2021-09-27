@@ -55,5 +55,15 @@ namespace sight {
      */
     std::string saveFileDialog(const char* basePath);
 
-    
+    /**
+     * @brief 
+     * 
+     * @param allowEnter   true: key `enter` also trigger 
+     * @return true 
+     * @return false 
+     */
+    inline bool buttonOK(const char* label = "OK", bool allowEnter = true) {
+        return ImGui::Button(label) || (allowEnter && ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter)));
+    }
+
 }

@@ -31,7 +31,9 @@
 
 #define COMMON_LANGUAGE_KEYS g_UIStatus->languageKeys->commonKeys
 #define WINDOW_LANGUAGE_KEYS g_UIStatus->languageKeys->windowNames
+#define MENU_LANGUAGE_KEYS g_UIStatus->languageKeys->menuKeys
 
+// todo change this
 static void glfw_error_callback(int error, const char* description)
 {
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
@@ -47,17 +49,17 @@ namespace sight {
     namespace {
         // private members and functions.
 
-        void showMainFileMenu(UIStatus& uiStatus){
-            if (ImGui::BeginMenu("New")){
-                if (ImGui::MenuItem("File")) {
+        
 
+        void showMainFileMenu(UIStatus& uiStatus){
+            if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS._new)) {
+                if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.file)) {
                 }
-                if (ImGui::MenuItem("Graph")) {
-                    dbg("open popup");
+                if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.graph)) {
                     g_UIStatus->windowStatus.popupGraphName = true;
                 }
 
-                if (ImGui::MenuItem("GraphByPath")) {
+                if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.graphByPath)) {
                     std::string path = saveFileDialog(currentProject()->pathGraphFolder().c_str());
                     if (!path.empty()) {
                         // create
@@ -65,7 +67,7 @@ namespace sight {
                     }
                 }
                 ImGui::Separator();
-                if (ImGui::MenuItem("Entity")) {
+                if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.entity)) {
                     if (g_UIStatus->windowStatus.createEntity) {
                         ImGui::SetWindowFocus(WINDOW_LANGUAGE_KEYS.createEntity);
                     } else {
@@ -75,57 +77,52 @@ namespace sight {
 
                 ImGui::EndMenu();
             }
-            
-            if (ImGui::MenuItem("Open", "Ctrl+O")) {
+
+            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.open, "Ctrl+O")) {
                 dbg("open graph file");
                 // changeGraph("./simple1");
             }
-            if (ImGui::MenuItem("Save", "Super+S")){
+            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.save, "Super+S")) {
                 dbg("save graph");
                 getCurrentGraph()->save();
             }
 
             ImGui::Separator();
-            if (ImGui::MenuItem("Options")) {
+            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.options)) {
                 // show options window
-
             }
 
-            if (ImGui::MenuItem("Exit")){
+            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.exit)) {
                 uiStatus.closeWindow = true;
             }
-            
         }
 
         void showMainEditMenu(){
-            if (ImGui::MenuItem("Undo")){
-
+            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.undo)) {
             }
 
-            if (ImGui::MenuItem("Redo")) {
-
+            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.redo)) {
             }
         }
 
         void showMainViewMenu(){
-            if (ImGui::MenuItem("View")) {
-
+            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.view)) {
             }
-            if (ImGui::BeginMenu("Graph")) {
-                if (ImGui::MenuItem("Entity")) {
+            if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.graph)) {
+                if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.entity)) {
                     // show entity graph
                     changeGraph("./entity", true);
                 }
                 ImGui::EndMenu();
             }
 
-            if (ImGui::BeginMenu("Layout")) {
-                if (ImGui::MenuItem("Reset")) {
+            if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.layout)) {
+                if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.reset)) {
                     g_UIStatus->windowStatus.layoutReset = true;
                 }
                 ImGui::EndMenu();
             }
-            if (ImGui::BeginMenu("Windows")) {
+            if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.windows)) {
                 if (ImGui::MenuItem("Demo")) {
                     g_UIStatus->windowStatus.testWindow = true;
                 }
@@ -135,31 +132,35 @@ namespace sight {
         }
 
         void showMainProjectMenu(){
-            if (ImGui::MenuItem("Build")) {
+            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.build)) {
                 currentProject()->build();
             }
-            if (ImGui::MenuItem("Rebuild")) {
+            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.rebuild)) {
                 currentProject()->rebuild();
             }
-            if (ImGui::MenuItem("Clean")) {
+            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.clean)) {
                 currentProject()->clean();
             }
             ImGui::Separator();
-            if (ImGui::MenuItem("Parse Graph")) {
+            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.parseGraph)) {
                 addJsCommand(JsCommandType::ParseGraph, "./simple.yaml");
             }
-            if (ImGui::MenuItem("Save Config")) {
+            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.projectSaveConfig)) {
                 currentProject()->saveConfigFile();
             }
-            if (ImGui::MenuItem("Reload", "Ctrl+R")) {
+            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.reload, "Ctrl+R")) {
                 currentProject()->buildFilesCache();
+                dbg("reload");
             }
         }
 
         void showMainCustomMenu(){
             if (ImGui::MenuItem("Trigger")) {
-                // parseSource("a = 99 + 102;");
-                dbg(openFileDialog("/Volumes/mac_extend/Project/sight/build/project/src/graph"));
+                auto p = findTemplateNode("test/http/HttpGetReqNode");
+                dbg(p);
+                if (p) {
+                    dbg(serializeJsNode(*p));
+                }
             }
             if (ImGui::MenuItem("Crash")) {
                 // produce a crash for test.
@@ -170,59 +171,28 @@ namespace sight {
 
         void showMainMenuBar(UIStatus& uiStatus){
             if (ImGui::BeginMainMenuBar()){
-                if (ImGui::BeginMenu("File")) {
+                if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.file)) {
                     showMainFileMenu(uiStatus);
                     ImGui::EndMenu();
                 }
-                if (ImGui::BeginMenu("Edit")) {
+                if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.edit)) {
                     showMainEditMenu();
                     ImGui::EndMenu();
                 }
-                if (ImGui::BeginMenu("View")) {
+                if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.view)) {
                     showMainViewMenu();
                     ImGui::EndMenu();
                 }
-                if (ImGui::BeginMenu("Project")) {
+                if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.project)) {
                     showMainProjectMenu();
                     ImGui::EndMenu();
                 }
-                if (ImGui::BeginMenu("Custom")) {
+                if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.custom)) {
                     showMainCustomMenu();
                     ImGui::EndMenu();
                 }
 
                 ImGui::EndMainMenuBar();
-            }
-
-            // modals
-            if (g_UIStatus->windowStatus.popupGraphName) {
-                g_UIStatus->windowStatus.popupGraphName = false;
-                ImGui::OpenPopup("graphName");
-
-                // Always center this window when appearing
-                ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-                ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-            }
-            
-            if (ImGui::BeginPopupModal("graphName", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-                ImGui::Text("Please input a graph name");
-                ImGui::Separator();
-
-                ImGui::InputText("name", g_UIStatus->buffer.littleName, std::size(g_UIStatus->buffer.littleName));
-                if (ImGui::Button("OK") || ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_Enter))) {
-                    // create
-                    
-                    if (strlen(g_UIStatus->buffer.littleName) > 0) {
-                        currentProject()->createGraph(g_UIStatus->buffer.littleName);
-                    }
-                    ImGui::CloseCurrentPopup();
-                }
-
-                if (ImGui::Button("Cancel")) {
-                    ImGui::CloseCurrentPopup();
-                }
-
-                ImGui::EndPopup();
             }
         }
 
@@ -239,36 +209,6 @@ namespace sight {
             // if (sightImage.ready()) {
             //     ImGui::Image(sightImage.textureId, ImVec2(sightImage.width, sightImage.height));
             // }
-
-            if (ImGui::Button("Delete.."))
-                ImGui::OpenPopup("Delete?");
-
-            // Always center this window when appearing
-            ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-            ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-
-            if (ImGui::BeginPopupModal("Delete?", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-                ImGui::Text("All those beautiful files will be deleted.\nThis operation cannot be undone!\n\n");
-                ImGui::Separator();
-
-                //static int unused_i = 0;
-                //ImGui::Combo("Combo", &unused_i, "Delete\0Delete harder\0");
-
-                static bool dont_ask_me_next_time = false;
-                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-                ImGui::Checkbox("Don't ask me next time", &dont_ask_me_next_time);
-                ImGui::PopStyleVar();
-
-                if (ImGui::Button("OK", ImVec2(120, 0))) {
-                    ImGui::CloseCurrentPopup();
-                }
-                ImGui::SetItemDefaultFocus();
-                ImGui::SameLine();
-                if (ImGui::Button("Cancel", ImVec2(120, 0))) {
-                    ImGui::CloseCurrentPopup();
-                }
-                ImGui::EndPopup();
-            }
 
             ImGui::End();
         }
@@ -305,6 +245,9 @@ namespace sight {
 
                 if (c == 1) {
                     selection.node = getCurrentGraph()->findNode(static_cast<uint>(selectedNodes[0].Get()));
+                    if (selection.node) {
+                        sprintf(g_UIStatus->buffer.inspectorNodeName, "%s", selection.node->nodeName.c_str());
+                    }
                 }
 
                 for (const auto & item : selectedNodes) {
@@ -380,9 +323,17 @@ namespace sight {
                     auto & nameBuf = g_UIStatus->buffer.inspectorNodeName;
                     if (ImGui::InputText("## Inspector.node.name", nameBuf, std::size(nameBuf))) {
                         dbg("InputText");
+                        // node->nodeName = nameBuf;
+                    }
+                    if (ImGui::IsItemDeactivatedAfterEdit()) {
+                        dbg("1");
                         node->nodeName = nameBuf;
                     }
 
+                    // fields
+                    ImGui::Text("Ports");
+                    ImGui::Separator();
+                    showNodePorts(node);
                 }
             }
             
@@ -390,65 +341,21 @@ namespace sight {
             ImGui::End();
         }
 
-        void showProjectFolder(const char* path) {
-            if (strcmp(path, "") == 0) {
-                dbg("path is empty...");
-                return;
-            }
-
-            // todo use cache maybe better.
-            auto & selection = g_UIStatus->selection;
-            
-            for (auto& item : directory_iterator{path}) {
-                if (isFileHidden(item.path().filename().c_str())) {
-                    continue;
-                }
-
-                auto filename = item.path().filename().c_str();
-                auto fullPath = std::filesystem::canonical(item.path()).generic_string();
-
-                if (item.is_directory()) {
-                    if (ImGui::TreeNode(fullPath.c_str(), "<dir> %s", filename)) {
-                        showProjectFolder(fullPath.c_str());
-                        ImGui::TreePop();
-                    }
-                } else if (item.is_regular_file()) {
-                    bool selected = selection.selectedFiles.contains(fullPath);
-                    if (ImGui::Selectable(filename, selected, ImGuiSelectableFlags_AllowDoubleClick)  ) {
-                        dbg(fullPath);
-
-                        if (ImGui::IsMouseDoubleClicked(0)) {
-                            selection.selectedFiles.clear();
-                            dbg("double click, open file");
-                        } else {
-                            
-                            if (!g_UIStatus->io->KeyCtrl) {
-                                selection.selectedFiles.clear();
-                            }
-
-                            if (!selected || !g_UIStatus->io->KeyCtrl) {
-                                selection.selectedFiles.insert(fullPath);
-                            }
-                        }
-                        
-                    }
-                }
-            }
-        }
-
         void showProjectFolder(ProjectFile const& folder){
-            auto & selection = g_UIStatus->selection;
+            auto selection = &g_UIStatus->selection;
 
             for (const auto& item : folder.files) {
                 if (item.fileType == ProjectFileType::Directory) {
                     if (ImGui::TreeNode(item.path.c_str(), "<dir> %s", item.filename.c_str())) {
-                        selection.selectedFiles.clear();
                         showProjectFolder(item);
                         ImGui::TreePop();
                     }
+                    if (ImGui::IsItemClicked()) {
+                        selection->selectedFiles.clear();
+                    }
                 } else {
 
-                    bool selected = selection.selectedFiles.contains(item.path);
+                    bool selected = selection->selectedFiles.contains(item.path);
                     std::string name;
                     switch (item.fileType) {
                         case ProjectFileType::Graph:
@@ -467,21 +374,28 @@ namespace sight {
                         dbg(item.path);
 
                         if (ImGui::IsMouseDoubleClicked(0)) {
-                            selection.selectedFiles.clear();
-                            dbg("double click, open file", item.path);
+                            auto g = getCurrentGraph();
+                            if (g && item.path == g->getFilePath()) {
+                                // same file, do nothing.
+                                return;
+                            }
+
+                            selection->selectedFiles.clear();
+                            // dbg("double click, open file", item.path);
                             if (item.fileType == ProjectFileType::Graph) {
-                                currentProject()->openGraph(item.path.c_str(), false);
+                                // currentProject()->openGraph(item.path.c_str(), false);
+                                uiChangeGraph(item.path.c_str());
                             } else {
                                 dbg("unHandle file type", item.fileType);
                             }
                         } else {
                             
                             if (!g_UIStatus->io->KeyCtrl) {
-                                selection.selectedFiles.clear();
+                                selection->selectedFiles.clear();
                             }
 
                             if (!selected || !g_UIStatus->io->KeyCtrl) {
-                                selection.selectedFiles.insert(item.path);
+                                selection->selectedFiles.insert(item.path);
                             }
                         }
                     }
@@ -621,7 +535,108 @@ namespace sight {
         }
     }
 
+    void showModals(){
+        // modals
+        auto& windowStatus = g_UIStatus->windowStatus;
+        if (windowStatus.popupGraphName) {
+            windowStatus.popupGraphName = false;
+            ImGui::OpenPopup("graphName");
+
+            // Always center this window when appearing
+            ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+            ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        }
+
+        if (ImGui::BeginPopupModal("graphName", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::Text("Please input a graph name");
+            ImGui::Separator();
+
+            ImGui::InputText("name", g_UIStatus->buffer.littleName, std::size(g_UIStatus->buffer.littleName));
+            if (buttonOK(COMMON_LANGUAGE_KEYS.ok)) {
+                // create
+
+                if (strlen(g_UIStatus->buffer.littleName) > 0) {
+                    currentProject()->createGraph(g_UIStatus->buffer.littleName);
+                    *g_UIStatus->buffer.littleName = '\0';
+                }
+                ImGui::CloseCurrentPopup();
+            }
+
+            if (ImGui::Button(COMMON_LANGUAGE_KEYS.cancel)) {
+                ImGui::CloseCurrentPopup();
+            }
+            
+            ImGui::EndPopup();
+        }
+
+        auto& modalAskData = g_UIStatus->modalAskData;
+        if (windowStatus.popupAskModal) {
+            windowStatus.popupAskModal = false;
+
+            if (!endsWith(modalAskData.title, MyUILabels::modalAskData)) {
+                modalAskData.title += MyUILabels::modalAskData;
+            }
+            ImGui::OpenPopup(MyUILabels::modalAskData);
+
+            // Always center this window when appearing
+            ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+            ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        }
+        if (ImGui::BeginPopupModal(modalAskData.title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::Text("%s", modalAskData.content.c_str());
+            ImGui::Dummy(ImVec2(0, 18));
+
+            if (buttonOK(COMMON_LANGUAGE_KEYS.ok)) {
+                modalAskData.callback(true);
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(COMMON_LANGUAGE_KEYS.cancel)) {
+                modalAskData.callback(false);
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::EndPopup();
+        }
+
+        auto& modalSaveData = g_UIStatus->modalSaveData;
+        if (windowStatus.popupSaveModal) {
+            windowStatus.popupSaveModal = false;
+
+            if (!endsWith(modalSaveData.title, MyUILabels::modalSaveData)) {
+                modalSaveData.title += MyUILabels::modalSaveData;
+            }
+            ImGui::OpenPopup(MyUILabels::modalSaveData);
+
+            // Always center this window when appearing
+            ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+            ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        }
+
+        if (ImGui::BeginPopupModal(modalSaveData.title.c_str())) {
+            ImGui::Text("%s", modalSaveData.content.c_str());
+            ImGui::Dummy(ImVec2(0,18));
+
+            if (buttonOK(MENU_LANGUAGE_KEYS.save)) {
+                modalSaveData.callback(SaveOperationResult::Save);
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(COMMON_LANGUAGE_KEYS.cancel)) {
+                modalSaveData.callback(SaveOperationResult::Cancel);
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(COMMON_LANGUAGE_KEYS.drop)) {
+                modalSaveData.callback(SaveOperationResult::Drop);
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+    }
+
     void mainWindowFrame(UIStatus & uiStatus) {
+        showModals();
         showMainMenuBar(uiStatus);
         showProjectWindow();
 
@@ -962,6 +977,59 @@ namespace sight {
 
     UIStatus* currentUIStatus() {
         return g_UIStatus;
+    }
+
+    void showNodePorts(SightNode* node, bool showField, bool showValue, bool showOutput, bool showInput) {
+        if (!showField && !showValue && !showOutput && !showInput) {
+            return;
+        }
+
+        auto nodeWork = [](std::vector<SightNodePort> & list, bool showValue, bool alwaysShow) {
+            for( auto& item: list){
+                if (alwaysShow || (showValue && item.options.showValue)) {
+                    ImGui::Text("%s: ", item.portName.c_str());
+                    ImGui::SameLine();
+                    showNodePortValue(&item);
+                }
+            }
+        };
+
+        nodeWork(node->fields, showValue, showField);
+        nodeWork(node->outputPorts, showValue, showOutput);
+        nodeWork(node->inputPorts, showValue, showInput);
+
+    }
+
+    void uiChangeGraph(const char* path ) {
+        auto g = getCurrentGraph(); 
+        if (!g) {
+            return;
+        }
+
+        if (!g->editing) {
+            // 
+            currentProject()->openGraph(path, false);
+            return;
+        }
+
+        std::string stringPath(path);
+        openSaveModal("Save File?", "Current Graph do not save, do you want save file?", [stringPath](SaveOperationResult r) {
+            if (r == SaveOperationResult::Drop) {
+                currentProject()->openGraph(stringPath.c_str(), false);
+            } else if (r == SaveOperationResult::Save) {
+                getCurrentGraph()->save();
+                currentProject()->openGraph(stringPath.c_str(), false);
+            }
+        });
+    }
+
+    void openSaveModal(const char* title, const char* content, std::function<void(SaveOperationResult)> const& callback) {
+        auto& askData = g_UIStatus->modalSaveData;
+        askData.title = title;
+        askData.content = content;
+        askData.callback = callback;
+
+        g_UIStatus->windowStatus.popupSaveModal = true;
     }
 
 

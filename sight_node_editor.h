@@ -3,6 +3,7 @@
 // Include node editor ui part and logic part.
 
 #pragma once
+#include <cstddef>
 #include <string>
 #include <vector>
 #include <map>
@@ -41,7 +42,10 @@ namespace sight {
         double d;
         bool b;
         char string[NAME_BUF_SIZE] = {0};
-        char* largeString;     // todo largeString
+        struct {
+            char * pointer;
+            size_t size;
+        } largeString;     // todo largeString
     };
 
     struct SightNodePortOptions {
@@ -314,9 +318,7 @@ namespace sight {
      */
     class SightNodeGraph{
     public:
-
-        //
-        std::atomic<uint> nodeOrPortId = 3000;
+        bool editing = false;
 
         SightNodeGraph();
         ~SightNodeGraph();
@@ -366,7 +368,7 @@ namespace sight {
         /**
          *
          * @param processType
-         * @param status   0 = success, 1 multiple enter. 2 no type nodes.
+         * @param status   0 = success, 1 multiple enter nodes. 2 no type nodes.
          * @return
          */
         SightNode* findNode(SightNodeProcessType processType, int* status = nullptr);
@@ -482,7 +484,7 @@ namespace sight {
          * @param path
          * @return
          */
-        SightNode* findTemplateNode(const char* path);
+        SightJsNode* findTemplateNode(const char* path);
 
     private:
 
@@ -507,7 +509,7 @@ namespace sight {
 
     int showNodeEditorGraph(const UIStatus & uiStatus);
 
-    void showNodePortValue(SightNodePort *port);
+    void showNodePortValue(SightNodePort *port, int width = 160);
 
     uint nextNodeOrPortId();
 
@@ -572,13 +574,13 @@ namespace sight {
      * @return
      */
     SightJsNode* findTemplateNode(const SightNode *node);
+    SightJsNode* findTemplateNode(const char* path);
 
-    /**
+        /**
      * @brief 
      * 
      * @return true  a graph is opened.
      * @return false 
      */
-    bool isNodeEditorReady();
-
+        bool isNodeEditorReady();
 }

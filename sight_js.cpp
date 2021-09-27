@@ -5,6 +5,7 @@
 #include <sstream>
 #include "dbg.h"
 #include "functional"
+#include <string>
 #include <thread>
 #include <chrono>
 
@@ -383,6 +384,21 @@ namespace sight {
             args.GetReturnValue().Set(0);
         }
 
+        std::string jsFunctionToString(Local<Function> function) {
+            auto isolate = g_V8Runtime->isolate;
+            auto context = isolate->GetCurrentContext();
+
+            auto toString = function->Get(context, v8pp::to_v8(isolate, "toString")).ToLocalChecked();
+            auto toStringFunc = toString.As<Function>();
+            auto str = toStringFunc->Call(context, function, 0, nullptr).ToLocalChecked();
+
+            if (IS_V8_STRING(str)) {
+                return v8pp::from_v8<std::string>(isolate, str);
+            } else {
+                dbg("toString's result not a string");
+                return {};
+            }
+        }
     }
 
 
@@ -605,8 +621,68 @@ namespace sight {
 
     std::string serializeJsNode(SightJsNode const& node) {
         // generate a function call.
-        
-        return {};
+        std::stringstream ss;
+        ss << "addTemplateNode({\n";
+
+        // name, address, nodes
+        ss << "    __meta_name: \"" << node.nodeName << "\",\n";
+        ss << "    __meta_address: \"" << node.fullTemplateAddress << "\",\n";
+
+        ss << "    __meta_inputs: { \n";
+        std::string spaces = "        ";
+        std::string intervalSpaces = "    ";
+        for (const auto & item : node.inputPorts) {
+            ss << spaces << item.portName << ": '";
+            ss << getTypeName(item.type);
+            ss << "',\n";
+        }
+
+        spaces.erase(0, intervalSpaces.size());
+        ss << spaces << "},\n";
+
+        ss << "    __meta_outputs: { \n";
+        spaces += intervalSpaces;
+        for (const auto& item : node.outputPorts) {
+            ss << spaces << item.portName << ": {\n";
+            spaces += intervalSpaces;
+
+            ss << spaces << "type: '" << getTypeName(item.type) << "',\n";
+            ss << spaces << "showValue: true,\n";
+
+            spaces.erase(0, intervalSpaces.size());
+            ss  << spaces << "},\n";
+        }
+        spaces.erase(0, intervalSpaces.size());
+        ss << spaces << "},\n";
+
+        // functions
+        auto writeFunction = [&ss, spaces,intervalSpaces](std::string const& name, v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function>> p) {
+            if (!p.IsEmpty()) {
+                auto code = jsFunctionToString(p.Get(g_V8Runtime->isolate));
+                if (!code.empty()) {
+                    ss << spaces << intervalSpaces << name << ": ";
+                    ss << code;
+                    ss << spaces << intervalSpaces << ",";
+                }
+            }
+        };
+
+        ss << spaces << "__meta_func: { \n";
+        writeFunction("generateCodeWork", node.generateCodeWork);
+        if (node.onReverseActive != node.generateCodeWork) {
+            //
+            writeFunction("onReverseActive", node.onReverseActive);
+        }
+        ss << spaces << "}, \n";
+
+        for (const auto& item : node.fields) {
+            ss << spaces << item.portName << ": '";
+            ss << getTypeName(item.type);
+            ss << "',\n";
+        }
+
+        ss << "});";
+        return ss.str();
     }
 
     /**

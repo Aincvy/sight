@@ -2,6 +2,7 @@
 // Created by Aincvy(aincvy@gmail.com) on 2021/7/20.
 //
 
+#include <string>
 #include <utility>
 #include <vector>
 #include <atomic>
@@ -279,15 +280,7 @@ namespace sight {
                 if (item.type == IntTypeProcess || !item.options.showValue){
 
                 } else {
-                    char buf[LITTLE_NAME_BUF_SIZE];
-                    sprintf(buf, "## %d", item.id);
-                    ImGui::SetNextItemWidth(120);
-                    if (item.type == IntTypeFloat) {
-                        ImGui::DragFloat(buf, &item.value.f, 0.5f);
-                    }
-                    else {
-                        ImGui::InputText(buf, item.value.string, NAME_BUF_SIZE);
-                    }
+                    showNodePortValue(&item, 120);
                     ImGui::SameLine();
                 }
 
@@ -476,29 +469,41 @@ namespace sight {
         ed::SetCurrentEditor(nullptr);
     }
 
-    void showNodePortValue(SightNodePort *port) {
+    void showNodePortValue(SightNodePort *port, int width) {
         char labelBuf[NAME_BUF_SIZE];
         sprintf(labelBuf, "## %d", port->id);
 
-        ImGui::SetNextItemWidth(160);
+        ImGui::SetNextItemWidth(width);
         switch (port->getType()) {
             case IntTypeFloat:
-                ImGui::DragFloat(labelBuf, &port->value.f, 0.5f);
+                if (ImGui::DragFloat(labelBuf, &port->value.f, 0.5f)) {
+                    port->node->graph->editing = true;
+                }
                 break;
             case IntTypeDouble:
-                ImGui::InputDouble(labelBuf, &port->value.d);
+                if (ImGui::InputDouble(labelBuf, &port->value.d)) {
+                    port->node->graph->editing = true;
+                }
                 break;
             case IntTypeInt:
-                ImGui::DragInt(labelBuf, &port->value.i);
+                if (ImGui::DragInt(labelBuf, &port->value.i)) {
+                    port->node->graph->editing = true;
+                }
                 break;
             case IntTypeString:
-                ImGui::InputText(labelBuf, port->value.string, std::size(port->value.string));
+                if (ImGui::InputText(labelBuf, port->value.string, std::size(port->value.string))) {
+                    port->node->graph->editing = true;
+                }
                 break;
             case IntTypeBool:
-                ImGui::Checkbox(labelBuf, &port->value.b);
+                if (ImGui::Checkbox(labelBuf, &port->value.b)) {
+                    port->node->graph->editing = true;
+                }
                 break;
             case IntTypeColor:
-                ImGui::ColorEdit3(labelBuf, &port->value.f);
+                if (ImGui::ColorEdit3(labelBuf, &port->value.f)) {
+                    port->node->graph->editing = true;
+                }
                 break;
             default:
                 ImGui::LabelText(labelBuf, "Unknown type of %d", port->getType());
@@ -518,7 +523,14 @@ namespace sight {
             ImGui::SetNextWindowSize(windowSize);
         }
 
-        ImGui::Begin("Node Editor Graph", nullptr,
+        std::string windowTitle("Graph");
+        if (CURRENT_GRAPH) {
+            windowTitle += " - ";
+            windowTitle += CURRENT_GRAPH->getFilePath();
+            windowTitle += "###Node Editor Graph";
+        }
+        
+        ImGui::Begin(windowTitle.c_str(), nullptr,
                      ImGuiWindowFlags_NoCollapse |
                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
                      ImGuiWindowFlags_NoSavedSettings);
@@ -789,7 +801,7 @@ namespace sight {
             this->setFilePath(path);
         }
         if (!saveAnyway && isBroken()) {
-            return 1;
+            return CODE_FAIL;
         }
 
         // ctor yaml object
@@ -884,7 +896,6 @@ namespace sight {
         out << YAML::EndMap;
 
         // other info
-        out << YAML::Key << "nodeOrPortId" << YAML::Value << this->nodeOrPortId.load();
 
         out << YAML::EndMap;       // end of 1st begin map
 
@@ -892,7 +903,7 @@ namespace sight {
         std::ofstream outToFile(path, std::ios::out | std::ios::trunc);
         outToFile << out.c_str() << std::endl;
         outToFile.close();
-        return 0;
+        return CODE_OK;
     }
 
     int SightNodeGraph::load(const char *path, bool isLoadEntity) {
@@ -1027,21 +1038,14 @@ namespace sight {
                 createConnection(left, right, connectionId);
             }
 
-            // other info
-            auto temp = root["nodeOrPortId"];
-            auto tempNodeOrPortId = 20000;
-            if (temp.IsDefined() && !temp.IsNull()) {
-                tempNodeOrPortId = temp.as<int>(20000);
-            }
-            this->nodeOrPortId = tempNodeOrPortId;
-
+            this->editing = false;
             return status;
         }catch (const YAML::BadConversion & e){
             fprintf(stderr, "read file %s error!\n", path);
             fprintf(stderr, "%s\n", e.what());
             this->reset();
             return -2;    // bad file
-        }
+        } 
 
         // return 0;
     }
@@ -1078,6 +1082,7 @@ namespace sight {
         };
         CALL_NODE_FUNC(p);
 
+        this->editing = true;
     }
 
     SightNode *SightNodeGraph::findNode(uint id) {
@@ -1182,18 +1187,19 @@ namespace sight {
     int SightNodeGraph::delNode(int id) {
         auto result = std::find_if(nodes.begin(), nodes.end(), [id](const SightNode& n){ return n.nodeId == id; });
         if (result == nodes.end()) {
-            return -1;
+            return CODE_FAIL;
         }
 
         nodes.erase(result);
-        return 0;
+        this->editing = true;
+        return CODE_OK;
     }
 
     int SightNodeGraph::delConnection(int id) {
         auto result = std::find_if(connections.begin(), connections.end(),
                                    [id](const SightNodeConnection &c) { return c.connectionId == id; });
         if (result == connections.end()) {
-            return -1;
+            return CODE_FAIL;
         }
 
         // deal refs.
@@ -1202,11 +1208,15 @@ namespace sight {
 
         connections.erase(result);
         dbg("delete connection" );
-        return 0;
+        return CODE_OK;
     }
 
     int SightNodeGraph::save() {
-        return saveToFile(this->filepath.c_str(), false);
+        auto c = saveToFile(this->filepath.c_str(), false);
+        if (c == CODE_OK) {
+            this->editing = false;
+        }
+        return c;
     }
 
     SightNodeGraph::SightNodeGraph() {
@@ -1255,14 +1265,14 @@ namespace sight {
         return 0;
     }
 
-    SightNode* NodeEditorStatus::findTemplateNode(const char* path){
+    SightJsNode* NodeEditorStatus::findTemplateNode(const char* path){
         auto address = resolveAddress(path);
         auto pointer = address;
         // compare and put.
         auto* list = &g_NodeEditorStatus->templateAddressList;
 
         bool findElement = false;
-        SightNode* result = nullptr;
+        SightJsNode* result = nullptr;
         while (pointer) {
             for(auto iter = list->begin(); iter != list->end(); iter++){
                 if (iter->name == pointer->part) {
@@ -1460,10 +1470,8 @@ namespace sight {
             node = new SightNode();
         }
 
-        auto & id = g_NodeEditorStatus->entityGraph->nodeOrPortId;
-
         node->nodeName = createEntityData.name;
-        node->nodeId = id++;         // All node and port's ids need to be initialized.
+        node->nodeId = nextNodeOrPortId();         // All node and port's ids need to be initialized.
 
         auto c = createEntityData.first;
         auto type = getIntType(c->type, true);
@@ -1472,7 +1480,7 @@ namespace sight {
             // input
             SightNodePort port = {
                     c->name,
-                    id++,
+                    nextNodeOrPortId(),
                     NodePortType::Input,
                     type,
                     {},
@@ -1484,7 +1492,7 @@ namespace sight {
             node->inputPorts.push_back(port);
 
             // output
-            port.id = id++;
+            port.id = nextNodeOrPortId();
             node->outputPorts.push_back(port);
 
             c = c->next;
@@ -1550,6 +1558,10 @@ namespace sight {
         auto temp = const_cast<SightNode*>(templateNode);
         auto jsNode = (SightJsNode*) temp;
         return jsNode;
+    }
+
+    SightJsNode* findTemplateNode(const char* path) {
+        return g_NodeEditorStatus->findTemplateNode(path);
     }
 
     bool isNodeEditorReady() {

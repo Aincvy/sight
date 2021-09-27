@@ -12,11 +12,12 @@ addTemplateNode({
         placeholder: 'String',
     },
     __meta_outputs: {
-        uid: 'Long',           //
+        uid: 'long',           //
         sign: 'String',
-        timestamp: 'Long',
+        timestamp: 'long',
     },
 
+    address: 'String',
 });
 
 addTemplateNode({
@@ -46,7 +47,6 @@ addTemplateNode({
     __meta_name: "If",
     // used for context menu
     __meta_address: "test/logic",
-    __meta_code: 'if($condition) { $true } else { $false }',
     // other ideas
     __meta_inputs: {
         chainIn: 'Process',
