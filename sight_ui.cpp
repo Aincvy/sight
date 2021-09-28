@@ -1,6 +1,7 @@
 #include "dbg.h"
 #include "imgui_node_editor.h"
 #include "sight_defines.h"
+#include "sight_keybindings.h"
 #include "sight_ui.h"
 #include "sight_node_editor.h"
 #include "sight.h"
@@ -8,11 +9,11 @@
 #include "sight_js_parser.h"
 #include "sight_project.h"
 #include "sight_util.h"
-#include "sight_widgets.h"
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include "sight_widgets.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -49,11 +50,17 @@ namespace sight {
     namespace {
         // private members and functions.
 
-        
+        /**
+         * @brief save whatever file/graph, if it was opened and edited.
+         * 
+         */
+        void saveAnyThing(){
+            getCurrentGraph()->save();
+        }
 
         void showMainFileMenu(UIStatus& uiStatus){
             if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS._new)) {
-                if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.file)) {
+                if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.entity)) {
                 }
                 if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.graph)) {
                     g_UIStatus->windowStatus.popupGraphName = true;
@@ -78,13 +85,13 @@ namespace sight {
                 ImGui::EndMenu();
             }
 
-            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.open, "Ctrl+O")) {
+            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.open)) {
                 dbg("open graph file");
-                // changeGraph("./simple1");
+                
             }
-            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.save, "Super+S")) {
+            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.save, g_UIStatus->keybindings->saveFile.tipsText())) {
                 dbg("save graph");
-                getCurrentGraph()->save();
+                saveAnyThing();
             }
 
             ImGui::Separator();
@@ -635,8 +642,25 @@ namespace sight {
         }
     }
 
+    /**
+     * @brief Handle some common keyboard input
+     * 
+     */
+    void handleKeyboardInput(){
+        if (!g_UIStatus->keybindings->controlKey.isKeyDown()) {
+            return;
+        }
+
+        // dbg("got control key");
+        if (g_UIStatus->keybindings->saveFile) {
+            dbg("save graph");
+            saveAnyThing();
+        }
+    }
+
     void mainWindowFrame(UIStatus & uiStatus) {
         showModals();
+        handleKeyboardInput();
         showMainMenuBar(uiStatus);
         showProjectWindow();
 
@@ -766,6 +790,10 @@ namespace sight {
 
         // init node editor.
         initNodeEditor();
+
+        // init keys
+        initKeys();
+        g_UIStatus->keybindings = loadKeyBindings("./keybindings.yaml");
 
         // uv loop init
         auto uvLoop = (uv_loop_t*)malloc(sizeof(uv_loop_t));

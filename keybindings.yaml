@@ -1,0 +1,14 @@
+# shift, alt, super/win, ctrl
+# l as prefix means only left, r is same.
+
+controlKey: super
+# you can use '' or ~ to flag: you do not want to has a prefix command.
+# when you give a value, then all other shortcuts will need this one as prefix.
+# e.g. `prefixCommand=k,save=s,controlKey=ctrl` then save need `ctrl+k,ctrl+s` to trigger.
+# prefixCommand may improve performance.
+prefixCommand: ~
+
+# file operations.
+# save file, graph, or others
+saveFile: s
+openGraph: o

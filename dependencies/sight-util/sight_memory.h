@@ -19,7 +19,7 @@ namespace sight {
     /**
      * A auto expand array. NOT thread safe.
      * All element's address do not change.
-     * @tparam T
+     * @tparam T need has a empty constructor
      */
     template<class T>
     class SightArray {
@@ -42,12 +42,13 @@ namespace sight {
             }
         }
 
+
         /**
          *
          * @param t
          * @return
          */
-        T *add(T const &t) {
+        T* add(T const &t) {
             T *p = add();
             *p = t;
             return p;
@@ -57,7 +58,7 @@ namespace sight {
          * get a element pointer.
          * @return
          */
-        T *add() {
+        T* add() {
             int index;
             if (!notUsed.empty()) {
                 auto iter = notUsed.begin();

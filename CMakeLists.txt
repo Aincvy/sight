@@ -32,7 +32,7 @@ target_sources(sight PRIVATE
         sight.cpp
         sight_plugin.cpp
         sight_widgets.cpp
-        
+        sight_keybindings.cpp
 )
 
 # depend
@@ -85,4 +85,5 @@ MESSAGE(STATUS "Found yaml-cpp at: ${YAML_CPP_INCLUDE_DIR}")
 
 add_custom_command(TARGET sight POST_BUILD
         COMMAND echo "copy plugins folder ..." && cp -fR "${CMAKE_CURRENT_LIST_DIR}/plugins" "${CMAKE_BINARY_DIR}"
+        COMMAND echo "copy config files ..." && cp -fR "${CMAKE_CURRENT_LIST_DIR}/keybindings.yaml" "${CMAKE_BINARY_DIR}"
         )

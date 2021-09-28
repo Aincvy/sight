@@ -6,6 +6,7 @@
 #include "uv.h"
 
 #include "sight.h"
+#include "sight_widgets.h"
 #include "sight_language.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -17,14 +18,6 @@ namespace sight {
 
     struct SightNode;
     struct SightNodeConnection;
-
-    inline ImVec4 rgba(int r, int g, int b, int a){
-        return ImVec4{ static_cast<float>(r) / 255.f, static_cast<float>(g) / 255.f, static_cast<float>(b) / 255.f, static_cast<float>(a) / 255.f };
-    }
-
-    inline ImVec4 rgb(int r, int g,int b){
-        return rgba(r,g,b, 255);
-    }
 
     enum class UICommandType{
         UICommandHolder,
@@ -153,8 +146,9 @@ namespace sight {
     };
 
     class Project;
+    struct KeyBindings;
 
-    /**
+        /**
      * @brief select items, path
      * Not thread safe.
      */
@@ -219,10 +213,11 @@ namespace sight {
         struct ModalAskData modalAskData;
         struct ModalSaveData modalSaveData;
 
-            struct LanguageKeys* languageKeys = nullptr;
+        struct LanguageKeys* languageKeys = nullptr;
         struct UIColors* uiColors = nullptr;
+        struct KeyBindings* keybindings = nullptr;
 
-        uv_loop_t *uvLoop = nullptr;
+        uv_loop_t* uvLoop = nullptr;
         uv_async_t* uvAsync = nullptr;
 
         ~UIStatus();
