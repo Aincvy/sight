@@ -12,3 +12,5 @@ prefixCommand: ~
 # save file, graph, or others
 saveFile: s
 openGraph: o
+
+duplicateNode: d

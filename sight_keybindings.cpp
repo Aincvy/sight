@@ -82,6 +82,7 @@ namespace sight {
         func("prefixCommand", keybindingds->prefixCommand);
         CHECK_RETURN("saveFile", keybindingds->saveFile);
         CHECK_RETURN("openGraph", keybindingds->openGraph);
+        CHECK_RETURN("duplicateNode", keybindingds->duplicateNode);
 
         return keybindingds;
     }

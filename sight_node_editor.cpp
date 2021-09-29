@@ -16,6 +16,7 @@
 #include "sight_ui.h"
 #include "sight_util.h"
 #include "sight_project.h"
+#include "sight_keybindings.h"
 
 #include "imgui.h"
 
@@ -298,7 +299,7 @@ namespace sight {
             return 0;
         }
 
-        int showNodes(const UIStatus &uiStatus) {
+        int showNodes(UIStatus const& uiStatus) {
             auto io = uiStatus.io;
 
             ImGui::Text("FPS: %.2f (%.2gms)", io->Framerate, io->Framerate ? 1000.0f / io->Framerate : 0.0f);
@@ -394,6 +395,20 @@ namespace sight {
             }
             ed::EndDelete(); // Wrap up deletion action
             
+            // handle keyboard
+            if (uiStatus.keybindings->controlKey.isKeyDown()) {
+                if (uiStatus.keybindings->duplicateNode) {
+                    dbg("duplicate node");
+                    auto tmpNode = uiStatus.selection.node; 
+                    if (tmpNode) {
+                        auto node = tmpNode->instantiate();
+                        auto pos = ed::GetNodePosition(tmpNode->nodeId);
+                        auto size = ed::GetNodeSize(tmpNode->nodeId);
+                        ed::SetNodePosition(node->nodeId, ImVec2(pos.x, pos.y + size.y + 10));
+                        addNode(node);
+                    }
+                }
+            }
 
             auto openPopupPosition = ImGui::GetMousePos();
             ed::Suspend();
@@ -512,7 +527,7 @@ namespace sight {
 
     }
 
-    int showNodeEditorGraph(const UIStatus &uiStatus) {
+    int showNodeEditorGraph(UIStatus const& uiStatus) {
         if (uiStatus.needInit) {
             ImVec2 startPos = {
                     300, 20
@@ -639,11 +654,11 @@ namespace sight {
     }
 
     SightNode *SightNode::instantiate(bool generateId) const {
-        dbg( this->nodeName);
         if (this->templateNode) {
             return this->templateNode->instantiate();
         }
 
+        dbg(this->nodeName);
         auto p = new SightNode();
         p->copyFrom(this, true);
         p->tryAddChainPorts();
@@ -1354,8 +1369,8 @@ namespace sight {
                 //
                 // dbg("it will create a new node.", this->name);
                 auto node = this->templateNode.instantiate();
-                addNode(node);
                 ed::SetNodePosition(node->nodeId, openPopupPosition);
+                addNode(node);
             }
         } else {
             if (ImGui::BeginMenu(name.c_str())) {

@@ -24,6 +24,7 @@ namespace sight {
         SightKeyWrapper saveFile;
 
         SightKeyWrapper openGraph;
+        SightKeyWrapper duplicateNode;
 
 
     };

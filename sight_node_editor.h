@@ -507,7 +507,7 @@ namespace sight {
 
     void nodeEditorFrameEnd();
 
-    int showNodeEditorGraph(const UIStatus & uiStatus);
+    int showNodeEditorGraph(UIStatus const& uiStatus);
 
     void showNodePortValue(SightNodePort *port, int width = 160);
 
