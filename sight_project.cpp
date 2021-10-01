@@ -387,6 +387,10 @@ namespace sight {
         return pathSrcFolder() + "graph/";
     }
 
+    absl::btree_map<std::string, BuildTarget> & Project::getBuildTargetMap() {
+        return buildTargetMap;
+    }
+
     Project *currentProject() {
         return g_Project;
     }

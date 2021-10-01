@@ -191,7 +191,7 @@ addTemplateNode({
         enter: true,
     },
     __meta_func: {
-        generateCodeWork($, $options) {
+        generateCodeWork($, $$) {
             print('from generateCodeWork.');
         },
 
@@ -208,3 +208,56 @@ addTemplateNode({
 
 
 });
+
+
+addTemplateNode({
+    // meta info, start with __meta
+
+    __meta_name: "Student",
+    // used for context menu
+    __meta_address: "sight://template/nodes/entity",
+    __meta_options: {
+        enter: true,
+    },
+    __meta_func: {
+        generateCodeWork($, $$) {
+            // The output nodes will be omitted on this function arg $.
+            // Because they has same name with input nodes. Here, I want to give the input nodes a higher priority.
+            
+            if ($.uid.isConnect){
+                $$.stmts.push(function($){
+                    // this ...
+                    this.uid = $.uid();
+                    $.this() = 1;
+                    $.abc() = 2;
+                    $.uid.this = 1;
+                    $.this().uid = 1;
+                });
+            }
+
+            
+        },
+
+    },
+
+    // other ideas
+    __meta_inputs: {
+        uid: {
+            type: 'long',
+        },
+        name: {
+            type: 'string',
+        }
+    },
+    __meta_outputs: {
+        uid: {
+            type: 'long',
+        }, 
+        name: {
+            type: 'string',
+        }
+    },
+
+
+});
+

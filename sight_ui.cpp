@@ -212,6 +212,7 @@ namespace sight {
 
             ImGui::Begin("Test Window", &g_UIStatus->windowStatus.testWindow);
             ImGui::Text("this is first line.");
+            ImGui::Text(u8"中文");
 
             // if (sightImage.ready()) {
             //     ImGui::Image(sightImage.textureId, ImVec2(sightImage.width, sightImage.height));
@@ -889,7 +890,15 @@ namespace sight {
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;           // Enable Docking
         // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;         // Enable Multi-Viewport / Platform Windows
+
         io.ConfigWindowsMoveFromTitleBarOnly = true;
+        io.Fonts->AddFontDefault();
+        ImFontConfig config;
+        config.MergeMode = true;
+        auto fontPointer = io.Fonts->AddFontFromFileTTF((resourceFolder + "font/FangZhengKaiTiJianTi-1.ttf").c_str(), 16, &config, io.Fonts->GetGlyphRangesChineseSimplifiedCommon());
+        io.Fonts->Build();
+        dbg(fontPointer);
+
         g_UIStatus->io = &io;
 
         // Setup Dear ImGui style

@@ -12,6 +12,8 @@
 
 namespace sight {
 
+    const std::string resourceFolder = "../resources/";
+
     void exitSight(int v) {
 
         addJsCommand(JsCommandType::Destroy);

@@ -46,12 +46,15 @@ namespace sight {
 
     class SightNodeGraph;
 
+
+
     /**
-     * @brief build target settings
-     * May include programming language, application type.
+     * @brief build target 
      */
     struct BuildTarget {
-
+        std::string name;
+        // if has children, then execute them in order.
+        std::vector<std::string> children;
     };
 
     enum class ProjectFileType {
@@ -72,8 +75,6 @@ namespace sight {
         std::string filename;
         // if this is a directory.
         std::vector<ProjectFile> files;
-
-        
     };
 
     /**
@@ -162,6 +163,8 @@ namespace sight {
         std::string pathPluginsFolder() const;
         std::string pathEntityFolder() const;
 
+        absl::btree_map<std::string, BuildTarget> & getBuildTargetMap();
+
     private:
         std::string baseDir;
         bool createIfNotExist;
@@ -169,11 +172,13 @@ namespace sight {
         ProjectFile fileCache;
 
         std::atomic<uint> typeIdIncr;
-        // todo this need to serialization and deserialization
         absl::btree_map<std::string, uint> typeMap;
         absl::btree_map<uint, std::string> reverseTypeMap;
 
         std::string lastOpenGraph{};
+
+        // key: name, 
+        absl::btree_map<std::string, BuildTarget> buildTargetMap;
 
         // file locations
         std::string pathConfigFile() const;

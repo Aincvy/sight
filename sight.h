@@ -9,6 +9,8 @@
 
 namespace sight {
 
+    extern const std::string resourceFolder;
+
     /**
      *
      */
