@@ -47,7 +47,7 @@ addTemplateNode({
     },
     __meta_func: {
         generateCodeWork($) {
-            await $.client() .set($.key(), $.value());
+            // await $.client() .set($.key(), $.value());
         },
 
     },

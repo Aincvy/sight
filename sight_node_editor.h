@@ -509,7 +509,14 @@ namespace sight {
 
     int showNodeEditorGraph(UIStatus const& uiStatus);
 
-    void showNodePortValue(SightNodePort *port, int width = 160);
+    /**
+     * @brief 
+     * 
+     * @param port 
+     * @param width 
+     * @param type     TypeInfo's id
+     */
+    void showNodePortValue(SightNodePort* port, int width = 160, int type = -1);
 
     uint nextNodeOrPortId();
 

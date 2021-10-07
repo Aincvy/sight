@@ -3,6 +3,7 @@
 //
 
 #include "sight_plugin.h"
+#include "dbg.h"
 #include "sight.h"
 #include "filesystem"
 #include "sight_util.h"
@@ -41,8 +42,11 @@ namespace sight {
 
         for (auto it = directory_iterator {"./plugins"}; it != directory_iterator {}; ++it) {
             auto plugin = new Plugin(this, it->path().string());
-            if (plugin->load() != CODE_OK) {
-                dbg("plugin load fail", it->path().c_str());
+            int i;
+            if ((i = plugin->load()) != CODE_OK) {
+                if (i != CODE_PLUGIN_DISABLED) {
+                    dbg("plugin load fail", it->path().c_str());
+                }
                 goto loadFailed;
             }
 
@@ -133,6 +137,10 @@ namespace sight {
             auto object = result.As<v8::Object>();
             readBaseInfoFromJsObject(object);
         }
+        if (this->disabled) {
+            dbg("plugin disabled", this->name);
+            return CODE_PLUGIN_DISABLED;
+        }
 
         // load other files.
         directory_iterator begin{ this->path}, end{};
@@ -216,6 +224,10 @@ namespace sight {
             } else if (key == "author") {
                 if (IS_V8_STRING(valueObject)) {
                     this->author = v8pp::from_v8<std::string>(isolate, valueObject);
+                }
+            } else if (key == "disabled") {
+                if (valueObject->IsBoolean()) {
+                    this->disabled = v8pp::from_v8<bool>(isolate, valueObject);
                 }
             }
 

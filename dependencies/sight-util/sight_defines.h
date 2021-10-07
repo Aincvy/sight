@@ -29,6 +29,7 @@
 
 
 #define IS_V8_STRING(localVal) (localVal)->IsString() || (localVal)->IsStringObject()
+#define IS_V8_NUMBER(localVal) (localVal)->IsNumber() || (localVal)->IsNumberObject()
 
 
 #define CHECK_CODE(func, i) if (( (i) = (func)) != CODE_OK){ \
@@ -36,12 +37,9 @@
 }
 
 
-
-
 namespace sight {
 
     extern std::string emptyString;
-
 
     /**
      *
@@ -52,5 +50,5 @@ namespace sight {
      *
      */
     extern const int addressPrefixLen;
-
+    
 }

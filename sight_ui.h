@@ -117,7 +117,7 @@ namespace sight {
     struct UIWindowStatus {
         bool nodeGraph = false;
         bool createEntity = false;
-        bool testWindow = true;
+        bool testWindow = false;
 
         bool layoutReset = false;
 

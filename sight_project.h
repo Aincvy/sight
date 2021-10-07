@@ -4,17 +4,17 @@
 
 #pragma once
 
-#include <cstring>
 #include <string>
+#include <tuple>
 #include <vector>
-#include "sight_plugin.h"
-#include "string"
 #include "atomic"
 #include "sys/types.h"
 
 #include "absl/container/btree_map.h"
 
 namespace sight {
+
+    union SightNodeValue;
 
     enum TypeIntValues {
         IntTypeProcess = 1,
@@ -29,8 +29,66 @@ namespace sight {
         IntTypeColor,
         IntTypeVector3,
         IntTypeVector4,
+        IntTypeObject,
 
         IntTypeNext = 3000,
+    };
+
+    enum class TypeInfoRenderKind {
+        Default,
+        ComboBox,
+
+    };
+    
+    struct TypeInfoRender {
+        TypeInfoRenderKind kind = TypeInfoRenderKind::Default;
+        // if asIntType > 0, then it's value should be one of TypeIntValues
+        u_char asIntType = 0;
+        union {
+            struct {
+                std::vector<std::string>* list;
+                int selected;
+            } comboBox;
+            int i = 0;
+        } data;
+
+        TypeInfoRender();
+        TypeInfoRender(TypeInfoRender const& rhs);
+        ~TypeInfoRender();
+
+        /**
+         * @brief init data by kind
+         * 
+         */
+        void initData();
+        void freeData();
+
+        void operator()(const char* labelBuf, SightNodeValue & value) const;
+
+        /**
+         * @brief Does this render has a render function ?
+         * 
+         * @return true 
+         * @return false 
+         */
+        operator bool();
+
+        TypeInfoRender& operator=(TypeInfoRender const& rhs);
+        
+    };
+
+    struct TypeInfo {
+        // typename
+        std::string name;
+        uint intValue = 0;
+        // does this type from a node ? ( > 0)
+        uint fromNode = 0;
+
+        TypeInfoRender render;
+
+        void initValue(SightNodeValue & value) const;
+
+        
     };
 
     /**
@@ -135,6 +193,12 @@ namespace sight {
          */
         uint addType(std::string const& name);
 
+        uint addTypeInfo(TypeInfo info);
+
+        TypeInfo const& getTypeInfo(uint id, bool* isFind = nullptr);
+
+        std::tuple<TypeInfo const&, bool> findTypeInfo(uint id);
+
         std::string getBaseDir() const;
 
         /**
@@ -173,7 +237,7 @@ namespace sight {
 
         std::atomic<uint> typeIdIncr;
         absl::btree_map<std::string, uint> typeMap;
-        absl::btree_map<uint, std::string> reverseTypeMap;
+        absl::btree_map<uint, TypeInfo> typeInfoMap;
 
         std::string lastOpenGraph{};
 
@@ -234,5 +298,11 @@ namespace sight {
      * @return
      */
     uint addType(std::string const& name);
+
+    uint addTypeInfo(TypeInfo const& info);
+    
+    bool inline isBuiltInType(uint type){
+        return type < IntTypeNext;
+    }
 
 }

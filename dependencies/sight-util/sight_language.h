@@ -39,6 +39,7 @@ namespace sight {
         // char view[SHORT_KEYS_BUF_SIZE] = "View";
         char project[SHORT_KEYS_BUF_SIZE] = "Project";
         char custom[SHORT_KEYS_BUF_SIZE] = "Custom";
+        char help[SHORT_KEYS_BUF_SIZE] = "Help";
 
         char _new[SHORT_KEYS_BUF_SIZE] = "New";
         char file[SHORT_KEYS_BUF_SIZE] = "File";

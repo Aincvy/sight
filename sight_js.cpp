@@ -1,6 +1,8 @@
 //
 // Created by Aincvy(aincvy@gmail.com) on 2021/7/20.
 //
+#include <algorithm>
+#include <iterator>
 #include <stdio.h>
 #include <sstream>
 #include "dbg.h"
@@ -9,6 +11,7 @@
 #include <thread>
 #include <chrono>
 
+#include "sight_defines.h"
 #include "sight_js.h"
 #include "sight_node_editor.h"
 #include "shared_queue.h"
@@ -22,6 +25,8 @@
 #include "v8.h"
 #include "libplatform/libplatform.h"
 
+#include "v8pp/convert.hpp"
+#include "v8pp/function.hpp"
 #include "v8pp/module.hpp"
 #include "v8pp/class.hpp"
 
@@ -118,29 +123,6 @@ namespace sight {
         };
 
 
-        // use it for register to v8.
-        struct NodePortTypeStruct {
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "readability-convert-member-functions-to-static"
-            int getInput() {
-                return static_cast<int>(NodePortType::Input);
-            }
-
-            int getOutput() {
-                return static_cast<int>(NodePortType::Output);
-            }
-
-            int getBoth() {
-                return static_cast<int>(NodePortType::Both);
-            }
-
-            int getField() {
-                return static_cast<int>(NodePortType::Field);
-            }
-#pragma clang diagnostic pop
-        };
-
-
         //
         //   register functions to v8
         //
@@ -151,7 +133,101 @@ namespace sight {
             
         }
 
-        void v8AddNode(SightJsNode &node) {
+        void v8AddType(const FunctionCallbackInfo<Value>& args) {
+            if (args.Length() <= 0) {
+                args.GetReturnValue().Set(-1);
+                return;
+            }
+
+            auto v8TypeName = args[0];
+            if (!IS_V8_STRING(v8TypeName)) {
+                args.GetReturnValue().Set(-2);
+                return;
+            }
+            auto isolate = args.GetIsolate();
+            auto name = v8pp::from_v8<std::string>(isolate, v8TypeName);
+            TypeInfoRender render;
+            render.kind = TypeInfoRenderKind::Default;
+            if (args.Length() >= 2) {
+                auto options = args[1];
+                if (!options->IsObject()) {
+                    args.GetReturnValue().Set(-3);
+                    return;
+                }
+
+                auto context = isolate->GetCurrentContext();
+                HandleScope handleScope(isolate);
+                auto object = options.As<Object>();
+                auto keys = object->GetOwnPropertyNames(context).ToLocalChecked();
+                for (int i = 0; i < keys->Length(); i++) {
+                    auto key = keys->Get(context, i).ToLocalChecked();
+                    auto value = object->Get(context, key).ToLocalChecked();
+                    auto keyString = v8pp::from_v8<std::string>(isolate, key);
+
+                    if (keyString == "kind") {
+                        if (IS_V8_STRING(value)) {
+                            auto valueString = v8pp::from_v8<std::string>(isolate, value);
+                            lowerCase(valueString);
+                            if (valueString == "combo box") {
+                                render.kind = TypeInfoRenderKind::ComboBox;
+                            }
+                        } else {
+                            dbg("kind not a string");
+                            return;
+                        }
+
+                        render.initData();
+                    } else if (keyString == "data") {
+                        switch (render.kind) {
+                        case TypeInfoRenderKind::Default:
+                            break;
+                        case TypeInfoRenderKind::ComboBox:{
+                            auto& data = render.data.comboBox;
+                            if (!value->IsArray()) {
+                                return;
+                            }
+                            auto array = value.As<Array>();
+                            for( int i = 0; i < array->Length(); i++){
+                                auto v = array->Get(context, i).ToLocalChecked();
+                                if (IS_V8_STRING(v)) {
+                                    data.list->push_back(v8pp::from_v8<std::string>(isolate, v));
+                                }
+                            }
+                            break;
+                        }
+                        }
+                    } else if (keyString == "defaultValue") {
+                        switch (render.kind) {
+                        case TypeInfoRenderKind::Default:
+                            break;
+                        case TypeInfoRenderKind::ComboBox:
+                        {
+                            auto& data = render.data.comboBox;
+                            if (IS_V8_STRING(value)) {
+                                std::string v = v8pp::from_v8<std::string>(isolate, value);
+                                auto find = std::find(data.list->begin(), data.list->end(), v);
+                                if (find != data.list->end()) {
+                                    // has one
+                                    data.selected = static_cast<int>(std::distance(data.list->begin(), find));
+                                }
+                            }  else if (IS_V8_NUMBER(value)) {
+                                data.selected = v8pp::from_v8<int>(isolate, value);
+                            }
+                            break;
+                        }
+                        }
+                    }
+                }
+            }
+
+            // add type
+            addTypeInfo({
+                .name = name,
+                .render = render,
+            });
+        }
+
+        void v8AddNode(SightJsNode& node) {
             g_NodeCache.push_back(node);
         }
 
@@ -483,14 +559,14 @@ namespace sight {
         auto isolate = g_V8Runtime->isolate;
         v8pp::module module(isolate);
 
-
         // classes ...
-        v8pp::class_<NodePortTypeStruct> jsNodePortTypeEnum(isolate);
-        jsNodePortTypeEnum.ctor<>()
-                .set("Input", v8pp::property(&NodePortTypeStruct::getInput))
-                .set("Output", v8pp::property(&NodePortTypeStruct::getOutput))
-                .set("Both", v8pp::property(&NodePortTypeStruct::getBoth))
-                .set("Field", v8pp::property(&NodePortTypeStruct::getField));
+        v8pp::module jsNodePortTypeEnum(isolate);
+        jsNodePortTypeEnum
+            .set_const("Input", static_cast<int>(NodePortType::Input))
+            .set_const("Output", static_cast<int>(NodePortType::Output))
+            .set_const("Both", static_cast<int>(NodePortType::Both))
+            .set_const("Field", static_cast<int>(NodePortType::Field))
+            ;
         module.set("NodePortType", jsNodePortTypeEnum);
 
         v8pp::class_<SightNodePort> jsNodePortClass(isolate);
@@ -519,6 +595,8 @@ namespace sight {
         currentContext->Global()->Set(currentContext, v8pp::to_v8(isolate, "print"), printFunc);
         auto addTemplateNodeFunc = v8pp::wrap_function(isolate, "addTemplateNode", v8AddTemplateNode);
         currentContext->Global()->Set(currentContext, v8pp::to_v8(isolate, "addTemplateNode"), addTemplateNodeFunc);
+        auto addTypeFunc = v8pp::wrap_function(isolate, "addType", &v8AddType);
+        currentContext->Global()->Set(currentContext, v8pp::to_v8(isolate, "addType"), addTypeFunc);
 
         v8pp::class_<GenerateOptions> generateOptionsClass(isolate);
         generateOptionsClass
@@ -713,8 +791,13 @@ namespace sight {
         v8::Local<v8::String> arguments[] = {module, exports, params};
         v8::ScriptCompiler::Source source(sourceCode);
         Local<Object> context_extensions[0];
-        Local<Function> function = v8::ScriptCompiler::CompileFunctionInContext(context, &source, 3, arguments,
-                                                                                0, context_extensions).ToLocalChecked();
+        auto mayFunction = v8::ScriptCompiler::CompileFunctionInContext(context, &source, 3, arguments,
+                                                                                0, context_extensions);
+        if (mayFunction.IsEmpty()) {
+            dbg("js file compile error", filepath);
+            return -2;
+        }
+        Local<Function> function = mayFunction.ToLocalChecked();
         Local<Object> recv = Object::New(isolate);
         recv->Set(context, String::NewFromUtf8(isolate, "test").ToLocalChecked(),
                   String::NewFromUtf8(isolate, "value-from-cpp").ToLocalChecked());

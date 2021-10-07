@@ -12,7 +12,7 @@
 
 namespace sight {
 
-    const std::string resourceFolder = "../resources/";
+    const std::string resourceFolder = "resources/";
 
     void exitSight(int v) {
 

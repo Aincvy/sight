@@ -3,6 +3,7 @@
 //
 
 #include <string>
+#include <sys/types.h>
 #include <utility>
 #include <vector>
 #include <atomic>
@@ -484,47 +485,63 @@ namespace sight {
         ed::SetCurrentEditor(nullptr);
     }
 
-    void showNodePortValue(SightNodePort *port, int width) {
+    void showNodePortValue(SightNodePort* port, int width, int type) {
         char labelBuf[NAME_BUF_SIZE];
         sprintf(labelBuf, "## %d", port->id);
 
         ImGui::SetNextItemWidth(width);
-        switch (port->getType()) {
-            case IntTypeFloat:
-                if (ImGui::DragFloat(labelBuf, &port->value.f, 0.5f)) {
-                    port->node->graph->editing = true;
-                }
-                break;
-            case IntTypeDouble:
-                if (ImGui::InputDouble(labelBuf, &port->value.d)) {
-                    port->node->graph->editing = true;
-                }
-                break;
-            case IntTypeInt:
-                if (ImGui::DragInt(labelBuf, &port->value.i)) {
-                    port->node->graph->editing = true;
-                }
-                break;
-            case IntTypeString:
-                if (ImGui::InputText(labelBuf, port->value.string, std::size(port->value.string))) {
-                    port->node->graph->editing = true;
-                }
-                break;
-            case IntTypeBool:
-                if (ImGui::Checkbox(labelBuf, &port->value.b)) {
-                    port->node->graph->editing = true;
-                }
-                break;
-            case IntTypeColor:
-                if (ImGui::ColorEdit3(labelBuf, &port->value.f)) {
-                    port->node->graph->editing = true;
-                }
-                break;
-            default:
-                ImGui::LabelText(labelBuf, "Unknown type of %d", port->getType());
-                break;
+        bool usePortType = false;
+        if (type <= 0) {
+            type = port->getType();
+            usePortType = true;
         }
-
+        switch (type) {
+        case IntTypeFloat:
+            if (ImGui::DragFloat(labelBuf, &port->value.f, 0.5f)) {
+                port->node->graph->editing = true;
+            }
+            break;
+        case IntTypeDouble:
+            if (ImGui::InputDouble(labelBuf, &port->value.d)) {
+                port->node->graph->editing = true;
+            }
+            break;
+        case IntTypeInt:
+            if (ImGui::DragInt(labelBuf, &port->value.i)) {
+                port->node->graph->editing = true;
+            }
+            break;
+        case IntTypeString:
+            if (ImGui::InputText(labelBuf, port->value.string, std::size(port->value.string))) {
+                port->node->graph->editing = true;
+            }
+            break;
+        case IntTypeBool:
+            if (ImGui::Checkbox(labelBuf, &port->value.b)) {
+                port->node->graph->editing = true;
+            }
+            break;
+        case IntTypeColor:
+            if (ImGui::ColorEdit3(labelBuf, &port->value.f)) {
+                port->node->graph->editing = true;
+            }
+            break;
+        default:{
+            bool isFind = false;
+            auto & typeInfo = currentProject()->getTypeInfo(static_cast<uint>(type), &isFind);
+            if (isFind) {
+                // has type info           
+                if (usePortType && typeInfo.render.asIntType > 0) {
+                    showNodePortValue(port, width, typeInfo.render.asIntType);
+                } else {
+                    typeInfo.render(labelBuf, port->value);
+                }
+            } else {
+                ImGui::LabelText(labelBuf, "Unknown type of %d", port->getType());
+            }
+            break;
+        }
+        }
     }
 
     int showNodeEditorGraph(UIStatus const& uiStatus) {
@@ -671,6 +688,16 @@ namespace sight {
         auto nodeFunc = [](std::vector<SightNodePort> & list) {
             for (auto &item : list) {
                 item.id = nextNodeOrPortId();
+
+                // check type
+                auto t = item.getType();
+                if (!isBuiltInType(t)) {
+                    bool isFind = false;
+                    auto typeInfo = currentProject()->getTypeInfo(t, &isFind);
+                    if (isFind) {
+                        typeInfo.initValue(item.value);
+                    }
+                }
             }
         };
 
@@ -847,26 +874,46 @@ namespace sight {
                 out << YAML::Key << "name" << YAML::Value << item.portName;
                 out << YAML::Key << "type" << YAML::Value << item.type;
 
+                auto type = item.getType();
                 out << YAML::Key << "value" << YAML::Value;
-                switch (item.type) {
-                    case IntTypeFloat:
-                        out << item.value.f;
-                        break;
-                    case IntTypeDouble:
-                        out << item.value.d;
-                        break;
-                    case IntTypeInt:
-                        out << item.value.i;
-                        break;
-                    case IntTypeString:
-                        out << item.value.string;
-                        break;
-                    case IntTypeBool:
-                        out << item.value.b;
-                        break;
-                    default:
+                switch (type) {
+                case IntTypeFloat:
+                    out << item.value.f;
+                    break;
+                case IntTypeDouble:
+                    out << item.value.d;
+                    break;
+                case IntTypeInt:
+                    out << item.value.i;
+                    break;
+                case IntTypeString:
+                    out << item.value.string;
+                    break;
+                case IntTypeBool:
+                    out << item.value.b;
+                    break;
+                default:
+                {
+                    bool serializeGood = false;
+                    if (!isBuiltInType(type)) {
+                        //
+                        auto [typeInfo, find] = currentProject()->findTypeInfo(type);
+                        if (find) {
+                            switch (typeInfo.render.kind) {
+                            case TypeInfoRenderKind::ComboBox:
+                                out << item.value.i;
+                                serializeGood = true;
+                                break;
+                            case TypeInfoRenderKind::Default:
+                                break;
+                            }
+                        }
+                    }
+                    if (!serializeGood) {
                         out << YAML::Null;
-                        break;
+                    }
+                    break;
+                }
                 }
 
                 out << YAML::EndMap;
@@ -977,7 +1024,24 @@ namespace sight {
                             break;
                         default:
                             dbg("type error, unHandled", type, getTypeName(type));
-                            port.value.i = 0;
+                            // port.value.i = 0;
+                            {
+                                if (!isBuiltInType(type)) {
+                                    //
+                                    auto [typeInfo, find] = currentProject()->findTypeInfo(type);
+                                    if (find) {
+                                        switch (typeInfo.render.kind) {
+                                        case TypeInfoRenderKind::ComboBox:
+                                            port.value.i = valueNode.as<int>();
+                                            break;
+                                        case TypeInfoRenderKind::Default:
+                                        default:
+                                            
+                                            break;
+                                        }
+                                    }
+                                } 
+                            }
                             break;
                     }
                 }
@@ -1598,7 +1662,6 @@ namespace sight {
     SightAnyThingData::SightAnyThingData(SightNode *node, uint portId) {
         this->portHandle = { node, portId };
     }
-
 
     bool SightNodePortConnection::bad() const {
         return !self || !target || !connection;

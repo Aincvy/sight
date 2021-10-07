@@ -153,6 +153,8 @@ namespace sight {
      */
     std::string saveFileDialog(const char* basePath);
 
+    void openUrlWithDefaultBrowser(std::string const& urlString);
+
     /**
      * @brief 
      * 
@@ -171,6 +173,7 @@ namespace sight {
     inline ImVec4 rgb(int r, int g, int b) {
         return rgba(r, g, b, 255);
     }
+
 
 
 }

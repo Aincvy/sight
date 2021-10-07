@@ -12,12 +12,6 @@ set(CMAKE_EXPORT_COMPILECOMMANDS ON)
 
 add_executable(sight program.cpp)
 
-#target_compile_options(
-#        sight PRIVATE
-#        -g
-#        -O2
-#)
-
 # source
 target_include_directories(
         sight PRIVATE
@@ -82,8 +76,16 @@ target_include_directories(sight PRIVATE YAML_CPP_INCLUDE_DIR)
 target_link_libraries(sight PRIVATE ${YAML_CPP_LIBRARIES})
 MESSAGE(STATUS "Found yaml-cpp at: ${YAML_CPP_INCLUDE_DIR}")
 
+# other macos kit
+# target_link_libraries(
+#         sight PRIVATE
+#         "-framework CoreFoundation"
+#         "-framework ApplicationServices"
+# )
 
-add_custom_command(TARGET sight POST_BUILD
+# custom commands 
+add_custom_target(copyFiles)
+add_custom_command(TARGET copyFiles PRE_BUILD
         COMMAND echo "copy plugins folder ..." && cp -fR "${CMAKE_CURRENT_LIST_DIR}/plugins" "${CMAKE_BINARY_DIR}"
         COMMAND echo "copy config files ..." && cp -fR "${CMAKE_CURRENT_LIST_DIR}/keybindings.yaml" "${CMAKE_BINARY_DIR}"
         )

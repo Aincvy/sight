@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstdint>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -24,6 +25,11 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_split.h"
+
+// #ifdef __APPLE__
+// #include <CoreFoundation/CFBundle.h>
+// #include <ApplicationServices/ApplicationServices.h>
+// #endif
 
 namespace sight {
 
@@ -267,6 +273,24 @@ namespace sight {
         }
 
         return {};
+    }
+
+    void openUrlWithDefaultBrowser(std::string const& urlString) {
+#ifdef __APPLE__
+        // CFURLRef url = CFURLCreateWithBytes(
+        //     NULL,                          // allocator
+        //     (UInt8*)urlString.c_str(),     // URLBytes
+        //     urlString.length(),            // length
+        //     kCFStringEncodingASCII,        // encoding
+        //     NULL                           // baseURL
+        // );
+        // LSOpenCFURLRef(url, 0);
+        // CFRelease(url);
+        
+        system(("open " + urlString).c_str());
+#elif _WIN32
+        system(("start " + urlString).c_str());
+#endif
     }
 
     SightKey::SightKey(ushort code)

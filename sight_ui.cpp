@@ -176,6 +176,15 @@ namespace sight {
             }
         }
 
+        void showHelpMenu(){
+            if (ImGui::MenuItem("About")) {
+                dbg("sight WIP v0.1");
+            }
+            if (ImGui::MenuItem("Github")) {
+                openUrlWithDefaultBrowser("https://github.com/Aincvy/sight");
+            }
+        }
+
         void showMainMenuBar(UIStatus& uiStatus){
             if (ImGui::BeginMainMenuBar()){
                 if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.file)) {
@@ -198,25 +207,36 @@ namespace sight {
                     showMainCustomMenu();
                     ImGui::EndMenu();
                 }
+                if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.help)) {
+                    showHelpMenu();
+                    ImGui::EndMenu();
+                }
 
                 ImGui::EndMainMenuBar();
             }
         }
 
         void showDemoWindow(bool needInit){
-            // static SightImage sightImage;
-            // if (needInit) {
-            //     auto b = loadImage("/Volumes/mac_extend/extDocuments/图片/82411909_p0.png", &sightImage);
-            //     dbg(b);
-            // }
-
             ImGui::Begin("Test Window", &g_UIStatus->windowStatus.testWindow);
             ImGui::Text("this is first line.");
             ImGui::Text(u8"中文");
 
-            // if (sightImage.ready()) {
-            //     ImGui::Image(sightImage.textureId, ImVec2(sightImage.width, sightImage.height));
-            // }
+            static const char* a[] = {
+                "A",
+                "B",
+                "C",
+                "D"
+            };
+            static int index = 0;
+            if (ImGui::BeginCombo("Combo Test", a[index])) {
+                for( int i = 0; i < std::size(a); i++){
+                    if (ImGui::Selectable(a[i], i == index)) {
+                        index = i;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::Text(u8"在吗，这里是下一行");
 
             ImGui::End();
         }
@@ -276,7 +296,6 @@ namespace sight {
                     auto findResult = std::find(selection.selectedItems.begin(), selection.selectedItems.end(), nodeId);
                     bool isSelected = findResult != selection.selectedItems.end();
                     if (Selectable(static_cast<int>(nodeId), node.nodeName.c_str(), isSelected)) {
-                        dbg(node.nodeName);
                         auto pointer = graph->findNode(nodeId);
                         if (!pointer) {
                             dbg("error" , nodeId);
@@ -897,7 +916,6 @@ namespace sight {
         config.MergeMode = true;
         auto fontPointer = io.Fonts->AddFontFromFileTTF((resourceFolder + "font/FangZhengKaiTiJianTi-1.ttf").c_str(), 16, &config, io.Fonts->GetGlyphRangesChineseSimplifiedCommon());
         io.Fonts->Build();
-        dbg(fontPointer);
 
         g_UIStatus->io = &io;
 

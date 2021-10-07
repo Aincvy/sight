@@ -42,6 +42,7 @@ namespace sight {
         std::string path;
         std::string version;
         std::string author;
+        bool disabled = false;
 
         PluginManager* pluginManager = nullptr;
 

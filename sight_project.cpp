@@ -4,6 +4,7 @@
 
 #include "sight_project.h"
 #include "dbg.h"
+#include "imgui.h"
 #include "sight_js_parser.h"
 #include "sight_ui.h"
 #include "sight_util.h"
@@ -17,12 +18,15 @@
 #include <algorithm>
 #include <string>
 #include <sys/types.h>
+#include <tuple>
+#include <vector>
 
 namespace sight {
 
     using directory_iterator = std::filesystem::directory_iterator;
 
     static Project* g_Project = nullptr;
+    static TypeInfo emptyTypeInfo;
 
     namespace  {
         
@@ -258,31 +262,24 @@ namespace sight {
     }
 
     void Project::initTypeMap() {
-        std::string process = "Process";
-        std::string _string = "String";
-        const char* number = "Number";
+        addType("int", IntTypeInt);
+        addType("float", IntTypeFloat);
+        addType("double", IntTypeDouble);
+        addType("long", IntTypeLong);
+        addType("bool", IntTypeBool);
+        addType("Color", IntTypeColor);
+        addType("Vector3", IntTypeVector3);
+        addType("Vector4", IntTypeVector4);
+        addType("Process", IntTypeProcess);
+        addType("String", IntTypeString);
+        addType("Object", IntTypeObject);
+        addType("Number", IntTypeFloat);
 
-        typeMap[process] = IntTypeProcess;
-        lowerCase(process);
-        typeMap[process] = IntTypeProcess;
-
-        typeMap[_string] = IntTypeString;
-        lowerCase(_string);
-        typeMap[_string] = IntTypeString;
-
-        typeMap[number] = IntTypeFloat;
-        typeMap["int"] = IntTypeInt;
-        typeMap["float"] = IntTypeFloat;
-        typeMap["double"] = IntTypeDouble;
-        typeMap["long"] = IntTypeLong;
-        typeMap["bool"] = IntTypeBool;
-        typeMap["Color"] = IntTypeColor;
-        typeMap["Vector3"] = IntTypeVector3;
-        typeMap["Vector4"] = IntTypeVector4;
-
-        for (auto & item: typeMap) {
-            reverseTypeMap[item.second] = item.first;
-        }
+        // type alias
+        typeMap["process"] = IntTypeProcess;
+        typeMap["string"] = IntTypeString;
+        typeMap["object"] = IntTypeObject;
+        typeMap["number"] = IntTypeFloat;
     }
 
     uint Project::getIntType(const std::string &str, bool addIfNotFound) {
@@ -317,7 +314,7 @@ namespace sight {
         }
         dbg(targetPath);
         changeGraph(targetPath.c_str());
-        lastOpenGraph = path;
+        lastOpenGraph = targetPath;
         return getCurrentGraph();
     }
 
@@ -343,9 +340,9 @@ namespace sight {
     }
 
     std::string const &Project::getTypeName(int type) {
-        auto a = reverseTypeMap.find(type);
-        if (a != reverseTypeMap.end()) {
-            return a->second;
+        auto a = typeInfoMap.find(type);
+        if (a != typeInfoMap.end()) {
+            return a->second.name;
         }
         return emptyString;
     }
@@ -378,9 +375,41 @@ namespace sight {
     }
 
     uint Project::addType(std::string const& name, uint v) {
-        typeMap[name] = v;
-        reverseTypeMap[v] = name;
-        return v;
+        return this->addTypeInfo({
+            .name = name,
+            .intValue = v,
+        });
+    }
+
+    uint Project::addTypeInfo(TypeInfo info) {
+        if (info.intValue <= 0) {
+            info.intValue = ++typeIdIncr;
+        }
+
+        typeInfoMap[info.intValue] = info;
+        typeMap[info.name] = info.intValue;
+        return info.intValue;
+    }
+
+    TypeInfo const& Project::getTypeInfo(uint id, bool* isFind) {
+        auto iter = typeInfoMap.find(id);
+        if (iter == typeInfoMap.end()) {
+            if (isFind) {
+                *isFind = false;
+            }
+        } else {
+            if (isFind) {
+                *isFind = true;
+            }
+            return iter->second;
+        }
+        return emptyTypeInfo;
+    }
+
+    std::tuple<TypeInfo const&, bool> Project::findTypeInfo(uint id) {
+        bool find = false;
+        auto & typeInfo = getTypeInfo(id, &find);
+        return std::make_tuple(typeInfo, find);
     }
 
     std::string Project::pathGraphFolder() const {
@@ -442,6 +471,111 @@ namespace sight {
 
     uint addType(const std::string &name) {
         return g_Project->addType(name);
+    }
+
+    uint addTypeInfo(TypeInfo const& info) {
+        return g_Project->addTypeInfo(info);
+    }
+
+    TypeInfoRender::TypeInfoRender()
+    {
+        this->data.i = 0;
+    }
+
+    TypeInfoRender::TypeInfoRender(TypeInfoRender const& rhs)
+    {
+        // copy 
+        operator=(rhs);
+    }
+
+    TypeInfoRender::~TypeInfoRender()
+    {
+        freeData();
+    }
+
+    void TypeInfoRender::initData() {
+        switch (kind) {
+            case TypeInfoRenderKind::Default:
+            break;
+            case TypeInfoRenderKind::ComboBox:
+                auto& data = this->data.comboBox; 
+                data.selected = 0;
+                data.list = new std::vector<std::string>();
+                break;
+        }
+    }
+
+    void TypeInfoRender::freeData() {
+        if (this->kind == TypeInfoRenderKind::ComboBox) {
+            if (this->data.comboBox.list) {
+                delete this->data.comboBox.list;
+                this->data.comboBox.list = nullptr;
+            }
+            this->data.comboBox.selected = 0;
+        }
+    }
+
+    void TypeInfoRender::operator()(const char* labelBuf, SightNodeValue& value) const{
+        switch (kind) {
+        case TypeInfoRenderKind::Default:
+            break;
+        case TypeInfoRenderKind::ComboBox:
+            auto& data = this->data.comboBox;
+            if (data.list->empty()) {
+                ImGui::Text("combo-no-data");
+                break;
+            }
+
+            // this will not working on graph, but works on inspector.
+            // maybe i will fix it on someday.
+            // fixme: https://github.com/thedmd/imgui-node-editor/issues/101
+            if (ImGui::BeginCombo(labelBuf, data.list->at(value.i).c_str())) {
+                auto & list = *data.list;
+                for( int i = 0; i < list.size(); i++){
+                    if (ImGui::Selectable(list[i].c_str(), value.i == i)) {
+                        value.i = i;
+                    }
+                }
+
+                ImGui::EndCombo();
+            }
+            
+            break;
+        }
+    }
+
+    TypeInfoRender::operator bool() {
+        return kind != TypeInfoRenderKind::Default;
+    }
+
+    TypeInfoRender& TypeInfoRender::operator=(TypeInfoRender const& rhs) {
+        // copy
+        freeData();
+        this->kind = rhs.kind;
+        initData();
+
+        switch (kind) {
+        case TypeInfoRenderKind::Default:
+            break;
+        case TypeInfoRenderKind::ComboBox:
+            auto& data = this->data.comboBox;
+            auto & targetData = rhs.data;
+
+            data.list->assign(targetData.comboBox.list->begin(), targetData.comboBox.list->end()); 
+            data.selected = targetData.comboBox.selected;
+            break;
+        }
+        return *this;
+    }
+
+    void TypeInfo::initValue(SightNodeValue & value) const {
+        switch (render.kind) {
+        case TypeInfoRenderKind::Default:
+            break;
+        case TypeInfoRenderKind::ComboBox:
+            value.i = render.data.comboBox.selected;
+            break;
+        }
     }
     
 }

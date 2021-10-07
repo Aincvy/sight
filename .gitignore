@@ -16,3 +16,7 @@ build/*
 .cache/*
 .vscode/*
 .history/*
+
+imgui.ini
+
+project/*

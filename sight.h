@@ -45,6 +45,7 @@ namespace sight {
         CODE_PLUGIN_COMPILE_FAIL,
         CODE_PLUGIN_NO_DESCRIPTION,
         CODE_PLUGIN_FILE_ERROR,
+        CODE_PLUGIN_DISABLED,
     };
 
     /**
