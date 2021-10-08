@@ -13,6 +13,7 @@
 namespace sight {
 
     const std::string resourceFolder = "resources/";
+    const std::string whoAmI = "who-am-i";
 
     void exitSight(int v) {
 

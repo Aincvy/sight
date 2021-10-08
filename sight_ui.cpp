@@ -161,13 +161,27 @@ namespace sight {
             }
         }
 
+        auto abc() {
+            struct {
+                int a;
+                float b;
+            } s {101,201};
+            return s;
+        }
+
+        void t() {
+            auto [a, b] = abc();
+            dbg(a, b);
+        }
+
         void showMainCustomMenu(){
             if (ImGui::MenuItem("Trigger")) {
-                auto p = findTemplateNode("test/http/HttpGetReqNode");
-                dbg(p);
-                if (p) {
-                    dbg(serializeJsNode(*p));
-                }
+                // auto p = findTemplateNode("test/http/HttpGetReqNode");
+                // dbg(p);
+                // if (p) {
+                //     dbg(serializeJsNode(*p));
+                // }
+                t();
             }
             if (ImGui::MenuItem("Crash")) {
                 // produce a crash for test.
@@ -1005,12 +1019,12 @@ namespace sight {
 
     int addUICommand(UICommandType type, void *data, size_t dataLength, bool needFree) {
         UICommand command = {
-                type,
-                {
-                        .needFree = needFree,
-                        .data =  data,
-                        .dataLength = dataLength,
-                }
+            type,
+            {
+                .needFree = needFree,
+                .data = data,
+                .dataLength = dataLength,
+            }
         };
 
         return addUICommand(command);
@@ -1020,7 +1034,7 @@ namespace sight {
         auto async = g_UIStatus->uvAsync;
         async->data = copyObject(&command, sizeof(UICommand));
         uv_async_send(async);
-        printf("addUICommand ...\n");
+        dbg(command.type);
         return 0;
     }
 

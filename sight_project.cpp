@@ -10,7 +10,9 @@
 #include "sight_util.h"
 #include "sight.h"
 #include "sight_node_editor.h"
+#include "sight_memory.h"
 
+#include "sight_widgets.h"
 #include "yaml-cpp/yaml.h"
 
 #include "filesystem"
@@ -27,6 +29,9 @@ namespace sight {
 
     static Project* g_Project = nullptr;
     static TypeInfo emptyTypeInfo;
+
+    static SightArray<TypeStyle> typeStyleArray;
+    static TypeStyle defaultTypeStyle = { IM_COL32_WHITE, IconType::Circle };
 
     namespace  {
         
@@ -173,9 +178,14 @@ namespace sight {
         return baseDir + "project.yaml";
     }
 
+    std::string Project::pathStyleConfigFile() const {
+        return baseDir + "styles.yaml";
+    }
+
     int Project::load() {
         int i;
         CHECK_CODE(loadConfigFile(), i);
+        CHECK_CODE(loadStyleInfo(), i);
 
         return 0;
     }
@@ -183,8 +193,9 @@ namespace sight {
     int Project::save() {
         int i;
         CHECK_CODE(saveConfigFile(), i);
+        CHECK_CODE(saveStyleInfo(), i);
 
-        return 0;
+        return CODE_OK;
     }
 
     int Project::saveConfigFile() {
@@ -193,7 +204,9 @@ namespace sight {
         YAML::Emitter out;
 
         out << YAML::BeginMap;
+        out << YAML::Key << whoAmI << YAML::Value << "sight-project";
         out << YAML::Key << "nodeOrPortId" << YAML::Value << projectConfig.nodeOrPortId.load();
+        out << YAML::Key << "typeIdIncr" << YAML::Value << typeIdIncr.load();
         out << YAML::Key << "lastOpenGraph" << YAML::Value << lastOpenGraph;
 
         out << YAML::Key << "typeMap" << YAML::BeginMap;
@@ -203,6 +216,38 @@ namespace sight {
             }
 
             out << YAML::Key << item.first << YAML::Value << item.second;
+        }
+        out << YAML::EndMap;
+
+        out << YAML::EndMap;
+
+        // save file
+        std::ofstream outToFile(path, std::ios::out | std::ios::trunc);
+        outToFile << out.c_str() << std::endl;
+        outToFile.close();
+        return CODE_OK;
+    }
+
+    int Project::saveStyleInfo() {
+        auto path = pathStyleConfigFile();
+
+        YAML::Emitter out;
+
+        out << YAML::BeginMap;
+        out << YAML::Key << whoAmI << YAML::Value << "sight-styles";
+
+        out << YAML::Key << "typeMap" << YAML::BeginMap;
+        for (const auto& item : this->typeInfoMap) {
+            if (!item.second.style) {
+                continue;
+            }
+
+            out << YAML::Key << item.first;
+            out << YAML::BeginMap;
+            auto style = item.second.style;
+            out << YAML::Key << "icon" << YAML::Value << static_cast<int>(style->iconType);
+            out << YAML::Key << "color" << YAML::Value << style->color;
+            out << YAML::EndMap;
         }
         out << YAML::EndMap;
 
@@ -229,6 +274,7 @@ namespace sight {
         try {
             auto root = YAML::Load(fin);
             projectConfig.nodeOrPortId = root["nodeOrPortId"].as<uint>();
+            typeIdIncr = root["typeIdIncr"].as<uint>();
 
             auto temp = root["lastOpenGraph"];
             if (temp.IsDefined()) {
@@ -250,8 +296,56 @@ namespace sight {
         return CODE_OK;
     }
 
-    int Project::loadPlugin(const char *name) {
+    int Project::loadStyleInfo() {
+        std::string path = pathStyleConfigFile();
 
+        std::ifstream fin(path);
+        if (!fin.is_open()) {
+            return CODE_FILE_ERROR;
+        }
+
+        try {
+            auto root = YAML::Load(fin);
+            auto temp = root[whoAmI];
+            if (temp.IsDefined()) {
+                if (temp.as<std::string>() != "sight-styles") {
+                    dbg("style file who-am-i error", path);
+                    return CODE_FILE_ERROR;
+                }
+            }
+
+            temp = root["typeMap"];
+            if (temp.IsDefined()) {
+                for (const auto& item : temp) {
+                    auto id = item.first.as<uint>();
+                    TypeStyle typeStyle = {
+                        item.second["color"].as<uint>(),
+                        static_cast<IconType>(item.second["icon"].as<int>())
+                    };
+
+                    auto iter = typeInfoMap.find(id);
+                    if (iter == typeInfoMap.end()) {
+                        dbg("type not found.", id);
+                        continue;
+                    }
+
+                    auto& typeInfo = iter->second;
+                    if (typeInfo.style) {
+                        *typeInfo.style = typeStyle;
+                    } else {
+                        typeInfo.style = typeStyleArray.add(typeStyle);
+                    }
+                }
+            }
+
+        } catch (const YAML::BadConversion& e) {
+            dbg("load project config error.", path.c_str(), e.what());
+            return CODE_FILE_FORMAT_ERROR;
+        }
+        return CODE_OK;
+    }
+
+    int Project::loadPlugin(const char *name) {
 
         return 0;
     }
@@ -262,20 +356,22 @@ namespace sight {
     }
 
     void Project::initTypeMap() {
-        addType("int", IntTypeInt);
-        addType("float", IntTypeFloat);
-        addType("double", IntTypeDouble);
-        addType("long", IntTypeLong);
-        addType("bool", IntTypeBool);
-        addType("Color", IntTypeColor);
-        addType("Vector3", IntTypeVector3);
-        addType("Vector4", IntTypeVector4);
-        addType("Process", IntTypeProcess);
-        addType("String", IntTypeString);
-        addType("Object", IntTypeObject);
-        addType("Number", IntTypeFloat);
+
+        ImU32 color = IM_COL32(0, 99, 160, 255);
+        addTypeInfo({ .name = "Process", .intValue = IntTypeProcess }, { color, IconType::Flow });
+        addTypeInfo({ .name = "int", .intValue = IntTypeInt}, { color, IconType::Circle });
+        addTypeInfo({ .name = "float", .intValue = IntTypeFloat }, { color, IconType::Circle });
+        addTypeInfo({ .name = "double", .intValue = IntTypeDouble }, { color, IconType::Circle });
+        addTypeInfo({ .name = "long", .intValue = IntTypeLong }, { color, IconType::Circle });
+        addTypeInfo({ .name = "bool", .intValue = IntTypeBool }, { color, IconType::Circle });
+        addTypeInfo({ .name = "Color", .intValue = IntTypeColor }, { color, IconType::Circle });
+        addTypeInfo({ .name = "Vector3", .intValue = IntTypeVector3 }, { color, IconType::Circle });
+        addTypeInfo({ .name = "Vector4", .intValue = IntTypeVector4 }, { color, IconType::Circle });
+        addTypeInfo({ .name = "String", .intValue = IntTypeString }, { color, IconType::Circle });
+        addTypeInfo({ .name = "Object", .intValue = IntTypeObject }, { color, IconType::Circle });
 
         // type alias
+        typeMap["Number"] = IntTypeFloat;
         typeMap["process"] = IntTypeProcess;
         typeMap["string"] = IntTypeString;
         typeMap["object"] = IntTypeObject;
@@ -290,7 +386,7 @@ namespace sight {
             return addType(str);
         }
 
-        return -1;
+        return 0;
     }
 
     std::string Project::getBaseDir() const {
@@ -336,7 +432,7 @@ namespace sight {
 
     int Project::openFile(ProjectFile const& file) {
 
-        return CODE_OK;
+        return CODE_NOT_IMPLEMENTED;
     }
 
     std::string const &Project::getTypeName(int type) {
@@ -349,6 +445,11 @@ namespace sight {
 
     uint Project::addType(const std::string &name) {
         return addType(name, ++(typeIdIncr));
+    }
+
+    uint Project::addTypeInfo(TypeInfo info, bool merge) {
+        defaultTypeStyle.color = randomColor();
+        return this->addTypeInfo(info, defaultTypeStyle, merge);
     }
 
     std::string Project::pathSrcFolder() const {
@@ -381,13 +482,44 @@ namespace sight {
         });
     }
 
-    uint Project::addTypeInfo(TypeInfo info) {
-        if (info.intValue <= 0) {
-            info.intValue = ++typeIdIncr;
+    uint Project::addTypeInfo(TypeInfo info, TypeStyle const& typeStyle, bool merge) {
+        dbg(info.intValue, info.name);
+        uint id = 0;
+        if (info.intValue > 0) {
+            id = info.intValue;
+        } else {
+            id = getIntType(info.name);
         }
 
+        if (id > 0) {
+            auto iter = typeInfoMap.find(id);
+            if (iter != typeInfoMap.end()) {
+                if (merge) {
+                    iter->second.mergeFrom(info);
+
+                    if (info.style) {
+                        typeStyleArray.remove(info.style);
+                        info.style = nullptr;
+                    }
+                    dbg(iter->first, iter->second.name, "type merged.");
+                    return iter->first;
+                } else {
+                    dbg("already exist", info.intValue);
+                    return 0;
+                }
+            }
+        }
+
+        if (id <= 0) {
+            info.intValue = ++typeIdIncr;
+        } 
+        if (!info.style) {
+            info.style = typeStyleArray.add(typeStyle);
+            // info.style->init();
+        }
         typeInfoMap[info.intValue] = info;
         typeMap[info.name] = info.intValue;
+        dbg(info.intValue, info.name);
         return info.intValue;
     }
 
@@ -409,7 +541,8 @@ namespace sight {
     std::tuple<TypeInfo const&, bool> Project::findTypeInfo(uint id) {
         bool find = false;
         auto & typeInfo = getTypeInfo(id, &find);
-        return std::make_tuple(typeInfo, find);
+        return std::forward_as_tuple(typeInfo, find);
+        // return std::make_tuple(typeInfo, find);
     }
 
     std::string Project::pathGraphFolder() const {
@@ -455,6 +588,7 @@ namespace sight {
         g_Project = new Project(baseDir, createIfNotExist);
         auto code = g_Project->load();
         if (code == CODE_OK) {
+            dbg(baseDir);
             onProjectAndUILoadSuccess(g_Project);
         }
         return code;
@@ -473,8 +607,8 @@ namespace sight {
         return g_Project->addType(name);
     }
 
-    uint addTypeInfo(TypeInfo const& info) {
-        return g_Project->addTypeInfo(info);
+    uint addTypeInfo(TypeInfo const& info, bool merge) {
+        return g_Project->addTypeInfo(info, merge);
     }
 
     TypeInfoRender::TypeInfoRender()
@@ -576,6 +710,20 @@ namespace sight {
             value.i = render.data.comboBox.selected;
             break;
         }
+    }
+
+    void TypeInfo::mergeFrom(TypeInfo const& rhs) {
+        // id, name do not change.
+        this->fromNode = rhs.fromNode;
+        this->render = rhs.render;
+        // if (rhs.style) {
+        //     this->style = typeStyleArray.add((*rhs.style));
+        // }
+    }
+
+    void TypeStyle::init() {
+        this->iconType = IconType::Circle;
+        this->color = IM_COL32_WHITE;
     }
     
 }

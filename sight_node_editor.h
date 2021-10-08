@@ -162,7 +162,6 @@ namespace sight {
     struct SightJsNodeOptions{
         SightNodeProcessType processFlag = SightNodeProcessType::Normal;
 
-
     };
 
     /**

@@ -6,6 +6,11 @@ addType('ComboBox', {
 
 });
 
+addType('Student');
+addType('Key');
+addType('Glass');
+addType('Word');
+
 addTemplateNode({
     // meta info, start with __meta
 
@@ -21,8 +26,24 @@ addTemplateNode({
     __meta_inputs: {
     },
     __meta_outputs: {
-        grade: {
-            type: 'ComboBox',
+        // grade: {
+        //     type: 'ComboBox',
+        //     showValue: true,
+        // },
+        data: {
+            type: 'Student',
+            showValue: true,
+        },
+        key: {
+            type: 'Key',
+            showValue: true,
+        },
+        glass: {
+            type: 'Glass',
+            showValue: true,
+        },
+        word: {
+            type: 'Word',
             showValue: true,
         },
     },

@@ -10,6 +10,7 @@
 namespace sight {
 
     extern const std::string resourceFolder;
+    extern const std::string whoAmI;
 
     /**
      *
@@ -37,6 +38,7 @@ namespace sight {
     enum ErrorCode {
         CODE_OK = 0,
         CODE_FAIL = 1,
+        CODE_NOT_IMPLEMENTED,
 
         CODE_FILE_ERROR = 100,
         CODE_FILE_FORMAT_ERROR,

@@ -129,8 +129,8 @@ namespace sight {
 
         // print func
         void v8rPrint(const char *msg) {
-            printf("%s\n", msg);
-            
+            // printf("%s\n", msg);
+            dbg(msg);
         }
 
         void v8AddType(const FunctionCallbackInfo<Value>& args) {
@@ -224,7 +224,7 @@ namespace sight {
             addTypeInfo({
                 .name = name,
                 .render = render,
-            });
+            }, true);
         }
 
         void v8AddNode(SightJsNode& node) {
@@ -509,7 +509,7 @@ namespace sight {
                 std::move(isolate_scope),
         };
 
-        logDebug("init js over.\n");
+        logDebug("init js over.");
         return 0;
     }
 
@@ -604,7 +604,7 @@ namespace sight {
                 .set("isPart", &GenerateOptions::isPart)
                 ;
 
-        logDebug("init js bindings over!\n");
+        logDebug("init js bindings over!");
         return 0;
     }
 

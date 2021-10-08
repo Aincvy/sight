@@ -3,13 +3,15 @@
 //
 #include "stdio.h"
 
+#include "sight_defines.h"
 #include "sight_log.h"
 
 namespace sight {
 
     int logDebug(const char *msg) {
-        printf("%s", msg);
+        dbg(msg);
 
         return 0;
     }
+    
 }

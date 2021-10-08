@@ -108,109 +108,218 @@ namespace sight {
             ed::Resume();
         }
 
-        void showNodePortIcon(uint type, ImColor color, bool isConnected = false){
+        void showNodePortIcon(IconType iconType, ImColor color, bool isConnected = false) {
             auto cursorPos = ImGui::GetCursorScreenPos();
-            auto drawList  = ImGui::GetWindowDrawList();
+            auto drawList = ImGui::GetWindowDrawList();
             const int iconSize = 20;
             const ImVec2 size(iconSize, iconSize);
             auto rect = ImRect(cursorPos, cursorPos + size);
-            auto rect_x         = rect.Min.x;
-            auto rect_y         = rect.Min.y;
-            auto rect_w         = rect.Max.x - rect.Min.x;
-            auto rect_h         = rect.Max.y - rect.Min.y;
-            auto rect_center_x  = (rect.Min.x + rect.Max.x) * 0.5f;
-            auto rect_center_y  = (rect.Min.y + rect.Max.y) * 0.5f;
-            auto rect_center    = ImVec2(rect_center_x, rect_center_y);
-            const auto outline_scale  = rect_w / 24.0f;
-            const auto extra_segments = static_cast<int>(2 * outline_scale); // for full circle
-            // auto color = ImColor(0,99,160,255);
-            const auto c = rect_center;
-            auto triangleStart = rect_center_x + 0.32f * rect_w;
+            auto rect_x = rect.Min.x;
+            auto rect_y = rect.Min.y;
+            auto rect_w = rect.Max.x - rect.Min.x;
+            auto rect_h = rect.Max.y - rect.Min.y;
+            auto rect_center_x = (rect.Min.x + rect.Max.x) * 0.5f;
+            auto rect_center_y = (rect.Min.y + rect.Max.y) * 0.5f;
+            auto rect_center = ImVec2(rect_center_x, rect_center_y);
+            const auto outline_scale = rect_w / 24.0f;
+            const auto extra_segments = static_cast<int>(2 * outline_scale);     // for full circle
             auto alpha = 255;
             auto innerColor = ImColor(32, 32, 32, alpha);
 
-            bool drawTriangle = true;
-            switch (type) {
-                case IntTypeProcess:
+            
+            if (iconType == IconType::Flow) {
+                const auto origin_scale = rect_w / 24.0f;
+
+                const auto offset_x = 1.0f * origin_scale;
+                const auto offset_y = 0.0f * origin_scale;
+                const auto margin = (isConnected ? 2.0f : 2.0f) * origin_scale;
+                const auto rounding = 0.1f * origin_scale;
+                const auto tip_round = 0.7f;     // percentage of triangle edge (for tip)
+                //const auto edge_round = 0.7f; // percentage of triangle edge (for corner)
+                const auto canvas = ImRect(
+                    rect.Min.x + margin + offset_x,
+                    rect.Min.y + margin + offset_y,
+                    rect.Max.x - margin + offset_x,
+                    rect.Max.y - margin + offset_y);
+                const auto canvas_x = canvas.Min.x;
+                const auto canvas_y = canvas.Min.y;
+                const auto canvas_w = canvas.Max.x - canvas.Min.x;
+                const auto canvas_h = canvas.Max.y - canvas.Min.y;
+
+                const auto left = canvas_x + canvas_w * 0.5f * 0.3f;
+                const auto right = canvas_x + canvas_w - canvas_w * 0.5f * 0.3f;
+                const auto top = canvas_y + canvas_h * 0.5f * 0.2f;
+                const auto bottom = canvas_y + canvas_h - canvas_h * 0.5f * 0.2f;
+                const auto center_y = (top + bottom) * 0.5f;
+                //const auto angle = AX_PI * 0.5f * 0.5f * 0.5f;
+
+                const auto tip_top = ImVec2(canvas_x + canvas_w * 0.5f, top);
+                const auto tip_right = ImVec2(right, center_y);
+                const auto tip_bottom = ImVec2(canvas_x + canvas_w * 0.5f, bottom);
+
+                drawList->PathLineTo(ImVec2(left, top) + ImVec2(0, rounding));
+                drawList->PathBezierCurveTo(
+                    ImVec2(left, top),
+                    ImVec2(left, top),
+                    ImVec2(left, top) + ImVec2(rounding, 0));
+                drawList->PathLineTo(tip_top);
+                drawList->PathLineTo(tip_top + (tip_right - tip_top) * tip_round);
+                drawList->PathBezierCurveTo(
+                    tip_right,
+                    tip_right,
+                    tip_bottom + (tip_right - tip_bottom) * tip_round);
+                drawList->PathLineTo(tip_bottom);
+                drawList->PathLineTo(ImVec2(left, bottom) + ImVec2(rounding, 0));
+                drawList->PathBezierCurveTo(
+                    ImVec2(left, bottom),
+                    ImVec2(left, bottom),
+                    ImVec2(left, bottom) - ImVec2(0, rounding));
+
+                if (!isConnected) {
+                    if (innerColor & 0xFF000000)
+                        drawList->AddConvexPolyFilled(drawList->_Path.Data, drawList->_Path.Size, innerColor);
+
+                    drawList->PathStroke(color, true, 2.0f * outline_scale);
+                } else
+                    drawList->PathFillConvex(color);
+                
+            } else {
+                bool drawTriangle = true;
+                auto triangleStart = rect_center_x + 0.32f * rect_w;
+                auto rect_offset = -static_cast<int>(rect_w * 0.25f * 0.25f);
+
+                rect.Min.x += rect_offset;
+                rect.Max.x += rect_offset;
+                rect_x += rect_offset;
+                rect_center_x += rect_offset * 0.5f;
+                rect_center.x += rect_offset * 0.5f;
+
+                switch (iconType) {
+                case IconType::Square:
+                {
+                    if (isConnected) {
+                        const auto r = 0.5f * rect_w / 2.0f;
+                        const auto p0 = rect_center - ImVec2(r, r);
+                        const auto p1 = rect_center + ImVec2(r, r);
+
+                        drawList->AddRectFilled(p0, p1, color, 0, 15 + extra_segments);
+                    } else {
+                        const auto r = 0.5f * rect_w / 2.0f - 0.5f;
+                        const auto p0 = rect_center - ImVec2(r, r);
+                        const auto p1 = rect_center + ImVec2(r, r);
+
+                        if (innerColor & 0xFF000000)
+                            drawList->AddRectFilled(p0, p1, innerColor, 0, 15 + extra_segments);
+
+                        drawList->AddRect(p0, p1, color, 0, 15 + extra_segments, 2.0f * outline_scale);
+                    }
+                    break;
+                }
+                case IconType::Grid:
+                {
+                    const auto r = 0.5f * rect_w / 2.0f;
+                    const auto w = ceilf(r / 3.0f);
+
+                    const auto baseTl = ImVec2(floorf(rect_center_x - w * 2.5f), floorf(rect_center_y - w * 2.5f));
+                    const auto baseBr = ImVec2(floorf(baseTl.x + w), floorf(baseTl.y + w));
+
+                    auto tl = baseTl;
+                    auto br = baseBr;
+                    for (int i = 0; i < 3; ++i) {
+                        tl.x = baseTl.x;
+                        br.x = baseBr.x;
+                        drawList->AddRectFilled(tl, br, color);
+                        tl.x += w * 2;
+                        br.x += w * 2;
+                        if (i != 1 || isConnected)
+                            drawList->AddRectFilled(tl, br, color);
+                        tl.x += w * 2;
+                        br.x += w * 2;
+                        drawList->AddRectFilled(tl, br, color);
+
+                        tl.y += w * 2;
+                        br.y += w * 2;
+                    }
+
+                    triangleStart = br.x + w + 1.0f / 24.0f * rect_w;
+                    break;
+                }
+                case IconType::RoundSquare:
                 {
                     drawTriangle = false;
-                    const auto origin_scale = rect_w / 24.0f;
+                    if (isConnected) {
+                        const auto r = 0.5f * rect_w / 2.0f;
+                        const auto cr = r * 0.5f;
+                        const auto p0 = rect_center - ImVec2(r, r);
+                        const auto p1 = rect_center + ImVec2(r, r);
 
-                    const auto offset_x  = 1.0f * origin_scale;
-                    const auto offset_y  = 0.0f * origin_scale;
-                    const auto margin     = (isConnected ? 2.0f : 2.0f) * origin_scale;
-                    const auto rounding   = 0.1f * origin_scale;
-                    const auto tip_round  = 0.7f; // percentage of triangle edge (for tip)
-                    //const auto edge_round = 0.7f; // percentage of triangle edge (for corner)
-                    const auto canvas = ImRect(
-                            rect.Min.x + margin + offset_x,
-                            rect.Min.y + margin + offset_y,
-                            rect.Max.x - margin + offset_x,
-                            rect.Max.y - margin + offset_y);
-                    const auto canvas_x = canvas.Min.x;
-                    const auto canvas_y = canvas.Min.y;
-                    const auto canvas_w = canvas.Max.x - canvas.Min.x;
-                    const auto canvas_h = canvas.Max.y - canvas.Min.y;
+                        drawList->AddRectFilled(p0, p1, color, cr, 15);
+                    } else {
+                        const auto r = 0.5f * rect_w / 2.0f - 0.5f;
+                        const auto cr = r * 0.5f;
+                        const auto p0 = rect_center - ImVec2(r, r);
+                        const auto p1 = rect_center + ImVec2(r, r);
 
-                    const auto left   = canvas_x + canvas_w            * 0.5f * 0.3f;
-                    const auto right  = canvas_x + canvas_w - canvas_w * 0.5f * 0.3f;
-                    const auto top    = canvas_y + canvas_h            * 0.5f * 0.2f;
-                    const auto bottom = canvas_y + canvas_h - canvas_h * 0.5f * 0.2f;
-                    const auto center_y = (top + bottom) * 0.5f;
-                    //const auto angle = AX_PI * 0.5f * 0.5f * 0.5f;
+                        if (innerColor & 0xFF000000)
+                            drawList->AddRectFilled(p0, p1, innerColor, cr, 15);
 
-                    const auto tip_top    = ImVec2(canvas_x + canvas_w * 0.5f, top);
-                    const auto tip_right  = ImVec2(right, center_y);
-                    const auto tip_bottom = ImVec2(canvas_x + canvas_w * 0.5f, bottom);
+                        drawList->AddRect(p0, p1, color, cr, 15, 2.0f * outline_scale);
+                    }
+                    break;
+                }
+                case IconType::Diamond:
+                {
+                    drawTriangle = false;
+                    if (isConnected) {
+                        const auto r = 0.607f * rect_w / 2.0f;
+                        const auto c = rect_center;
 
-                    drawList->PathLineTo(ImVec2(left, top) + ImVec2(0, rounding));
-                    drawList->PathBezierCurveTo(
-                            ImVec2(left, top),
-                            ImVec2(left, top),
-                            ImVec2(left, top) + ImVec2(rounding, 0));
-                    drawList->PathLineTo(tip_top);
-                    drawList->PathLineTo(tip_top + (tip_right - tip_top) * tip_round);
-                    drawList->PathBezierCurveTo(
-                            tip_right,
-                            tip_right,
-                            tip_bottom + (tip_right - tip_bottom) * tip_round);
-                    drawList->PathLineTo(tip_bottom);
-                    drawList->PathLineTo(ImVec2(left, bottom) + ImVec2(rounding, 0));
-                    drawList->PathBezierCurveTo(
-                            ImVec2(left, bottom),
-                            ImVec2(left, bottom),
-                            ImVec2(left, bottom) - ImVec2(0, rounding));
+                        drawList->PathLineTo(c + ImVec2(0, -r));
+                        drawList->PathLineTo(c + ImVec2(r, 0));
+                        drawList->PathLineTo(c + ImVec2(0, r));
+                        drawList->PathLineTo(c + ImVec2(-r, 0));
+                        drawList->PathFillConvex(color);
+                    } else {
+                        const auto r = 0.607f * rect_w / 2.0f - 0.5f;
+                        const auto c = rect_center;
 
-                    if (!isConnected)
-                    {
+                        drawList->PathLineTo(c + ImVec2(0, -r));
+                        drawList->PathLineTo(c + ImVec2(r, 0));
+                        drawList->PathLineTo(c + ImVec2(0, r));
+                        drawList->PathLineTo(c + ImVec2(-r, 0));
+
                         if (innerColor & 0xFF000000)
                             drawList->AddConvexPolyFilled(drawList->_Path.Data, drawList->_Path.Size, innerColor);
 
                         drawList->PathStroke(color, true, 2.0f * outline_scale);
                     }
-                    else
-                        drawList->PathFillConvex(color);
                     break;
                 }
+                case IconType::Circle:
                 default:
                 {
-                    if (isConnected) {
+                    const auto c = rect_center;
+
+                    if (!isConnected) {
+                        const auto r = 0.5f * rect_w / 2.0f - 0.5f;
+
+                        if (innerColor & 0xFF000000)
+                            drawList->AddCircleFilled(c, r, innerColor, 12 + extra_segments);
+                        drawList->AddCircle(c, r, color, 12 + extra_segments, 2.0f * outline_scale);
+                    } else
                         drawList->AddCircleFilled(c, 0.5f * rect_w / 2.0f, color, 12 + extra_segments);
-                    } else {
-                        drawList->AddCircle(c, 0.5f * rect_w / 2.0f, color, 12 + extra_segments,1.35f);
-                    }
                     break;
                 }
+                }
 
-            }
-
-            if (drawTriangle) {
-                const auto triangleTip = triangleStart + rect_w * (0.45f - 0.32f);
-                drawList->AddTriangleFilled(
+                if (drawTriangle) {
+                    const auto triangleTip = triangleStart + rect_w * (0.45f - 0.32f);
+                    drawList->AddTriangleFilled(
                         ImVec2(ceilf(triangleTip), rect_y + rect_h * 0.5f),
                         ImVec2(triangleStart, rect_center_y + 0.15f * rect_h),
                         ImVec2(triangleStart, rect_center_y - 0.15f * rect_h),
                         color);
+                }
             }
 
             ImGui::Dummy(size);
@@ -227,13 +336,17 @@ namespace sight {
             }
 
             auto color = ImColor(0,99,160,255);
+            auto project = currentProject();
+            auto [typeProcess, _] = project->findTypeInfo(IntTypeProcess);
+            // dbg(typeProcess.name, typeProcess.intValue, typeProcess.style);
 
             ed::BeginNode(node->nodeId);
             ImGui::Dummy(ImVec2(7,5));
             auto chainInPort = node->chainInPort;
             if (chainInPort) {
                 ed::BeginPin(chainInPort->id, ed::PinKind::Input);
-                showNodePortIcon(IntTypeProcess, color, chainInPort->isConnect());
+                showNodePortIcon(typeProcess.style->iconType, typeProcess.style->color, chainInPort->isConnect());
+                // ImGui::Dummy(ImVec2(20, 20));
                 ed::EndPin();
                 ImGui::SameLine();
             }
@@ -244,7 +357,8 @@ namespace sight {
             if (chainOutPort) {
                 ImGui::SameLine();
                 ed::BeginPin(chainOutPort->id, ed::PinKind::Output);
-                showNodePortIcon(IntTypeProcess, color, chainOutPort->isConnect());
+                showNodePortIcon(typeProcess.style->iconType, typeProcess.style->color, chainOutPort->isConnect());
+                // ImGui::Dummy(ImVec2(20, 20));
                 ed::EndPin();
             }
             ImGui::Dummy(ImVec2(0,3));
@@ -266,17 +380,28 @@ namespace sight {
                 ed::BeginPin(item.id, ed::PinKind::Input);
                 ed::PinPivotAlignment(ImVec2(0, 0.5f));
                 ed::PinPivotSize(ImVec2(0, 0));
-                showNodePortIcon(item.type, color, item.isConnect());
+
+                // port icon
+                auto [tmpTypeInfo, find] = project->findTypeInfo(item.getType());
+                if (!find || !tmpTypeInfo.style) {
+                    showNodePortIcon(IconType::Circle, color, item.isConnect());
+                } else {
+                    showNodePortIcon(tmpTypeInfo.style->iconType, tmpTypeInfo.style->color, item.isConnect());
+                }
+                // ImGui::Dummy(ImVec2(20, 20));
+
                 ImGui::SameLine();
                 ImGui::Text("%s", item.portName.c_str());
                 ed::EndPin();
             }
 
             ImGuiEx_NextColumn();
+            dbg("begin outputs");
             for (SightNodePort &item : node->outputPorts) {
                 if (item.portName.empty()) {
                     continue;       // do not show the chain port. (Process port)
                 }
+                dbg(item.portName, item.getType());
 
                 // test value
                 if (item.type == IntTypeProcess || !item.options.showValue){
@@ -291,9 +416,20 @@ namespace sight {
                 ed::PinPivotSize(ImVec2(0, 0));
                 ImGui::Text("%s", item.portName.c_str());
                 ImGui::SameLine();
-                showNodePortIcon(item.type, color, item.isConnect());
+
+                // port icon
+                auto [tmpTypeInfo, find] = project->findTypeInfo(item.getType());
+                if (!find || !tmpTypeInfo.style) {
+                    showNodePortIcon(IconType::Circle, color, item.isConnect());
+                } else {
+                    showNodePortIcon(tmpTypeInfo.style->iconType, tmpTypeInfo.style->color, item.isConnect());
+                }
+                // ImGui::Dummy(ImVec2(20,20));
+                // ImGui::Text("new line?");
+
                 ed::EndPin();
             }
+            dbg("end outputs");
 
             ImGuiEx_EndColumn();
             ed::EndNode();
@@ -320,7 +456,7 @@ namespace sight {
 
             // Submit Links
             for (const auto &connection : CURRENT_GRAPH->getConnections()) {
-                ed::Link(connection.connectionId, connection.leftPortId(), connection.rightPortId());
+                // ed::Link(connection.connectionId, connection.leftPortId(), connection.rightPortId());
             }
 
             //
@@ -1020,11 +1156,9 @@ namespace sight {
                             port.value.b = valueNode.as<bool>();
                             break;
                         case IntTypeProcess:
-                            dbg("IntTypeProcess" , portName);
+                            // dbg("IntTypeProcess" , portName);
                             break;
                         default:
-                            dbg("type error, unHandled", type, getTypeName(type));
-                            // port.value.i = 0;
                             {
                                 if (!isBuiltInType(type)) {
                                     //
@@ -1036,10 +1170,12 @@ namespace sight {
                                             break;
                                         case TypeInfoRenderKind::Default:
                                         default:
-                                            
+                                            dbg("type error, unHandled", type, getTypeName(type));
                                             break;
                                         }
                                     }
+                                }else {
+                                    dbg("type error, unHandled", type, getTypeName(type));
                                 } 
                             }
                             break;

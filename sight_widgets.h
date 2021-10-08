@@ -155,6 +155,8 @@ namespace sight {
 
     void openUrlWithDefaultBrowser(std::string const& urlString);
 
+    ImU32 randomColor(bool randomAlpha = false);
+
     /**
      * @brief 
      * 
@@ -173,7 +175,5 @@ namespace sight {
     inline ImVec4 rgb(int r, int g, int b) {
         return rgba(r, g, b, 255);
     }
-
-
 
 }

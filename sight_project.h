@@ -7,6 +7,7 @@
 #include <string>
 #include <tuple>
 #include <vector>
+#include <map>
 #include "atomic"
 #include "sys/types.h"
 
@@ -15,6 +16,7 @@
 namespace sight {
 
     union SightNodeValue;
+    class SightNodeGraph;
 
     enum TypeIntValues {
         IntTypeProcess = 1,
@@ -39,7 +41,31 @@ namespace sight {
         ComboBox,
 
     };
-    
+
+    /**
+     * @brief Copy from imgui-node-editor/examples/buildprints-example/utilities/drawing.h
+     * 
+     */
+    enum class IconType {
+        Flow = 100,
+        Circle,
+        Square,
+        Grid,
+        RoundSquare,
+        Diamond
+    };
+
+    /**
+     * @brief Used for port icon.
+     * 
+     */
+    struct TypeStyle {
+        uint color = 0;
+        IconType iconType = IconType::Circle;
+
+        void init();
+    };
+
     struct TypeInfoRender {
         TypeInfoRenderKind kind = TypeInfoRenderKind::Default;
         // if asIntType > 0, then it's value should be one of TypeIntValues
@@ -80,30 +106,28 @@ namespace sight {
     struct TypeInfo {
         // typename
         std::string name;
+        // id
         uint intValue = 0;
         // does this type from a node ? ( > 0)
         uint fromNode = 0;
 
+        TypeStyle* style = nullptr;
         TypeInfoRender render;
 
         void initValue(SightNodeValue & value) const;
 
-        
+        /**
+         * @brief Only merge fromNode, render,
+         * 
+         * @param rhs 
+         */
+        void mergeFrom(TypeInfo const& rhs);
     };
 
-    /**
-     * todo colors
-     */
-    struct SightNodeStyles {
-
-    };
 
     struct ProjectConfig {
         std::atomic<uint> nodeOrPortId = 3000;
     };
-
-    class SightNodeGraph;
-
 
 
     /**
@@ -154,6 +178,12 @@ namespace sight {
 
         int load();
         int loadConfigFile();
+        /**
+         * @brief load type style, 
+         * 
+         * @return int 
+         */
+        int loadStyleInfo();
 
         /**
          * load all need plugins
@@ -170,6 +200,7 @@ namespace sight {
 
         int save();
         int saveConfigFile();
+        int saveStyleInfo();
 
 
         /**
@@ -193,7 +224,16 @@ namespace sight {
          */
         uint addType(std::string const& name);
 
-        uint addTypeInfo(TypeInfo info);
+        uint addTypeInfo(TypeInfo info, bool merge = false);
+
+        /**
+         * @brief 
+         * 
+         * @param info if info has a style, and info need merge, then the style will be free.
+         * @param merge 
+         * @return uint 0=add fail. 
+         */
+        uint addTypeInfo(TypeInfo info, TypeStyle const& typeStyle, bool merge = false);
 
         TypeInfo const& getTypeInfo(uint id, bool* isFind = nullptr);
 
@@ -238,6 +278,8 @@ namespace sight {
         std::atomic<uint> typeIdIncr;
         absl::btree_map<std::string, uint> typeMap;
         absl::btree_map<uint, TypeInfo> typeInfoMap;
+        // absl::btree_map<uint, TypeStyle> typeStyleMap;
+        std::map<uint, TypeStyle> typeStyleMap;
 
         std::string lastOpenGraph{};
 
@@ -246,6 +288,7 @@ namespace sight {
 
         // file locations
         std::string pathConfigFile() const;
+        std::string pathStyleConfigFile() const;
 
         std::string pathSrcFolder() const;
         std::string pathTargetFolder() const;
@@ -299,10 +342,12 @@ namespace sight {
      */
     uint addType(std::string const& name);
 
-    uint addTypeInfo(TypeInfo const& info);
+    uint addTypeInfo(TypeInfo const& info, bool merge = false);
     
     bool inline isBuiltInType(uint type){
         return type < IntTypeNext;
     }
+
+
 
 }

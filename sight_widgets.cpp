@@ -1,4 +1,5 @@
 #include "sight_widgets.h"
+#include "dbg.h"
 #include "nfd.h"
 #include "sight.h"
 #include "sight_defines.h"
@@ -15,6 +16,7 @@
 #include <cstdlib>
 #include <string>
 #include <vector>
+#include <random>
 
 #include "GLFW/glfw3.h"
 
@@ -291,6 +293,21 @@ namespace sight {
 #elif _WIN32
         system(("start " + urlString).c_str());
 #endif
+    }
+
+    ImU32 randomColor(bool randomAlpha) {
+        int r,g,b,a = 255;
+        std::random_device device;
+        std::mt19937 rng(device());
+        std::uniform_int_distribution<std::mt19937::result_type> range(0,255);
+        r = range(rng);
+        g = range(rng);
+        b = range(rng);
+        if (randomAlpha) {
+            a = range(rng);
+        }
+        // dbg(r,g,b,a);
+        return IM_COL32(r,g,b,a);
     }
 
     SightKey::SightKey(ushort code)

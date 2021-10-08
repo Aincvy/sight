@@ -261,3 +261,18 @@ addTemplateNode({
 
 });
 
+
+function addType(type, options) {
+
+}
+
+addType('ComboBox', {
+    // kind must be the first prop.
+    kind: 'combo box',
+    data: ['A','B','C','D'],
+    defaultValue: 'A',
+    serialize: 'int',
+    
+});
+
+addType('MyString');
