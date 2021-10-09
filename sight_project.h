@@ -269,6 +269,8 @@ namespace sight {
 
         absl::btree_map<std::string, BuildTarget> & getBuildTargetMap();
 
+        absl::btree_map<uint, TypeInfo> const& getTypeInfoMap() const;
+
     private:
         std::string baseDir;
         bool createIfNotExist;
@@ -278,8 +280,6 @@ namespace sight {
         std::atomic<uint> typeIdIncr;
         absl::btree_map<std::string, uint> typeMap;
         absl::btree_map<uint, TypeInfo> typeInfoMap;
-        // absl::btree_map<uint, TypeStyle> typeStyleMap;
-        std::map<uint, TypeStyle> typeStyleMap;
 
         std::string lastOpenGraph{};
 
@@ -343,7 +343,13 @@ namespace sight {
     uint addType(std::string const& name);
 
     uint addTypeInfo(TypeInfo const& info, bool merge = false);
-    
+
+    std::tuple<const char**, size_t> getIconTypeStrings();
+
+    const char* getIconTypeName(IconType iconType);
+
+
+
     bool inline isBuiltInType(uint type){
         return type < IntTypeNext;
     }

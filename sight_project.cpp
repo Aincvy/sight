@@ -18,6 +18,7 @@
 #include "filesystem"
 #include "fstream"
 #include <algorithm>
+#include <iterator>
 #include <string>
 #include <sys/types.h>
 #include <tuple>
@@ -32,6 +33,7 @@ namespace sight {
 
     static SightArray<TypeStyle> typeStyleArray;
     static TypeStyle defaultTypeStyle = { IM_COL32_WHITE, IconType::Circle };
+    static const char* iconTypeStrings[] = { "Flow", "Circle", "Square","Grid","RoundSquare","Diamond" };
 
     namespace  {
         
@@ -464,6 +466,10 @@ namespace sight {
         return baseDir + "plugins/";
     }
 
+    absl::btree_map<uint, TypeInfo> const& Project::getTypeInfoMap() const {
+        return typeInfoMap;
+    }
+
     std::string Project::pathEntityFolder() const {
         return pathSrcFolder() + "entity/";
     }
@@ -609,6 +615,14 @@ namespace sight {
 
     uint addTypeInfo(TypeInfo const& info, bool merge) {
         return g_Project->addTypeInfo(info, merge);
+    }
+
+    std::tuple<const char**, size_t> getIconTypeStrings() {
+        return std::make_tuple(iconTypeStrings, std::size(iconTypeStrings));
+    }
+
+    const char* getIconTypeName(IconType iconType) {
+        return iconTypeStrings[static_cast<int>(iconType) - static_cast<int>(IconType::Flow)];
     }
 
     TypeInfoRender::TypeInfoRender()

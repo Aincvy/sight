@@ -809,6 +809,7 @@ namespace sight {
         auto p = new SightNode();
         p->copyFrom(this, true);
         p->tryAddChainPorts();
+        p->graph = CURRENT_GRAPH;
 
         if (!generateId) {
             return p;
@@ -1164,7 +1165,7 @@ namespace sight {
                                             break;
                                         case TypeInfoRenderKind::Default:
                                         default:
-                                            dbg("type error, unHandled", type, getTypeName(type));
+                                            dbg("no-render-function", type, getTypeName(type));
                                             break;
                                         }
                                     }

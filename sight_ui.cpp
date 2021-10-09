@@ -150,7 +150,7 @@ namespace sight {
             }
             ImGui::Separator();
             if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.parseGraph)) {
-                addJsCommand(JsCommandType::ParseGraph, "./simple.yaml");
+                // addJsCommand(JsCommandType::ParseGraph, "./simple.yaml");
             }
             if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.projectSaveConfig)) {
                 currentProject()->saveConfigFile();
@@ -158,6 +158,13 @@ namespace sight {
             if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.reload, "Ctrl+R")) {
                 currentProject()->buildFilesCache();
                 dbg("reload");
+            }
+            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.settings)) {
+                if (g_UIStatus->windowStatus.projectSettingsWindow) {
+                    ImGui::SetWindowFocus(WINDOW_LANGUAGE_KEYS.projectSettings);
+                } else {
+                    g_UIStatus->windowStatus.projectSettingsWindow = true;
+                }
             }
         }
 
@@ -193,6 +200,11 @@ namespace sight {
         void showHelpMenu(){
             if (ImGui::MenuItem("About")) {
                 dbg("sight WIP v0.1");
+                if (g_UIStatus->windowStatus.aboutWindow) {
+                    ImGui::SetWindowFocus(WINDOW_LANGUAGE_KEYS.about);
+                } else {
+                    g_UIStatus->windowStatus.aboutWindow = true;
+                }
             }
             if (ImGui::MenuItem("Github")) {
                 openUrlWithDefaultBrowser("https://github.com/Aincvy/sight");
@@ -574,6 +586,100 @@ namespace sight {
 
             ImGui::End();
         }
+
+        void showAboutWindow(){
+            if (ImGui::Begin(WINDOW_LANGUAGE_KEYS.about, &g_UIStatus->windowStatus.aboutWindow)) {
+                ImGui::Text("Sight WIP v0.1");
+                ImGui::Text("Author: aincvy(aincvy@gmail.com)");
+                
+                ImGui::Dummy(ImVec2(0,15));
+                if (ImGui::Button("Close")) {
+                    g_UIStatus->windowStatus.aboutWindow = false;
+                }
+                ImGui::End();
+            }
+        }
+
+        void showProjectSettingsWindow(){
+            static bool panelBasic = true, panelTypes = false;
+
+            auto resetFlags = [&](){
+                panelBasic = false;
+                panelTypes = false;
+            };
+
+            ImGui::SetNextWindowSize(ImVec2(600,440), ImGuiCond_FirstUseEver);
+            if (ImGui::Begin(WINDOW_LANGUAGE_KEYS.projectSettings, &g_UIStatus->windowStatus.projectSettingsWindow)) {
+                
+                // left panel
+                ImGui::BeginChild("left panel", ImVec2(150,0), true);
+                if (ImGui::Selectable("Basic", panelBasic)) {
+                    resetFlags();
+                    panelBasic = true;
+                }
+                if (ImGui::Selectable("Types", panelTypes)) {
+                    resetFlags();
+                    panelTypes = true;
+                }
+                ImGui::EndChild();
+                ImGui::SameLine();
+
+                // right panel
+                ImGui::BeginGroup();
+                ImGui::BeginChild("right panel", ImVec2(0, -ImGui::GetFrameHeightWithSpacing()));
+                if (panelBasic) {
+                    ImGui::Text("Basic Info");
+                } else if (panelTypes) {
+                    ImGui::Text("Types");
+                }
+                ImGui::Separator();
+                if (panelBasic) {
+                    ImGui::Text("panelBasic");
+                    // show some project basic info.
+
+                } else if (panelTypes) {
+                    // show types.
+                    auto typeInfoMap =currentProject()->getTypeInfoMap();
+                    for( const auto& [key, value]: typeInfoMap){
+                        ImGui::Text("%4d: %8s", key, value.name.c_str());
+                        // show style
+                        if (value.style) {
+                            auto style = value.style;
+                            ImGui::SameLine();
+                            ImGui::SetNextItemWidth(120);
+                            char labelBuf[LITTLE_NAME_BUF_SIZE]{ 0 };
+                            sprintf(labelBuf, "##style.iconType-%d", key);
+                            if (ImGui::BeginCombo(labelBuf, getIconTypeName(style->iconType))) {
+                                auto [iconNames, iconSize] = getIconTypeStrings();
+                                for (int i = 0; i < iconSize; i++) {
+                                    auto tmpIndex = static_cast<int>(IconType::Flow);
+                                    if (ImGui::Selectable(iconNames[i], i == static_cast<int>(style->iconType) - tmpIndex)) {
+                                        style->iconType = static_cast<IconType>(tmpIndex + i);
+                                    }
+                                }
+                                
+                                ImGui::EndCombo();
+                            }
+
+                            ImGui::SameLine();
+
+                            // ImGui::ColorEdit4("##style.color", ImColor());
+                            ImGui::SetNextItemWidth(180);
+                            ImVec4 color = ImColor(style->color);
+                            char colorLabelBuf[LITTLE_NAME_BUF_SIZE]{0};
+                            sprintf(colorLabelBuf, "##style.color-%d", key);
+                            if (ImGui::ColorEdit3(colorLabelBuf, (float*)&color)) {
+                                style->color = ImColor(color);
+                            }
+                        }
+                    }
+                }
+                ImGui::EndChild();
+                ImGui::EndGroup();
+
+                ImGui::End();
+            }
+        }
     }
 
     void showModals(){
@@ -711,6 +817,12 @@ namespace sight {
         }
         if (uiStatus.windowStatus.testWindow) {
             showDemoWindow(false);
+        }
+        if (uiStatus.windowStatus.aboutWindow) {
+            showAboutWindow();
+        }
+        if (uiStatus.windowStatus.projectSettingsWindow) {
+            showProjectSettingsWindow();
         }
 
         nodeEditorFrameEnd();

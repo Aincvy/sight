@@ -18,7 +18,9 @@ namespace sight {
         char createEntity[MOST_KEYS_BUF_SIZE] = "CreateEntity";
         char hierarchy[MOST_KEYS_BUF_SIZE] = "Hierarchy";
         char inspector[MOST_KEYS_BUF_SIZE] = "Inspector";
-        char project[MOST_KEYS_BUF_SIZE] = "Project";
+        char project[SHORT_KEYS_BUF_SIZE] = "Project";
+        char about[SHORT_KEYS_BUF_SIZE] = "About";
+        char projectSettings[MOST_KEYS_BUF_SIZE] = "ProjectSettings";
     };
 
     struct LanguageCommonKeys {
@@ -65,6 +67,7 @@ namespace sight {
         char parseGraph[SHORT_KEYS_BUF_SIZE] = "Parse Graph";
         char projectSaveConfig[SHORT_KEYS_BUF_SIZE] = "Save Config";
         char reload[SHORT_KEYS_BUF_SIZE] = "Reload";
+        char settings[SHORT_KEYS_BUF_SIZE] = "Settings";
         
     };
 

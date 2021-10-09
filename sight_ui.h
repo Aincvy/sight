@@ -118,6 +118,8 @@ namespace sight {
         bool nodeGraph = false;
         bool createEntity = false;
         bool testWindow = false;
+        bool aboutWindow = false;
+        bool projectSettingsWindow = false;
 
         bool layoutReset = false;
 
