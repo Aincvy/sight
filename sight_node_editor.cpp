@@ -346,7 +346,6 @@ namespace sight {
             if (chainInPort) {
                 ed::BeginPin(chainInPort->id, ed::PinKind::Input);
                 showNodePortIcon(typeProcess.style->iconType, typeProcess.style->color, chainInPort->isConnect());
-                // ImGui::Dummy(ImVec2(20, 20));
                 ed::EndPin();
                 ImGui::SameLine();
             }
@@ -358,7 +357,6 @@ namespace sight {
                 ImGui::SameLine();
                 ed::BeginPin(chainOutPort->id, ed::PinKind::Output);
                 showNodePortIcon(typeProcess.style->iconType, typeProcess.style->color, chainOutPort->isConnect());
-                // ImGui::Dummy(ImVec2(20, 20));
                 ed::EndPin();
             }
             ImGui::Dummy(ImVec2(0,3));
@@ -388,7 +386,6 @@ namespace sight {
                 } else {
                     showNodePortIcon(tmpTypeInfo.style->iconType, tmpTypeInfo.style->color, item.isConnect());
                 }
-                // ImGui::Dummy(ImVec2(20, 20));
 
                 ImGui::SameLine();
                 ImGui::Text("%s", item.portName.c_str());
@@ -396,12 +393,10 @@ namespace sight {
             }
 
             ImGuiEx_NextColumn();
-            dbg("begin outputs");
             for (SightNodePort &item : node->outputPorts) {
                 if (item.portName.empty()) {
                     continue;       // do not show the chain port. (Process port)
                 }
-                dbg(item.portName, item.getType());
 
                 // test value
                 if (item.type == IntTypeProcess || !item.options.showValue){
@@ -429,7 +424,6 @@ namespace sight {
 
                 ed::EndPin();
             }
-            dbg("end outputs");
 
             ImGuiEx_EndColumn();
             ed::EndNode();
@@ -456,7 +450,7 @@ namespace sight {
 
             // Submit Links
             for (const auto &connection : CURRENT_GRAPH->getConnections()) {
-                // ed::Link(connection.connectionId, connection.leftPortId(), connection.rightPortId());
+                ed::Link(connection.connectionId, connection.leftPortId(), connection.rightPortId(), ImColor(connection.leftColor));
             }
 
             //
@@ -1336,7 +1330,6 @@ namespace sight {
     }
 
     uint SightNodeGraph::createConnection(uint leftPortId, uint rightPortId, uint connectionId) {
-//        dbg(leftPortId, rightPortId);
         if (leftPortId == rightPortId) {
             return -2;
         }
@@ -1350,12 +1343,19 @@ namespace sight {
             return -3;
         }
 
-//        dbg(left, right);
         auto id = connectionId > 0 ? connectionId : nextNodeOrPortId();
+        // find color ;
+        ImU32 color = IM_COL32_WHITE;
+        auto [typeInfo, find] = currentProject()->findTypeInfo(left->getType());
+        if (find && typeInfo.style) {
+            color = typeInfo.style->color;
+        }
+
         SightNodeConnection connection = {
                 id,
                 leftPortId,
                 rightPortId,
+                color,
         };
         addConnection(connection, left, right);
         return id;

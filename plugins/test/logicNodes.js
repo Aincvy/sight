@@ -26,10 +26,10 @@ addTemplateNode({
     __meta_inputs: {
     },
     __meta_outputs: {
-        // grade: {
-        //     type: 'ComboBox',
-        //     showValue: true,
-        // },
+        grade: {
+            type: 'ComboBox',
+            showValue: true,
+        },
         data: {
             type: 'Student',
             showValue: true,

@@ -110,7 +110,8 @@ namespace sight {
         uint connectionId;
         uint left;
         uint right;
-
+        // left port color  
+        uint leftColor = IM_COL32_WHITE;
 
         /**
          * Remove from left and right port.

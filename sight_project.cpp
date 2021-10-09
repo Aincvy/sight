@@ -652,6 +652,7 @@ namespace sight {
     void TypeInfoRender::operator()(const char* labelBuf, SightNodeValue& value) const{
         switch (kind) {
         case TypeInfoRenderKind::Default:
+            ImGui::Text(" ");
             break;
         case TypeInfoRenderKind::ComboBox:
             auto& data = this->data.comboBox;
