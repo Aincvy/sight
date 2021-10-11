@@ -118,35 +118,6 @@ addTemplateNode({
 addTemplateNode({
     // meta info, start with __meta
 
-    __meta_name: "Number",
-    // used for context menu
-    __meta_address: "test/math/literal",
-    __meta_func: {
-        // this function will be to string(only function body.).
-        generateCodeWork($, $$) {
-            $$.options.isPart = true;
-            return $.number.value;       // When a output node is returned, it will be map to node's value.
-            //print('Number generateCodeWork.');
-        },
-
-        // If object do not has `onReverseActive` function, then it will be call generateCodeWork when this function is needed.
-        // onReverseActive(nodePort, $options){
-        //
-        // },
-    },
-    // other ideas
-    __meta_outputs: {
-        number: {
-            type: 'Number',
-            showValue: true,       // Show value and the value can be changed by input component
-        },
-    },
-
-});
-
-addTemplateNode({
-    // meta info, start with __meta
-
     __meta_name: "EnterNode",
     // used for context menu
     __meta_address: "process",

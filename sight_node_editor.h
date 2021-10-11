@@ -46,6 +46,9 @@ namespace sight {
             char * pointer;
             size_t size;
         } largeString;     // todo largeString
+        float vector2[2];
+        float vector3[3];
+        float vector4[4];
     };
 
     struct SightNodePortOptions {
@@ -435,6 +438,7 @@ namespace sight {
         std::map<uint, SightAnyThingWrapper> idMap;
         // for ...
         const static SightAnyThingWrapper invalidAnyThingWrapper;
+        
 
 
         /**
@@ -516,7 +520,7 @@ namespace sight {
      * @param width 
      * @param type     TypeInfo's id
      */
-    void showNodePortValue(SightNodePort* port, int width = 160, int type = -1);
+    void showNodePortValue(SightNodePort* port, int width = 120, int type = -1);
 
     uint nextNodeOrPortId();
 

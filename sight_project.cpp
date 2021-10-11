@@ -366,6 +366,7 @@ namespace sight {
         addTypeInfo({ .name = "double", .intValue = IntTypeDouble }, { color, IconType::Circle });
         addTypeInfo({ .name = "long", .intValue = IntTypeLong }, { color, IconType::Circle });
         addTypeInfo({ .name = "bool", .intValue = IntTypeBool }, { color, IconType::Circle });
+        addTypeInfo({ .name = "char", .intValue = IntTypeChar }, { color, IconType::Circle });
         addTypeInfo({ .name = "Color", .intValue = IntTypeColor }, { color, IconType::Circle });
         addTypeInfo({ .name = "Vector3", .intValue = IntTypeVector3 }, { color, IconType::Circle });
         addTypeInfo({ .name = "Vector4", .intValue = IntTypeVector4 }, { color, IconType::Circle });
@@ -525,7 +526,7 @@ namespace sight {
         }
         typeInfoMap[info.intValue] = info;
         typeMap[info.name] = info.intValue;
-        dbg(info.intValue, info.name);
+//        dbg(info.intValue, info.name);
         return info.intValue;
     }
 

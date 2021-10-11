@@ -10,6 +10,7 @@
 #include "sight_js.h"
 
 #include "v8pp/convert.hpp"
+#include <unistd.h>
 
 #define FILE_NAME_PACKAGE "package.js"
 
@@ -39,8 +40,11 @@ namespace sight {
 
     int PluginManager::loadPlugins() {
         dbg("load plugins");
-
+        
         for (auto it = directory_iterator {"./plugins"}; it != directory_iterator {}; ++it) {
+            while (!pluginStatus.addNodesFinished || !pluginStatus.addTemplateNodesFinished) {
+                usleep(200);
+            }    
             auto plugin = new Plugin(this, it->path().string());
             int i;
             if ((i = plugin->load()) != CODE_OK) {
@@ -61,6 +65,14 @@ namespace sight {
         }
 
         return 0;
+    }
+
+    AtomicPluginStatus& PluginManager::getPluginStatus() {
+        return pluginStatus;
+    }
+
+    AtomicPluginStatus const& PluginManager::getPluginStatus() const {
+        return pluginStatus;
     }
 
     v8::Isolate *PluginManager::getIsolate() {

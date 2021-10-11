@@ -669,6 +669,7 @@ namespace sight {
             }
             g_NodeCache.clear();
 
+            pluginManager()->getPluginStatus().addNodesFinished = false;
             addUICommand(UICommandType::AddNode, nodePointer, size);
         }
 
@@ -682,6 +683,7 @@ namespace sight {
             }
             g_TemplateNodeCache.clear();
 
+            pluginManager()->getPluginStatus().addTemplateNodesFinished = false;
             addUICommand(UICommandType::AddTemplateNode, pointer, size);
         }
 

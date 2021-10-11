@@ -6,6 +6,7 @@
 
 #include <string>
 #include "vector"
+#include <atomic>
 #include "absl/container/flat_hash_map.h"
 
 #include "v8.h"
@@ -13,6 +14,12 @@
 namespace sight {
 
     class PluginManager;
+
+    struct AtomicPluginStatus {
+        // ui thread change field to true.
+        std::atomic<bool> addNodesFinished = true;
+        std::atomic<bool> addTemplateNodesFinished = true;
+    };
 
     class Plugin {
     public:
@@ -73,6 +80,9 @@ namespace sight {
 
         void addSearchPath(const char* path);
 
+        AtomicPluginStatus& getPluginStatus();
+        AtomicPluginStatus const& getPluginStatus() const;
+
     private:
         absl::flat_hash_map<std::string, Plugin*> pluginMap;
 
@@ -82,14 +92,16 @@ namespace sight {
         v8::Isolate* isolate = nullptr;
 
         std::vector<std::string> searchPaths;
+        AtomicPluginStatus pluginStatus;
 
     };
 
     /**
-     * Use plugin manager from js thread.
+     * Get the plugin manager.
      * @return
      */
     PluginManager* pluginManager();
+
 
     extern v8::MaybeLocal<v8::String> readFile(v8::Isolate *isolate, const char *name);
 

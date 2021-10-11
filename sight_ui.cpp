@@ -2,6 +2,7 @@
 #include "imgui_node_editor.h"
 #include "sight_defines.h"
 #include "sight_keybindings.h"
+#include "sight_plugin.h"
 #include "sight_ui.h"
 #include "sight_node_editor.h"
 #include "sight.h"
@@ -55,7 +56,10 @@ namespace sight {
          * 
          */
         void saveAnyThing(){
-            getCurrentGraph()->save();
+            int i ;
+            if ((i = getCurrentGraph()->save()) != CODE_OK) {
+                dbg(i);
+            }
         }
 
         void showMainFileMenu(UIStatus& uiStatus){
@@ -601,11 +605,12 @@ namespace sight {
         }
 
         void showProjectSettingsWindow(){
-            static bool panelBasic = true, panelTypes = false;
+            static bool panelBasic = true, panelTypes = false, panelPlugins = false;
 
             auto resetFlags = [&](){
                 panelBasic = false;
                 panelTypes = false;
+                panelPlugins = false;
             };
 
             ImGui::SetNextWindowSize(ImVec2(600,440), ImGuiCond_FirstUseEver);
@@ -621,6 +626,10 @@ namespace sight {
                     resetFlags();
                     panelTypes = true;
                 }
+                if (ImGui::Selectable("Plugins", panelPlugins)) {
+                    resetFlags();
+                    panelPlugins = true;
+                }
                 ImGui::EndChild();
                 ImGui::SameLine();
 
@@ -631,11 +640,15 @@ namespace sight {
                     ImGui::Text("Basic Info");
                 } else if (panelTypes) {
                     ImGui::Text("Types");
+                } else if (panelPlugins) {
+                    ImGui::Text("Plugins");
                 }
                 ImGui::Separator();
                 if (panelBasic) {
-                    ImGui::Text("panelBasic");
                     // show some project basic info.
+                    auto p = currentProject();
+                    ImGui::Text("Path: %s", p->getBaseDir().c_str());
+                    ImGui::Text("Loaded Plugins: 0");
 
                 } else if (panelTypes) {
                     // show types.
@@ -673,6 +686,9 @@ namespace sight {
                             }
                         }
                     }
+                } else if (panelPlugins) {
+                    // show loaded plugins.
+
                 }
                 ImGui::EndChild();
                 ImGui::EndGroup();
@@ -852,6 +868,7 @@ namespace sight {
                 for (int i = 0; i < size; ++i) {
                     addNode(nodePointer[i]);
                 }
+                pluginManager()->getPluginStatus().addNodesFinished = true;
                 break;
             }
             case UICommandType::AddTemplateNode:{
@@ -862,6 +879,7 @@ namespace sight {
                     addTemplateNode(*p);
                     delete p;
                 }
+                pluginManager()->getPluginStatus().addTemplateNodesFinished = true;
                 break;
             } 
 

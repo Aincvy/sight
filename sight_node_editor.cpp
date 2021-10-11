@@ -48,20 +48,6 @@ namespace sight {
             static_cast<SightNode*>(nullptr),
     };
 
-    void ImGuiEx_BeginColumn() {
-        ImGui::BeginGroup();
-    }
-
-    void ImGuiEx_NextColumn() {
-        ImGui::EndGroup();
-        ImGui::SameLine();
-        ImGui::BeginGroup();
-    }
-
-    void ImGuiEx_EndColumn() {
-        ImGui::EndGroup();
-    }
-
     namespace {
         // private members and functions
 
@@ -369,7 +355,7 @@ namespace sight {
             }
 
             // inputPorts
-            ImGuiEx_BeginColumn();
+            ImGui::BeginGroup();
             for (auto &item : node->inputPorts) {
                 if (item.portName.empty()) {
                     continue;       // do not show the chain port. (Process port)
@@ -392,7 +378,9 @@ namespace sight {
                 ed::EndPin();
             }
 
-            ImGuiEx_NextColumn();
+            ImGui::EndGroup();
+            ImGui::SameLine();
+            ImGui::BeginGroup();
             for (SightNodePort &item : node->outputPorts) {
                 if (item.portName.empty()) {
                     continue;       // do not show the chain port. (Process port)
@@ -425,7 +413,7 @@ namespace sight {
                 ed::EndPin();
             }
 
-            ImGuiEx_EndColumn();
+            ImGui::EndGroup();
             ed::EndNode();
             return 0;
         }
@@ -636,12 +624,14 @@ namespace sight {
                 port->node->graph->editing = true;
             }
             break;
+        case IntTypeLong:
         case IntTypeInt:
             if (ImGui::DragInt(labelBuf, &port->value.i)) {
                 port->node->graph->editing = true;
             }
             break;
         case IntTypeString:
+            ImGui::SetNextItemWidth(width + width / 2.0f);
             if (ImGui::InputText(labelBuf, port->value.string, std::size(port->value.string))) {
                 port->node->graph->editing = true;
             }
@@ -652,7 +642,25 @@ namespace sight {
             }
             break;
         case IntTypeColor:
-            if (ImGui::ColorEdit3(labelBuf, &port->value.f)) {
+            if (ImGui::ColorEdit3(labelBuf, port->value.vector4)) {
+                port->node->graph->editing = true;
+            }
+            break;
+        case IntTypeVector3:
+            ImGui::SetNextItemWidth(width * 2);
+            if (ImGui::DragFloat3(labelBuf,  port->value.vector3)) {
+                port->node->graph->editing = true;
+            }
+            break;
+        case IntTypeVector4:
+            ImGui::SetNextItemWidth(width * 2);
+            if (ImGui::DragFloat4(labelBuf, port->value.vector4)) {
+                port->node->graph->editing = true;
+            }
+            break;    
+        case IntTypeChar:
+            ImGui::SetNextItemWidth(width / 3.0f);
+            if (ImGui::InputText(labelBuf, port->value.string, 2)) {
                 port->node->graph->editing = true;
             }
             break;
@@ -999,7 +1007,15 @@ namespace sight {
                 }
             }
 
-            auto portWork = [&out](SightNodePort const& item) {
+            auto writeFloatArray = [&out](float* p, int size) {
+                out << YAML::BeginSeq;
+                for( int i = 0; i < size; i++){
+                    out << p[i];
+                }
+                out << YAML::EndSeq;
+            };
+
+            auto portWork = [&out, &writeFloatArray](SightNodePort const& item) {
                 out << YAML::Key << item.id;
                 out << YAML::Value << YAML::BeginMap;
                 out << YAML::Key << "name" << YAML::Value << item.portName;
@@ -1015,6 +1031,7 @@ namespace sight {
                     out << item.value.d;
                     break;
                 case IntTypeInt:
+                case IntTypeLong:
                     out << item.value.i;
                     break;
                 case IntTypeString:
@@ -1022,6 +1039,16 @@ namespace sight {
                     break;
                 case IntTypeBool:
                     out << item.value.b;
+                    break;
+                case IntTypeVector3:
+                    writeFloatArray((float*)item.value.vector3, 3);
+                    break;
+                case IntTypeChar:
+                    out << item.value.string[0];
+                    break;
+                case IntTypeVector4:
+                case IntTypeColor:
+                    writeFloatArray((float*)item.value.vector4, 4);
                     break;
                 default:
                 {
@@ -1115,7 +1142,18 @@ namespace sight {
             auto nodeRoot = root["nodes"];
             dbg(nodeRoot.size());
 
-            auto portWork = [](YAML::detail::iterator_value const& item, NodePortType nodePortType) -> SightNodePort {
+            auto readFloatArray = [](float* p, int size, YAML::Node const& valueNode) {
+                if (valueNode.IsSequence()) {
+                    for( int i = 0; i < size; i++){
+                        auto tmp = valueNode[i];
+                        if (tmp.IsDefined()) {
+                            p[i] = tmp.as<float>();
+                        }
+                    }
+                }
+            };
+
+            auto portWork = [&readFloatArray](YAML::detail::iterator_value const& item, NodePortType nodePortType) -> SightNodePort {
                 auto id = item.first.as<uint>();
                 auto values = item.second;
                 auto portName = values["name"].as<std::string>();
@@ -1135,45 +1173,57 @@ namespace sight {
                 auto valueNode = values["value"];
                 if (valueNode.IsDefined()) {
                     switch (type) {
-                        case IntTypeFloat:
-                            port.value.f = valueNode.as<float>();
-                            break;
-                        case IntTypeDouble:
-                            port.value.d = valueNode.as<double>();
-                            break;
-                        case IntTypeInt:
-                            port.value.i = valueNode.as<int>();
-                            break;
-                        case IntTypeString:
-                            sprintf(port.value.string, "%s", valueNode.as<std::string>().c_str());
-                            break;
-                        case IntTypeBool:
-                            port.value.b = valueNode.as<bool>();
-                            break;
-                        case IntTypeProcess:
-                            // dbg("IntTypeProcess" , portName);
-                            break;
-                        default:
-                            {
-                                if (!isBuiltInType(type)) {
-                                    //
-                                    auto [typeInfo, find] = currentProject()->findTypeInfo(type);
-                                    if (find) {
-                                        switch (typeInfo.render.kind) {
-                                        case TypeInfoRenderKind::ComboBox:
-                                            port.value.i = valueNode.as<int>();
-                                            break;
-                                        case TypeInfoRenderKind::Default:
-                                        default:
-                                            dbg("no-render-function", type, getTypeName(type));
-                                            break;
-                                        }
-                                    }
-                                }else {
-                                    dbg("type error, unHandled", type, getTypeName(type));
-                                } 
+                    case IntTypeFloat:
+                        port.value.f = valueNode.as<float>();
+                        break;
+                    case IntTypeDouble:
+                        port.value.d = valueNode.as<double>();
+                        break;
+                    case IntTypeInt:
+                    case IntTypeLong:
+                        port.value.i = valueNode.as<int>();
+                        break;
+                    case IntTypeString:
+                        sprintf(port.value.string, "%s", valueNode.as<std::string>().c_str());
+                        break;
+                    case IntTypeBool:
+                        port.value.b = valueNode.as<bool>();
+                        break;
+                    case IntTypeProcess:
+                        // dbg("IntTypeProcess" , portName);
+                        break;
+                    case IntTypeChar:
+                        if (valueNode.IsDefined() && !valueNode.IsNull()) {
+                            port.value.string[0] = valueNode.as<char>();
+                        }
+                        break;
+                    case IntTypeVector3:
+                        readFloatArray(port.value.vector3, 3, valueNode);
+                        break;
+                    case IntTypeVector4:
+                    case IntTypeColor:
+                        readFloatArray(port.value.vector4, 4, valueNode);
+                        break;
+                    default:
+                    {
+                        if (!isBuiltInType(type)) {
+                            //
+                            auto [typeInfo, find] = currentProject()->findTypeInfo(type);
+                            if (find) {
+                                switch (typeInfo.render.kind) {
+                                case TypeInfoRenderKind::ComboBox:
+                                    port.value.i = valueNode.as<int>();
+                                    break;
+                                case TypeInfoRenderKind::Default:
+                                default:
+                                    dbg("no-render-function", type, getTypeName(type));
+                                    break;
+                                }
                             }
-                            break;
+                        } else {
+                            dbg("type error, unHandled", type, getTypeName(type));
+                        }
+                    } break;
                     }
                 }
 
