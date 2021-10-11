@@ -310,6 +310,17 @@ namespace sight {
         return IM_COL32(r,g,b,a);
     }
 
+    void helpMarker(const char* desc) {
+        // ImGui::TextDisabled("(?)");
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+            ImGui::TextUnformatted(desc);
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+        }
+    }
+
     SightKey::SightKey(ushort code)
         : code(code) {
     }

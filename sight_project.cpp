@@ -371,6 +371,7 @@ namespace sight {
         addTypeInfo({ .name = "Vector3", .intValue = IntTypeVector3 }, { color, IconType::Circle });
         addTypeInfo({ .name = "Vector4", .intValue = IntTypeVector4 }, { color, IconType::Circle });
         addTypeInfo({ .name = "String", .intValue = IntTypeString }, { color, IconType::Circle });
+        addTypeInfo({ .name = "LargeString", .intValue = IntTypeLargeString }, { color, IconType::Circle });
         addTypeInfo({ .name = "Object", .intValue = IntTypeObject }, { color, IconType::Circle });
 
         // type alias

@@ -101,6 +101,23 @@ addTemplateNode({
 });
 
 addTemplateNode({
+    __meta_name: "LargeString",
+    __meta_address: "built-in/literal/basic",
+    __meta_func: {
+        generateCodeWork($, $$) {
+            // $$.options.isPart = true;
+            return $.string.value;       // When a output node is returned, it will be map to node's value.
+        },
+    },
+    __meta_outputs: {
+        string: {
+            type: 'LargeString',
+            showValue: true,       // Show value and the value can be changed by input component
+        },
+    },
+});
+
+addTemplateNode({
     __meta_name: "Bool",
     __meta_address: "built-in/literal/basic",
     __meta_func: {

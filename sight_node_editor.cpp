@@ -2,6 +2,8 @@
 // Created by Aincvy(aincvy@gmail.com) on 2021/7/20.
 //
 
+#include <cstddef>
+#include <cstdio>
 #include <string>
 #include <sys/types.h>
 #include <utility>
@@ -12,6 +14,7 @@
 
 #include "dbg.h"
 #include "sight.h"
+#include "sight_defines.h"
 #include "sight_node_editor.h"
 #include "sight_address.h"
 #include "sight_ui.h"
@@ -20,6 +23,7 @@
 #include "sight_keybindings.h"
 
 #include "imgui.h"
+#include "sight_widgets.h"
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui_canvas.h"
@@ -603,7 +607,7 @@ namespace sight {
         ed::SetCurrentEditor(nullptr);
     }
 
-    void showNodePortValue(SightNodePort* port, int width, int type) {
+    void showNodePortValue(SightNodePort* port, bool fromGraph, int width, int type) {
         char labelBuf[NAME_BUF_SIZE];
         sprintf(labelBuf, "## %d", port->id);
 
@@ -662,6 +666,18 @@ namespace sight {
             ImGui::SetNextItemWidth(width / 3.0f);
             if (ImGui::InputText(labelBuf, port->value.string, 2)) {
                 port->node->graph->editing = true;
+            }
+            break;
+        case IntTypeLargeString:
+            if (fromGraph) {
+                ImGui::Text("%s", port->value.largeString.pointer);
+                helpMarker("Please edit it in external editor or Inspector window.");
+            } else {
+                auto nWidth = width + width / 2.0f;
+                if (ImGui::InputTextMultiline(labelBuf, port->value.largeString.pointer, port->value.largeString.bufferSize,
+                                              ImVec2(nWidth, 150))) {
+                    port->node->graph->editing = true;
+                }
             }
             break;
         default:{
@@ -804,7 +820,7 @@ namespace sight {
 
     SightNode *SightNode::clone() const{
         auto p = new SightNode();
-        p->copyFrom(this, false);
+        p->copyFrom(this, false, CopyFromType::Clone);
         return p;
     }
 
@@ -815,7 +831,7 @@ namespace sight {
 
         dbg(this->nodeName);
         auto p = new SightNode();
-        p->copyFrom(this, true);
+        p->copyFrom(this, true, CopyFromType::Instantiate);
         p->tryAddChainPorts();
         p->graph = CURRENT_GRAPH;
 
@@ -846,7 +862,7 @@ namespace sight {
         return p;
     }
 
-    void SightNode::copyFrom(const SightNode *node, bool isTemplate) {
+    void SightNode::copyFrom(const SightNode* node, bool isTemplate, CopyFromType copyFromType) {
         this->nodeId = node->nodeId;
         this->nodeName = node->nodeName;
         if (isTemplate) {
@@ -855,9 +871,17 @@ namespace sight {
             this->templateNode = node->templateNode;
         }
 
-        auto copyFunc = [](std::vector<SightNodePort> const &src, std::vector<SightNodePort> & dst){
+        auto copyFunc = [copyFromType](std::vector<SightNodePort> const& src, std::vector<SightNodePort>& dst) {
             for (const auto &item : src) {
                 dst.push_back(item);
+
+                if (copyFromType == CopyFromType::Instantiate) {
+                    // init something
+                    auto& back = dst.back();
+                    if (back.getType() == IntTypeLargeString) {
+                        back.value.stringInit();
+                    }
+                }
             }
         };
 
@@ -937,6 +961,18 @@ namespace sight {
         nodeFunc(this->outputPorts, NodePortType::Output);
 
         updateChainPortPointer();
+    }
+
+    void SightNode::reset() {
+        auto nodeFunc = [] (std::vector<SightNodePort> & list){
+            for(auto& item: list){
+                if (item.getType() == IntTypeLargeString) {
+                    item.value.stringFree();
+                }
+            }
+        };
+
+        CALL_NODE_FUNC(this);
     }
 
     void SightJsNode::callFunction(const char *name) {
@@ -1036,6 +1072,9 @@ namespace sight {
                     break;
                 case IntTypeString:
                     out << item.value.string;
+                    break;
+                case IntTypeLargeString:
+                    out << item.value.largeString.pointer;
                     break;
                 case IntTypeBool:
                     out << item.value.b;
@@ -1186,6 +1225,13 @@ namespace sight {
                     case IntTypeString:
                         sprintf(port.value.string, "%s", valueNode.as<std::string>().c_str());
                         break;
+                    case IntTypeLargeString:
+                    {
+                        std::string tmpString = valueNode.as<std::string>();
+                        port.value.stringCheck(tmpString.size());
+                        sprintf(port.value.largeString.pointer, "%s", tmpString.c_str());
+                        break;
+                    }
                     case IntTypeBool:
                         port.value.b = valueNode.as<bool>();
                         break;
@@ -1872,6 +1918,32 @@ namespace sight {
     SightNodePortConnection::SightNodePortConnection(SightNodePort *self, SightNodePort *target,
                                                      SightNodeConnection *connection) : self(self), target(target),
                                                                                         connection(connection) {}
+
+    void SightNodeValue::stringInit() {
+        largeString.bufferSize = NAME_BUF_SIZE * 2;
+        largeString.size = 0;
+        largeString.pointer = (char*)calloc(1, largeString.bufferSize);
+
+        // dbg(largeString.bufferSize, largeString.pointer, largeString.size);
+    }
+
+    void SightNodeValue::stringCheck(size_t needSize) {
+        stringFree();
+        static constexpr size_t tmpSize = NAME_BUF_SIZE * 2;
+        
+        largeString.bufferSize = needSize < tmpSize ? tmpSize : static_cast<size_t>(needSize * 1.5f);
+        largeString.size = 0;
+        largeString.pointer = (char*)calloc(1, largeString.bufferSize);
+    }
+
+    void SightNodeValue::stringFree() {
+        if (largeString.pointer) {
+            free(largeString.pointer);
+            largeString.pointer = nullptr;
+            largeString.size = largeString.bufferSize = 0;
+        }
+    }
+
 
 
 }

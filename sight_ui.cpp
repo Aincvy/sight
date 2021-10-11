@@ -719,8 +719,9 @@ namespace sight {
                 // create
 
                 if (strlen(g_UIStatus->buffer.littleName) > 0) {
+                    dbg(g_UIStatus->buffer.littleName);
                     currentProject()->createGraph(g_UIStatus->buffer.littleName);
-                    *g_UIStatus->buffer.littleName = '\0';
+                    g_UIStatus->buffer.littleName[0] = '\0';
                 }
                 ImGui::CloseCurrentPopup();
             }
@@ -730,6 +731,7 @@ namespace sight {
             }
             
             ImGui::EndPopup();
+            return;
         }
 
         auto& modalAskData = g_UIStatus->modalAskData;
@@ -760,6 +762,7 @@ namespace sight {
             }
 
             ImGui::EndPopup();
+            return;
         }
 
         auto& modalSaveData = g_UIStatus->modalSaveData;
@@ -795,6 +798,7 @@ namespace sight {
                 ImGui::CloseCurrentPopup();
             }
             ImGui::EndPopup();
+            return;
         }
     }
 

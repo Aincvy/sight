@@ -159,6 +159,14 @@ namespace sight {
 
     /**
      * @brief 
+     * copied by imgui_demo.cpp
+     * 
+     * @param desc 
+     */
+    void helpMarker(const char* desc);
+
+    /**
+     * @brief 
      * 
      * @param allowEnter   true: key `enter` also trigger 
      * @return true 

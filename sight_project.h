@@ -32,6 +32,8 @@ namespace sight {
         IntTypeVector3,
         IntTypeVector4,
         IntTypeObject,
+        // a large string.
+        IntTypeLargeString,
 
         IntTypeNext = 3000,
     };

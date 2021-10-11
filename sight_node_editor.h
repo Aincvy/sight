@@ -45,10 +45,17 @@ namespace sight {
         struct {
             char * pointer;
             size_t size;
+            size_t bufferSize;
         } largeString;     // todo largeString
         float vector2[2];
         float vector3[3];
         float vector4[4];
+
+        // if this union is largeString, then you can call below functions.
+        // if not, DO NOT call those functions.
+        void stringInit();
+        void stringCheck(size_t needSize);
+        void stringFree();
     };
 
     struct SightNodePortOptions {
@@ -229,14 +236,24 @@ namespace sight {
          */
         void tryAddChainPorts();
 
+        /**
+         * @brief Reset node for next time used.
+         * This function will be release some memory.
+         */
+        void reset();
+
     protected:
+        enum class CopyFromType {
+            Clone,
+            Instantiate,
+        };
 
         /**
          *
          * @param node
          * @param isTemplate   if true, node will as a template node.
          */
-        void copyFrom(const SightNode *node, bool isTemplate);
+        void copyFrom(const SightNode* node, bool isTemplate, CopyFromType copyFromType = CopyFromType::Clone);
     };
 
     /**
@@ -519,8 +536,9 @@ namespace sight {
      * @param port 
      * @param width 
      * @param type     TypeInfo's id
+     * @param fromGraph   true: for drawing graph, false: not
      */
-    void showNodePortValue(SightNodePort* port, int width = 120, int type = -1);
+    void showNodePortValue(SightNodePort* port, bool fromGraph = false, int width = 120, int type = -1);
 
     uint nextNodeOrPortId();
 
