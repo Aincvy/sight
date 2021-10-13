@@ -100,22 +100,6 @@ addTemplateNode({
     },
 });
 
-addTemplateNode({
-    __meta_name: "LargeString",
-    __meta_address: "built-in/literal/basic",
-    __meta_func: {
-        generateCodeWork($, $$) {
-            // $$.options.isPart = true;
-            return $.string.value;       // When a output node is returned, it will be map to node's value.
-        },
-    },
-    __meta_outputs: {
-        string: {
-            type: 'LargeString',
-            showValue: true,       // Show value and the value can be changed by input component
-        },
-    },
-});
 
 addTemplateNode({
     __meta_name: "Bool",
@@ -203,3 +187,72 @@ addTemplateNode({
     },
 });
 
+addTemplateNode({
+    __meta_name: "LargeString",
+    __meta_address: "built-in/sundry",
+    __meta_func: {
+        generateCodeWork($, $$) {
+            // $$.options.isPart = true;
+            return $.string.value;       // When a output node is returned, it will be map to node's value.
+        },
+    },
+    __meta_outputs: {
+        string: {
+            type: 'LargeString',
+            showValue: true,       // Show value and the value can be changed by input component
+        },
+    },
+});
+
+addType('InOrOut', {
+    kind: 'combo box',
+    data: ['In', 'Out' ],
+    defaultValue: 'In',
+
+});
+
+addTemplateNode({
+    __meta_name: "VarDeclare",
+    __meta_address: "built-in/sundry",
+    __meta_func: {
+        generateCodeWork($) {
+            $.varName.value = $.object();
+        },
+    },
+    __meta_inputs: {
+        object: 'Object',
+    },
+    __meta_outputs: {
+    },
+
+    type: {
+        type: 'InOrOut'
+    },
+
+    varName: {
+        type: 'String',
+        defaultValue: 'varName',
+    },
+
+});
+
+addTemplateNode({
+    __meta_name: "Portal",
+    __meta_address: "built-in",
+    __meta_func: {
+        generateCodeWork($) {
+            $.varName.value = $.number();
+        },
+    },
+    __meta_inputs: {
+        object: 'Object',
+    },
+    __meta_outputs: {
+    },
+
+    varName: {
+        type: 'String',
+        defaultValue: 'varName',
+    },
+
+});

@@ -10,10 +10,31 @@
 #include <cstring>
 #include <sys/stat.h>
 
+#ifdef __APPLE__
+#include <mach/mach.h>
+#endif
+
 namespace sight {
 
     std::string emptyString("");
 
+
+    ProcessUsageInfo currentProcessUsageInfo() {
+        ProcessUsageInfo usageInfo;
+#ifdef __APPLE__
+        // from https://stackoverflow.com/a/1911863/11226492
+        struct task_basic_info t_info;
+        mach_msg_type_number_t t_info_count = TASK_BASIC_INFO_COUNT;
+
+        if (KERN_SUCCESS == task_info(mach_task_self(),
+                                      TASK_BASIC_INFO, (task_info_t)&t_info,
+                                      &t_info_count)) {
+            usageInfo.virtualMemBytes = t_info.virtual_size;
+            usageInfo.residentMemBytes = t_info.resident_size;
+        }
+#endif
+        return usageInfo;
+    }
 
     bool endsWith(const std::string &fullString, const std::string &ending) {
         if (fullString.length() >= ending.length()) {

@@ -5,8 +5,10 @@
 #pragma once
 
 #include <cstddef>
+#include <type_traits>
 #include "absl/container/flat_hash_set.h"
 
+#include "dbg.h"
 #include "sight_defines.h"
 
 namespace sight {
@@ -15,6 +17,8 @@ namespace sight {
     public:
         virtual void reset() = 0;
     };
+
+
 
     /**
      * A auto expand array. NOT thread safe.
@@ -252,7 +256,7 @@ namespace sight {
         }
 
         void resetElement(T* p){
-            if constexpr(std::is_same_v<T, ResetAble>) {
+            if constexpr(std::is_base_of_v<ResetAble, T>) {
                 ((ResetAble *) p)->reset();
             }
 

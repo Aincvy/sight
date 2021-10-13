@@ -8,6 +8,13 @@
 
 namespace sight {
 
+    struct ProcessUsageInfo{
+        size_t virtualMemBytes = 0;
+        size_t residentMemBytes = 0;
+    };
+
+    ProcessUsageInfo currentProcessUsageInfo();
+
     /**
      *
      * @param fullString

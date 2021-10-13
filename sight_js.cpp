@@ -32,6 +32,8 @@
 
 using namespace v8;
 
+using PersistentFunction = Persistent<Function, CopyablePersistentTraits<Function>>;
+
 namespace sight {
     namespace {
         struct V8Runtime;
@@ -47,7 +49,6 @@ static std::vector<sight::SightNodeTemplateAddress> g_TemplateNodeCache;
 namespace sight {
 
     std::string runGenerateFunction(v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function>> & persistent, Isolate* isolate, SightNode* node);
-
 
     /**
      *
@@ -126,6 +127,109 @@ namespace sight {
         //
         //   register functions to v8
         //
+
+        void checkTinyData(const char* key, Local<Object> data, Isolate* isolate){
+            auto g = getCurrentGraph();
+            if (!g) {
+                dbg("need a graph opened!");
+                return;
+            }
+
+            auto & map = g->getExternalData().tinyDataMap;
+            if (!map.contains(key)) {
+                // fixme: perhaps g_V8Runtime->isolate should be uiStatus->isolate
+                map[key] = SightNodeGraphExternalData::V8ObjectType(isolate, data);
+            }
+        }
+
+        MaybeLocal<Object> tinyData(const char* key, MaybeLocal<Object> mayData, Isolate* isolate) {
+            auto g = getCurrentGraph();
+            if (!g) {
+                dbg("need a graph opened!");
+                return {};
+            }
+
+            auto& map = g->getExternalData().tinyDataMap;
+
+            if (mayData.IsEmpty()) {
+                // get data
+                if (map.contains(key)) {
+                    auto data = map[key].Get(isolate);
+                    return {data};
+                }
+                return {};
+            } else {
+                // set data
+                auto data = mayData.ToLocalChecked();
+                if (map.contains(key)) {
+                    map[key].Reset();
+                }
+                map[key] = SightNodeGraphExternalData::V8ObjectType(isolate, data);
+                return mayData;
+            }
+        }
+
+        void v8CheckTinyData(const FunctionCallbackInfo<Value>& args) {
+            auto isolate = args.GetIsolate();
+            HandleScope handleScope(isolate);
+            auto rValue = args.GetReturnValue();
+            if (args.Length() != 2) {
+                rValue.Set(-1);
+                return;
+            }
+            auto arg1 = args[0];
+            auto arg2 = args[1];
+
+            if (!IS_V8_STRING(arg1)) {
+                rValue.Set(-2);
+                return;
+            }
+            if (!arg2->IsObject()) {
+                rValue.Set(-3);
+                return;
+            }
+
+            std::string key = v8pp::from_v8<std::string>(isolate, arg1);
+            auto data = arg2.As<Object>();
+            checkTinyData(key.c_str(), data, isolate);
+            rValue.Set(0);
+        }
+
+        void v8TinyData(const FunctionCallbackInfo<Value>& args) {
+            auto isolate = args.GetIsolate();
+            HandleScope handleScope(isolate);
+            auto rValue = args.GetReturnValue();
+            if (args.Length() <= 0) {
+                rValue.Set(-1);
+                return;
+            }
+
+            auto arg1 = args[0];
+            if (!IS_V8_STRING(arg1)) {
+                rValue.Set(-2);
+                return;
+            }
+
+            MaybeLocal<Object> data = {};
+            if (args.Length() >= 2) {
+                // set
+                auto arg2 = args[1];
+                if (!arg2->IsObject()) {
+                    rValue.Set(-3);
+                    return;
+                }
+
+                data = arg2.As<Object>();
+            }
+
+            std::string key = v8pp::from_v8<std::string>(isolate, arg1);
+            auto tmp = tinyData(key.c_str(), data, isolate);
+            if (tmp.IsEmpty()) {
+                rValue.SetUndefined();
+            } else {
+                rValue.Set(tmp.ToLocalChecked());
+            }
+        }
 
         // print func
         void v8rPrint(const char *msg) {
@@ -435,6 +539,36 @@ namespace sight {
                             dbg("unknown option key", keyString);
                         }
                     }
+                } else if (key == "__meta_events") {
+                    // events 
+                    if (!localVal->IsObject()) {
+                        args.GetReturnValue().Set(-2);
+                        return;
+                    }
+
+                    auto eventsRoot = localVal.As<Object>();
+                    auto eventsKeys = eventsRoot->GetOwnPropertyNames(context).ToLocalChecked();
+                    for( int j = 0; j < eventsKeys->Length(); j++){
+                        auto eventKey = eventsKeys->Get(context, j).ToLocalChecked();
+                        std::string keyString = v8pp::from_v8<std::string>(isolate, eventKey);
+                        auto eventValue = eventsRoot->Get(context, eventKey).ToLocalChecked();
+
+                        auto tmpFunction = eventValue.As<Function>();
+                        auto maySource = tmpFunction->FunctionProtoToString(context);
+                        if (maySource.IsEmpty()) {
+                            dbg("function source not found", keyString);
+                            continue;
+                        }
+                        std::string sourceCode = v8pp::from_v8<std::string>(isolate, maySource.ToLocalChecked().As<String>());
+                        dbg(sourceCode);
+                        if (keyString == "onInstantiate") {
+                            sightNode.onInstantiate = sourceCode;
+                            // sightNode.onInstantiate = PersistentFunction(uiIsolate, eventValue.As<Function>());
+                        } else if (keyString == "onDestroyed") {
+                            // sightNode.onDestroyed = PersistentFunction(uiIsolate, eventValue.As<Function>());
+                            sightNode.onDestroyed = sourceCode;
+                        }
+                    }
                 }
 
                 else {
@@ -501,6 +635,7 @@ namespace sight {
                 v8::ArrayBuffer::Allocator::NewDefaultAllocator();
         auto isolate = v8::Isolate::New(createParams);
         auto isolate_scope = std::make_unique<v8::Isolate::Scope>(isolate);
+        dbg(isolate);
 
         g_V8Runtime = new V8Runtime{
                 std::move(platform),
@@ -546,17 +681,32 @@ namespace sight {
         return 0;
     }
 
+    void bindTinyData(Isolate* isolate, const v8::Local<v8::Context>& context) {
+        auto tinyData = v8pp::wrap_function(isolate, "tinyData", &v8TinyData);
+        auto checkTinyData = v8pp::wrap_function(isolate, "tinyData", &v8CheckTinyData);
+        context->Global()->Set(context, v8pp::to_v8(isolate, "tinyData"), tinyData);
+        context->Global()->Set(context, v8pp::to_v8(isolate, "checkTinyData"), checkTinyData);
+    }
+
+    void sight::bindBaseFunctions(v8::Isolate* isolate, const v8::Local<v8::Context>& context) {
+        auto printFunc = v8pp::wrap_function(isolate, "print", &v8rPrint);
+        context->Global()->Set(context, v8pp::to_v8(isolate, "print"), printFunc);
+    }
+
+    v8::Isolate* sight::getJsIsolate() {
+        return g_V8Runtime->isolate;
+    }
+
     /**
      * init js binds
      * cpp struct, functions to js engine.
      * @return
      */
-    int initJsBindings(const v8::Local<v8::Context> &context) {
+    int initJsBindings(Isolate* isolate, const v8::Local<v8::Context> &context) {
         if (!g_V8Runtime) {
             return -1;
         }
 
-        auto isolate = g_V8Runtime->isolate;
         v8pp::module module(isolate);
 
         // classes ...
@@ -590,9 +740,6 @@ namespace sight {
 
         auto currentContext = context;
         currentContext->Global()->Set(currentContext, v8pp::to_v8(isolate, "sight"), module.new_instance());
-
-        auto printFunc = v8pp::wrap_function(isolate, "print", &v8rPrint);
-        currentContext->Global()->Set(currentContext, v8pp::to_v8(isolate, "print"), printFunc);
         auto addTemplateNodeFunc = v8pp::wrap_function(isolate, "addTemplateNode", v8AddTemplateNode);
         currentContext->Global()->Set(currentContext, v8pp::to_v8(isolate, "addTemplateNode"), addTemplateNodeFunc);
         auto addTypeFunc = v8pp::wrap_function(isolate, "addType", &v8AddType);
@@ -604,6 +751,7 @@ namespace sight {
                 .set("isPart", &GenerateOptions::isPart)
                 ;
 
+        bindBaseFunctions(isolate, context);
         logDebug("init js bindings over!");
         return 0;
     }
@@ -778,15 +926,13 @@ namespace sight {
         auto isolate = g_V8Runtime->isolate;
         v8::HandleScope handle_scope(isolate);
         auto context = isolate->GetCurrentContext();
-//        auto context = v8::Context::New(isolate);
-//        v8::Context::Scope contextScope(context);
-//        printf(context.IsEmpty() ? "empty\n" : "not empty\n");
 
         TryCatch tryCatch(isolate);
 
         v8::Local<v8::String> sourceCode = readFile(isolate, filepath).ToLocalChecked();
 
         //
+        
         v8::Local<v8::String> module = v8::String::NewFromUtf8(isolate, "module").ToLocalChecked();
         v8::Local<v8::String> exports = v8::String::NewFromUtf8(isolate, "exports").ToLocalChecked();
         v8::Local<v8::String> params = v8::String::NewFromUtf8(isolate, "params").ToLocalChecked();
@@ -1254,7 +1400,7 @@ namespace sight {
             v8::Local<v8::Context> context = v8::Context::New(isolate);
             //         Enter the context
             v8::Context::Scope context_scope(context);
-            initJsBindings(context);
+            initJsBindings(isolate, context);
 
             runJsCommands();
         }

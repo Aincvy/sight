@@ -491,7 +491,7 @@ namespace sight {
     }
 
     uint Project::addTypeInfo(TypeInfo info, TypeStyle const& typeStyle, bool merge) {
-        dbg(info.intValue, info.name);
+        // dbg(info.intValue, info.name);
         uint id = 0;
         if (info.intValue > 0) {
             id = info.intValue;

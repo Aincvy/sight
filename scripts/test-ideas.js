@@ -276,3 +276,99 @@ addType('ComboBox', {
 });
 
 addType('MyString');
+
+/**
+ * check the key exist, if not, set with the data. If the key exists, then do nothing.
+ * @param {*} key 
+ * @param {*} data 
+ */
+function checkTinyData(key, data){
+
+}
+
+/**
+ * 
+ * @param {*} key  can be a string or a node. if given a node, then use node's templateNode.
+ * @param {*} data 
+ */
+function tinyData(key, data = undefined){
+    if(data){
+        // set data
+    } else {
+        // get data
+
+    }
+}
+
+/**
+ * 
+ * @param {*} node 
+ * @param {*} portName 
+ * @param {*} order  undefined or an array.If it's an array, then the value should be NodePortType.Indirect the search order.
+ * @returns a handle for value or a number as error code or undefined as not found.
+ */
+function nodePortValue(node, portName, order = undefined){
+    return {
+        get(){
+
+        },
+
+        set(data){
+
+        }
+    };
+}
+
+
+addTemplateNode({
+    // meta info, start with __meta
+
+    __meta_name: "EventTest",
+    // used for context menu
+    __meta_address: "sight://template/nodes/entity",
+    __meta_options: {
+        enter: true,
+    },
+    __meta_func: {
+        generateCodeWork($) {
+        },
+    },
+    __meta_events: {
+        // call after instantiate, called by ui thread.([ui thread] in below.)
+        // node is the node data, not the template node.
+        onInstantiate(node){
+            checkTinyData(node, { names: []});
+
+            let data = tinyData(node);
+            let nameHandle = nodePortValue(node, 'field1');
+            let name = nameHandle.get();
+            if (data.names.includes(name)){
+                // name is used.
+                let index = 0;
+                while (data.names.includes(name + index)){
+                    index++;
+                }
+                
+                name += index;
+                nameHandle.set(name);
+            }
+        },
+        
+        // node isn't the template node.
+        onDestroyed(node){
+
+        }
+
+    },
+
+    field1: {
+        type: 'String',
+        showValue: true,
+        // [ui thread]
+        onValueChange(node, newValue){
+            // update value to auto-complete list.
+            
+        },
+    },
+
+});

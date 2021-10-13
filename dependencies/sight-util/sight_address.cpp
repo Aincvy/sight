@@ -73,7 +73,7 @@ namespace sight {
     }
 
     Address* resolveAddress(const std::string &fullAddress) {
-        auto & str = fullAddress.find(addressPrefix) == 0 ? fullAddress.substr(addressPrefixLen+1) : fullAddress;
+        auto & str = fullAddress.find(addressPrefix) == 0 ? fullAddress.substr(addressPrefixLen) : fullAddress;
         std::vector<std::string> list = absl::StrSplit(str, "/");
         auto size = list.size();
         auto first = (Address*) calloc(1, sizeof(struct Address) * size);

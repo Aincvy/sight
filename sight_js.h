@@ -9,6 +9,8 @@
 #include "sight.h"
 #include "shared_queue.h"
 
+#include "v8.h"
+
 namespace sight{
 
     struct SightJsNode;
@@ -94,6 +96,18 @@ namespace sight{
      * @return std::string 
      */
     std::string serializeJsNode(SightJsNode const& node);
+
+    /**
+     * @brief checkTinyData(), tinyData()
+     * 
+     * @param isolate 
+     * @param context 
+     */
+    void bindTinyData(v8::Isolate* isolate, const v8::Local<v8::Context>& context);
+
+    void bindBaseFunctions(v8::Isolate* isolate, const v8::Local<v8::Context>& context);
+
+    v8::Isolate* getJsIsolate();
 
 }
 

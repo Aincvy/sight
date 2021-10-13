@@ -15,8 +15,10 @@
 #include "sight_memory.h"
 
 #include "v8.h"
+#include "absl/container/flat_hash_map.h"
 
 namespace ed = ax::NodeEditor;
+using Isolate = v8::Isolate;
 
 namespace sight {
 
@@ -178,7 +180,7 @@ namespace sight {
     /**
      * a real node.
      */
-    struct SightNode {
+    struct SightNode : public ResetAble {
         std::string nodeName;
         uint nodeId;
         // this node's template node.  Real template node's `templateNode` must be nullptr.
@@ -240,7 +242,7 @@ namespace sight {
          * @brief Reset node for next time used.
          * This function will be release some memory.
          */
-        void reset();
+        void reset() override;
 
     protected:
         enum class CopyFromType {
@@ -256,6 +258,22 @@ namespace sight {
         void copyFrom(const SightNode* node, bool isTemplate, CopyFromType copyFromType = CopyFromType::Clone);
     };
 
+    struct ScriptFunctionWrapper {
+        using Function = v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function>>;
+
+        Function function;
+        std::string sourceCode;
+
+        ScriptFunctionWrapper() = default;
+        ~ScriptFunctionWrapper() = default;
+        ScriptFunctionWrapper(Function const& f);
+        ScriptFunctionWrapper(std::string const& code);
+
+        void compile(Isolate* isolate);
+
+        void operator()(Isolate* isolate) const;
+    };
+
     /**
      * js node
      */
@@ -263,15 +281,25 @@ namespace sight {
 
         std::string fullTemplateAddress;
 
+        // called by js thread
         v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function>> generateCodeWork;
         v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function>> onReverseActive;
+
+        // events ,  called by ui thread.
+        ScriptFunctionWrapper onInstantiate;
+        ScriptFunctionWrapper onDestroyed;
+
+
         SightJsNodeOptions options;
 
         SightJsNode();
         ~SightJsNode() = default;
 
-        void callFunction(const char *name);
 
+        void compileFunctions(Isolate* isolate);
+
+
+        // todo delete this function. (When use another way to impl entity)
         SightJsNode & operator=(SightNode const & sightNode);
 
     };
@@ -331,6 +359,14 @@ namespace sight {
          * If has children, then show them, otherwise, show self.
          */
         void showContextMenu(const ImVec2 &openPopupPosition);
+    };
+
+    struct SightNodeGraphExternalData{
+        using V8ObjectType = v8::Persistent<v8::Object, v8::CopyablePersistentTraits<v8::Object>>;
+
+        // std::map<std::string, V8ObjectType> tinyDataMap;
+        absl::flat_hash_map<std::string, V8ObjectType> tinyDataMap;
+        
     };
 
     /**
@@ -441,6 +477,8 @@ namespace sight {
 
         bool isBroken() const;
 
+        SightNodeGraphExternalData& getExternalData();
+
     private:
 
         // save and read path.
@@ -455,7 +493,8 @@ namespace sight {
         std::map<uint, SightAnyThingWrapper> idMap;
         // for ...
         const static SightAnyThingWrapper invalidAnyThingWrapper;
-        
+
+        SightNodeGraphExternalData externalData;
 
 
         /**
@@ -605,11 +644,12 @@ namespace sight {
     SightJsNode* findTemplateNode(const SightNode *node);
     SightJsNode* findTemplateNode(const char* path);
 
-        /**
+    /**
      * @brief 
      * 
      * @return true  a graph is opened.
      * @return false 
      */
-        bool isNodeEditorReady();
+    bool isNodeEditorReady();
+
 }

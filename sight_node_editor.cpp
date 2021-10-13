@@ -15,6 +15,7 @@
 #include "dbg.h"
 #include "sight.h"
 #include "sight_defines.h"
+#include "sight_js.h"
 #include "sight_node_editor.h"
 #include "sight_address.h"
 #include "sight_ui.h"
@@ -24,6 +25,7 @@
 
 #include "imgui.h"
 #include "sight_widgets.h"
+#include "v8pp/convert.hpp"
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui_canvas.h"
@@ -54,7 +56,8 @@ namespace sight {
 
     namespace {
         // private members and functions
-
+        
+        // node editor functions
         void showContextMenu(const ImVec2& openPopupPosition, uint nodeId, uint linkId, uint pinId){
             ed::Suspend();
 
@@ -699,15 +702,22 @@ namespace sight {
     }
 
     int showNodeEditorGraph(UIStatus const& uiStatus) {
-        if (uiStatus.needInit) {
-            ImVec2 startPos = {
-                    300, 20
-            };
+        // if (uiStatus.needInit) {
+        //     ImVec2 startPos = {
+        //             300, 20
+        //     };
 
-            auto windowSize = uiStatus.io->DisplaySize - startPos;
-            ImGui::SetNextWindowPos(startPos);
-            ImGui::SetNextWindowSize(windowSize);
-        }
+        //     auto windowSize = uiStatus.io->DisplaySize - startPos;
+        //     ImGui::SetNextWindowPos(startPos, ImGuiCond_Once);
+        //     ImGui::SetNextWindowSize(windowSize, ImGuiCond_Once);
+        // }
+
+        ImVec2 startPos = {
+            300, 20
+        };
+        auto windowSize = uiStatus.io->DisplaySize - startPos;
+        ImGui::SetNextWindowPos(startPos, ImGuiCond_Once);
+        ImGui::SetNextWindowSize(windowSize, ImGuiCond_Once);
 
         std::string windowTitle("Graph");
         if (CURRENT_GRAPH) {
@@ -835,30 +845,32 @@ namespace sight {
         p->tryAddChainPorts();
         p->graph = CURRENT_GRAPH;
 
-        if (!generateId) {
-            return p;
-        }
+        if (generateId) {
+            // generate id
+            auto nodeFunc = [](std::vector<SightNodePort>& list) {
+                for (auto& item : list) {
+                    item.id = nextNodeOrPortId();
 
-        // generate id
-        auto nodeFunc = [](std::vector<SightNodePort> & list) {
-            for (auto &item : list) {
-                item.id = nextNodeOrPortId();
-
-                // check type
-                auto t = item.getType();
-                if (!isBuiltInType(t)) {
-                    bool isFind = false;
-                    auto typeInfo = currentProject()->getTypeInfo(t, &isFind);
-                    if (isFind) {
-                        typeInfo.initValue(item.value);
+                    // check type
+                    auto t = item.getType();
+                    if (!isBuiltInType(t)) {
+                        bool isFind = false;
+                        auto typeInfo = currentProject()->getTypeInfo(t, &isFind);
+                        if (isFind) {
+                            typeInfo.initValue(item.value);
+                        }
                     }
                 }
-            }
-        };
+            };
 
-        p->nodeId = nextNodeOrPortId();
-        CALL_NODE_FUNC(p);
+            p->nodeId = nextNodeOrPortId();
+            CALL_NODE_FUNC(p);
+        }
 
+        auto tmp = dynamic_cast<const SightJsNode*>(this);
+        if (tmp) {
+            tmp->onInstantiate(currentUIStatus()->isolate);
+        }
         return p;
     }
 
@@ -964,6 +976,13 @@ namespace sight {
     }
 
     void SightNode::reset() {
+        dbg("node reset");
+        // call events
+        if (templateNode) {
+            auto t = dynamic_cast<const SightJsNode*>(templateNode);
+            t->onDestroyed(currentUIStatus()->isolate);
+        }
+
         auto nodeFunc = [] (std::vector<SightNodePort> & list){
             for(auto& item: list){
                 if (item.getType() == IntTypeLargeString) {
@@ -975,16 +994,17 @@ namespace sight {
         CALL_NODE_FUNC(this);
     }
 
-    void SightJsNode::callFunction(const char *name) {
-
-    }
-
     SightJsNode::SightJsNode() {
 
     }
 
-    SightJsNode &SightJsNode::operator=(SightNode const & sightNode) {
-        this->copyFrom( &sightNode, false);
+    void SightJsNode::compileFunctions(Isolate* isolate) {
+        onInstantiate.compile(isolate);
+        onDestroyed.compile(isolate);
+    }
+
+    SightJsNode &SightJsNode::operator=(SightNode const & rhs) {
+        this->copyFrom( &rhs, false);
         return *this;
     }
 
@@ -1480,6 +1500,10 @@ namespace sight {
         return this->nodes;
     }
 
+    SightNodeGraphExternalData& SightNodeGraph::getExternalData() {
+        return externalData;
+    }
+
     const SightArray <SightNodeConnection> & SightNodeGraph::getConnections() const {
         return this->connections;
     }
@@ -1754,6 +1778,7 @@ namespace sight {
             if (!pointer->next) {
                 // no next, this is the last element, it should be the node's name.
                 list->push_back(SightNodeTemplateAddress(pointer->part, templateNode));
+                list->back().templateNode.compileFunctions(currentUIStatus()->isolate);
                 break;
             }
 
@@ -1944,6 +1969,67 @@ namespace sight {
         }
     }
 
+    ScriptFunctionWrapper::ScriptFunctionWrapper(Function const& f)
+        : function(f)
+    {
+        
+    }
 
+    ScriptFunctionWrapper::ScriptFunctionWrapper(std::string const& code)
+        : sourceCode(code)
+    {
+        
+    }
 
+    void ScriptFunctionWrapper::compile(Isolate* isolate) {
+        if (!function.IsEmpty() || sourceCode.empty()) {
+            return;
+        }
+        using namespace v8;
+
+        trim(sourceCode);
+        if (!startsWith(sourceCode, "function")) {
+            sourceCode = "function " + sourceCode;
+        }
+        sourceCode = "return " + sourceCode;
+        dbg(sourceCode);
+
+        auto context = isolate->GetCurrentContext();
+        HandleScope handleScope(isolate);
+        v8::ScriptCompiler::Source source(v8pp::to_v8(isolate, sourceCode.c_str()));
+        auto mayFunction = v8::ScriptCompiler::CompileFunctionInContext(context, &source, 0, nullptr, 0, nullptr);
+        if (mayFunction.IsEmpty()) {
+            dbg("compile failed");
+        } else {
+            auto recv = Object::New(isolate);
+            auto t1 = mayFunction.ToLocalChecked()->Call(context, recv, 0, nullptr);
+            if (!t1.IsEmpty()) {
+                auto t2 = t1.ToLocalChecked();
+                dbg(t2->IsFunction());
+                if (t2->IsFunction()) {
+                    function = Function(isolate, t2.As<v8::Function>());
+                }
+            }
+        }
+    }
+
+    void ScriptFunctionWrapper::operator()(Isolate* isolate) const {
+        if (function.IsEmpty()) {
+            dbg(sourceCode);
+            return;
+        }
+
+        v8::HandleScope handleScope(isolate);
+        auto f = function.Get(isolate);
+        auto context = isolate->GetCurrentContext();
+        auto recv = v8::Object::New(isolate);
+        
+        std::string name = v8pp::from_v8<std::string>(isolate, f->GetName());
+        dbg(name);
+        
+        auto result = f->Call(context, recv, 0, nullptr);
+        if (result.IsEmpty()) {
+            return;
+        }
+    }
 }

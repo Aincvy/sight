@@ -649,6 +649,11 @@ namespace sight {
                     auto p = currentProject();
                     ImGui::Text("Path: %s", p->getBaseDir().c_str());
                     ImGui::Text("Loaded Plugins: 0");
+                    
+                    auto memUsage = currentProcessUsageInfo();
+                    ImGui::Text("Memory Usage.");
+                    ImGui::Text(" Virtual Memory(mb): %.2f", memUsage.virtualMemBytes / 1024.0 / 1024);
+                    ImGui::Text("Resident Memory(mb): %.2f", memUsage.residentMemBytes / 1024.0 / 1024);
 
                 } else if (panelTypes) {
                     // show types.
@@ -972,6 +977,20 @@ namespace sight {
         g_UIStatus->languageKeys = loadLanguage("");
         g_UIStatus->uiColors = new UIColors();
 
+        // init ui v8
+        dbg("init ui v8 Isolate");
+        v8::Isolate::CreateParams createParams;
+        createParams.array_buffer_allocator =
+            v8::ArrayBuffer::Allocator::NewDefaultAllocator();
+        g_UIStatus->isolate = v8::Isolate::New(createParams);
+        g_UIStatus->arrayBufferAllocator = createParams.array_buffer_allocator;
+        auto isolate = g_UIStatus->isolate;
+        v8::Isolate::Scope isolateScope(isolate);
+        v8::HandleScope handle_scope(isolate);
+        v8::Local<v8::Context> context = v8::Context::New(isolate);
+        g_UIStatus->v8GlobalContext.Reset(isolate, context);
+        v8::Context::Scope contextScope(context);
+
         // load plugins
         addJsCommand(JsCommandType::InitParser);
         addJsCommand(JsCommandType::InitPluginManager);
@@ -1033,7 +1052,7 @@ namespace sight {
 
         glfwDestroyWindow(window);
 
-        dbg("end loading");
+        dbg("end loading", g_UIStatus->isolate);
         return 0;
     }
 
@@ -1041,6 +1060,17 @@ namespace sight {
         if (!g_UIStatus) {
             return CODE_FAIL;
         }
+
+        // create js context
+        auto isolate = g_UIStatus->isolate;
+        v8::Isolate::Scope isolateScope(isolate);
+        v8::HandleScope handle_scope(isolate);
+        v8::Local<v8::Context> context = g_UIStatus->v8GlobalContext.Get(isolate);
+        //         Enter the context
+        v8::Context::Scope contextScope(context);
+        bindBaseFunctions(isolate, context);
+        bindTinyData(isolate, context);
+        dbg("v8 runtime init over.", isolate);
 
         // Create window with graphics context
         glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
@@ -1133,6 +1163,12 @@ namespace sight {
         destroyNodeEditor();
         glfwTerminate();
 
+        g_UIStatus->v8GlobalContext.Reset();
+        delete g_UIStatus->arrayBufferAllocator;
+        g_UIStatus->arrayBufferAllocator = nullptr;
+        g_UIStatus->isolate->Dispose();
+        g_UIStatus->isolate = nullptr;
+    
         exitSight();
 
         delete g_UIStatus;
@@ -1190,7 +1226,7 @@ namespace sight {
         auto nodeWork = [](std::vector<SightNodePort> & list, bool showValue, bool alwaysShow) {
             for( auto& item: list){
                 if (alwaysShow || (showValue && item.options.showValue)) {
-                    ImGui::Text("%s: ", item.portName.c_str());
+                    ImGui::Text("%7s: ", item.portName.c_str());
                     ImGui::SameLine();
                     showNodePortValue(&item);
                 }

@@ -13,6 +13,8 @@
 #include <functional>
 #include <string>
 #include <sys/types.h>
+#include <v8.h>
+
 
 namespace sight {
 
@@ -218,6 +220,11 @@ namespace sight {
         struct LanguageKeys* languageKeys = nullptr;
         struct UIColors* uiColors = nullptr;
         struct KeyBindings* keybindings = nullptr;
+
+        // for execute js code in ui thread.
+        v8::Isolate* isolate = nullptr;
+        v8::ArrayBuffer::Allocator* arrayBufferAllocator = nullptr;
+        v8::Persistent<v8::Context, v8::CopyablePersistentTraits<v8::Context>> v8GlobalContext{};
 
         uv_loop_t* uvLoop = nullptr;
         uv_async_t* uvAsync = nullptr;
