@@ -2,6 +2,7 @@
 // Created by Aincvy(aincvy@gmail.com) on 2021/7/20.
 //
 #include <algorithm>
+#include <cstdio>
 #include <iterator>
 #include <stdio.h>
 #include <sstream>
@@ -29,6 +30,9 @@
 #include "v8pp/function.hpp"
 #include "v8pp/module.hpp"
 #include "v8pp/class.hpp"
+#include "v8pp/property.hpp"
+#include "v8pp/object.hpp"
+#include "v8pp/json.hpp"
 
 using namespace v8;
 
@@ -128,6 +132,190 @@ namespace sight {
         //   register functions to v8
         //
 
+        Local<Value> getPortValue(Isolate* isolate, SightNodePort const& port) {
+            switch (port.getType()) {
+            case IntTypeProcess:
+                break;
+            case IntTypeFloat:
+                return v8pp::to_v8(isolate, port.value.f);
+            case IntTypeDouble:
+                return v8pp::to_v8(isolate, port.value.d);
+            case IntTypeString:
+                return v8pp::to_v8(isolate, (const char*)port.value.string);
+            case IntTypeInt:
+            case IntTypeLong:
+                return v8pp::to_v8(isolate, port.value.i);
+            case IntTypeBool:
+                return v8pp::to_v8(isolate, port.value.b);
+            case IntTypeLargeString:
+                return v8pp::to_v8(isolate, (const char*)port.value.largeString.pointer);
+            default:
+            { 
+                if (!isBuiltInType(port.getType())) {
+                    auto [typeInfo, find] = currentProject()->findTypeInfo(port.getType());
+                    if (find) {
+                        auto & render = typeInfo.render;
+                        switch (render.kind) {
+                        case TypeInfoRenderKind::Default:
+                            break;
+                        case TypeInfoRenderKind::ComboBox: {
+                            auto object = Object::New(isolate);
+                            v8pp::set_const(isolate, object, "index", port.value.i);
+                            v8pp::set_const(isolate, object, "name", render.data.comboBox.list->at(port.value.i));
+                            return object;
+                        }
+                        }
+                    }
+                }
+                dbg("unhandled type error", port.type);
+                break;
+            }
+            }
+
+            return v8::Undefined(isolate);
+        }
+
+        bool setPortValue(Isolate* isolate, SightNodePort* port, Local<Value> value){
+            if (!port) {
+                return false;
+            }
+
+            bool flag = true;
+            switch (port->getType()) {
+            case IntTypeProcess:
+                break;
+            case IntTypeFloat:
+                port->value.f = v8pp::from_v8<float>(isolate, value);
+                break;
+            case IntTypeDouble:
+                port->value.d = v8pp::from_v8<double>(isolate, value);
+                break;
+            case IntTypeString:{
+                std::string tmp = v8pp::from_v8<std::string>(isolate, value);
+                sprintf(port->value.string, "%s", tmp.c_str());
+                break;
+            }
+            case IntTypeInt:
+            case IntTypeLong:
+                port->value.i = v8pp::from_v8<int>(isolate, value);
+                break;
+            case IntTypeBool:
+                port->value.b = v8pp::from_v8<bool>(isolate, value);
+                break;
+            case IntTypeLargeString:{
+                std::string tmp = v8pp::from_v8<std::string>(isolate, value);
+                port->value.stringCopy(tmp);
+                break;
+            }
+            default:
+                if (isBuiltInType(port->getType())) {
+                    auto [typeInfo, find] = currentProject()->findTypeInfo(port->getType());
+                    if (find) {
+                        auto& render = typeInfo.render;
+                        switch (render.kind) {
+                        case TypeInfoRenderKind::ComboBox:
+                        {
+                            auto& data = render.data.comboBox;
+                            if (IS_V8_STRING(value)) {
+                                std::string v = v8pp::from_v8<std::string>(isolate, value);
+                                auto find = std::find(data.list->begin(), data.list->end(), v);
+                                if (find != data.list->end()) {
+                                    // has one
+                                    port->value.i = static_cast<int>(std::distance(data.list->begin(), find));
+                                } else {
+                                    flag = false;
+                                }
+                            } else if (IS_V8_NUMBER(value)) {
+                                auto selected = v8pp::from_v8<int>(isolate, value);
+                                if (selected < 0 || selected >= data.list->size()) {
+                                    flag = false;
+                                } else {
+                                    port->value.i = selected;
+                                }
+                            }
+                            break;
+                        }
+                        default:
+                            flag = false;
+                            break;
+                        }
+                    }
+                } else {
+                    flag = false;
+                }
+                if (!flag) {
+                    dbg("unhandled type error", port->getType());
+                }
+                break;
+            }
+
+            return flag;
+        }
+
+        Local<Value> nodePortValue(Isolate* isolate, SightNode* node, const char* portName){
+            auto portHandle = node->findPort(portName);
+            if (!portHandle) {
+                return Undefined(isolate);
+            }
+
+            auto object = Object::New(isolate);
+            auto context = isolate->GetCurrentContext();
+
+            auto get = [portHandle, isolate]() -> Local<Value> {
+                auto port = portHandle.get();
+                if (!port) {
+                    return v8::Undefined(isolate);
+                }
+
+                // get value
+                return getPortValue(isolate, *port);
+            };
+            auto set = [portHandle, isolate](Local<Value> arg){
+                return setPortValue(isolate, portHandle.get(), arg);
+            };
+
+            auto port = portHandle.get();
+            object->Set(context, v8pp::to_v8(isolate, "get"), v8pp::wrap_function(isolate, "get", get)).ToChecked();
+            object->Set(context, v8pp::to_v8(isolate, "set"), v8pp::wrap_function(isolate, "set", set)).ToChecked();
+            v8pp::set_const(isolate, object, "id", port->id);
+            v8pp::set_const(isolate, object, "name", port->portName);
+
+            return object;
+        }
+
+        void v8NodePortValue(FunctionCallbackInfo<Value> const& args) {
+            auto isolate = args.GetIsolate();
+            auto node = v8pp::class_<SightNode>::unwrap_object(isolate, args.This());
+            auto rValue = args.GetReturnValue();
+            if (!node || args.Length() <= 0) {
+                rValue.SetUndefined();
+                return;
+            }
+
+            auto arg1 = args[0];
+            if (!IS_V8_STRING(arg1)) {
+                rValue.SetUndefined();
+                return;
+            }
+
+            std::string portName = v8pp::from_v8<std::string>(isolate, arg1);
+            rValue.Set(nodePortValue(isolate, node, portName.c_str()));
+        }
+
+        void v8NodeTemplateAddress(FunctionCallbackInfo<Value> const& args) {
+            auto isolate = args.GetIsolate();
+            auto node = v8pp::class_<SightNode>::unwrap_object(isolate, args.This());
+
+            const SightNode* t1 = node;
+            if (node->templateNode) {
+                t1 = node->templateNode;
+            }
+            auto t = dynamic_cast<SightJsNode const*>(t1);
+            if (t) {
+                args.GetReturnValue().Set(v8pp::to_v8(isolate, t->fullTemplateAddress.c_str()));
+            }
+        }
+
         void checkTinyData(const char* key, Local<Object> data, Isolate* isolate){
             auto g = getCurrentGraph();
             if (!g) {
@@ -179,8 +367,20 @@ namespace sight {
             }
             auto arg1 = args[0];
             auto arg2 = args[1];
-
-            if (!IS_V8_STRING(arg1)) {
+            std::string key;
+            if (IS_V8_STRING(arg1)) {
+                key = v8pp::from_v8<std::string>(isolate, arg1);
+            } else if (arg1->IsObject()) {
+                auto node = v8pp::class_<SightNode>::unwrap_object(isolate, arg1);
+                if (node && node->templateNode) {
+                    // valid object
+                    auto t = dynamic_cast<SightJsNode const*>(node->templateNode);
+                    if (t) {
+                        key = t->fullTemplateAddress;
+                    }
+                }
+            }
+            if (key.empty()) {
                 rValue.Set(-2);
                 return;
             }
@@ -189,7 +389,6 @@ namespace sight {
                 return;
             }
 
-            std::string key = v8pp::from_v8<std::string>(isolate, arg1);
             auto data = arg2.As<Object>();
             checkTinyData(key.c_str(), data, isolate);
             rValue.Set(0);
@@ -205,7 +404,20 @@ namespace sight {
             }
 
             auto arg1 = args[0];
-            if (!IS_V8_STRING(arg1)) {
+            std::string key;
+            if (IS_V8_STRING(arg1)) {
+                key = v8pp::from_v8<std::string>(isolate, arg1);
+            }else if (arg1->IsObject()) {
+                auto node = v8pp::class_<SightNode>::unwrap_object(isolate, arg1);
+                if (node && node->templateNode) {
+                    // valid object
+                    auto t = dynamic_cast<SightJsNode const*>(node->templateNode);
+                    if (t) {
+                        key = t->fullTemplateAddress;
+                    }
+                }
+            }
+            if (key.empty()) {
                 rValue.Set(-2);
                 return;
             }
@@ -222,7 +434,6 @@ namespace sight {
                 data = arg2.As<Object>();
             }
 
-            std::string key = v8pp::from_v8<std::string>(isolate, arg1);
             auto tmp = tinyData(key.c_str(), data, isolate);
             if (tmp.IsEmpty()) {
                 rValue.SetUndefined();
@@ -232,9 +443,42 @@ namespace sight {
         }
 
         // print func
-        void v8rPrint(const char *msg) {
-            // printf("%s\n", msg);
-            dbg(msg);
+        void v8Print(const FunctionCallbackInfo<Value>& args) {
+            auto isolate = args.GetIsolate();
+            auto context = isolate->GetCurrentContext();
+            for( int i = 0; i < args.Length(); i++){
+                auto arg = args[i];
+
+                if (IS_V8_STRING(arg)) {
+                    std::string msg = v8pp::from_v8<std::string>(isolate, arg);
+                    dbg(msg);
+                } else if (IS_V8_NUMBER(arg)) {
+                    if (arg->IsInt32() ) {
+                        int msg = arg->Int32Value(context).ToChecked();
+                        dbg(msg);
+                    } else if (arg->IsUint32()) {
+                        uint msg = arg->Uint32Value(context).ToChecked();
+                        dbg(msg);
+                    } else {
+                        auto msg = arg->NumberValue(context).ToChecked();
+                        dbg(msg);
+                    }
+                } else if (arg->IsObject()) {
+                    // dbg("print object is waited for impl.");
+                    auto str = v8pp::json_str(isolate, arg);
+                    auto msg = str.c_str();
+                    dbg(msg);
+                } else if (arg->IsUndefined()) {
+                    constexpr const char* msg = "undefined";
+                    dbg(msg);
+                } else if (arg->IsNull()) {
+                    constexpr const char* msg = "null";
+                    dbg(msg);
+                }
+                else {
+                    dbg("no-handled-type");
+                }
+            }
         }
 
         void v8AddType(const FunctionCallbackInfo<Value>& args) {
@@ -563,9 +807,7 @@ namespace sight {
                         dbg(sourceCode);
                         if (keyString == "onInstantiate") {
                             sightNode.onInstantiate = sourceCode;
-                            // sightNode.onInstantiate = PersistentFunction(uiIsolate, eventValue.As<Function>());
                         } else if (keyString == "onDestroyed") {
-                            // sightNode.onDestroyed = PersistentFunction(uiIsolate, eventValue.As<Function>());
                             sightNode.onDestroyed = sourceCode;
                         }
                     }
@@ -684,16 +926,59 @@ namespace sight {
     void bindTinyData(Isolate* isolate, const v8::Local<v8::Context>& context) {
         auto tinyData = v8pp::wrap_function(isolate, "tinyData", &v8TinyData);
         auto checkTinyData = v8pp::wrap_function(isolate, "tinyData", &v8CheckTinyData);
-        context->Global()->Set(context, v8pp::to_v8(isolate, "tinyData"), tinyData);
-        context->Global()->Set(context, v8pp::to_v8(isolate, "checkTinyData"), checkTinyData);
+        context->Global()->Set(context, v8pp::to_v8(isolate, "tinyData"), tinyData).ToChecked();
+        context->Global()->Set(context, v8pp::to_v8(isolate, "checkTinyData"), checkTinyData).ToChecked();
     }
 
-    void sight::bindBaseFunctions(v8::Isolate* isolate, const v8::Local<v8::Context>& context) {
-        auto printFunc = v8pp::wrap_function(isolate, "print", &v8rPrint);
-        context->Global()->Set(context, v8pp::to_v8(isolate, "print"), printFunc);
+    void bindBaseFunctions(v8::Isolate* isolate, const v8::Local<v8::Context>& context) {
+        auto printFunc = v8pp::wrap_function(isolate, "print", &v8Print);
+        context->Global()->Set(context, v8pp::to_v8(isolate, "print"), printFunc).ToChecked();
     }
 
-    v8::Isolate* sight::getJsIsolate() {
+    void bindNodeTypes(v8::Isolate* isolate, const v8::Local<v8::Context>& context) {
+        HandleScope handleScope(isolate);
+
+        auto v8StringSight = v8pp::to_v8(isolate, "sight");
+        auto maySightModel = context->Global()->Get(context, v8StringSight);
+        dbg(maySightModel.IsEmpty());
+        auto sightModel = maySightModel.ToLocalChecked();
+        v8pp::module module = sightModel->IsNullOrUndefined() ? v8pp::module(isolate) : v8pp::module{ isolate, sightModel.As<ObjectTemplate>() };
+
+        v8pp::module jsNodePortTypeEnum(isolate);
+        jsNodePortTypeEnum
+            .set_const("Input", static_cast<int>(NodePortType::Input))
+            .set_const("Output", static_cast<int>(NodePortType::Output))
+            .set_const("Both", static_cast<int>(NodePortType::Both))
+            .set_const("Field", static_cast<int>(NodePortType::Field));
+        module.set("NodePortType", jsNodePortTypeEnum);
+
+        v8pp::class_<SightNodePort> jsNodePortClass(isolate);
+        jsNodePortClass.ctor<>()
+            .set("portName", &SightNodePort::portName)
+            .set("id", &SightNodePort::id)
+            .set("setKind", &SightNodePort::setKind);
+        module.set("SightNodePort", jsNodePortClass);
+
+        v8pp::class_<SightNode> nodeClass(isolate);
+        nodeClass
+            .ctor<>()
+            .set("nodeName", &SightNode::nodeName)
+            .set("name", &SightNode::nodeName)
+            .set("nodeId", &SightNode::nodeId)
+            .set("id", &SightNode::nodeId)
+            .set("addPort", &SightNode::addPort)
+            .set("templateAddress", &v8NodeTemplateAddress)
+            .set("portValue", &v8NodePortValue)
+            ;
+
+        module.set("SightNode", nodeClass);
+        
+        if (maySightModel.IsEmpty()) {
+            context->Global()->Set(context, v8StringSight, module.new_instance()).ToChecked();
+        }
+    }
+
+    v8::Isolate* getJsIsolate() {
         return g_V8Runtime->isolate;
     }
 
@@ -709,41 +994,16 @@ namespace sight {
 
         v8pp::module module(isolate);
 
-        // classes ...
-        v8pp::module jsNodePortTypeEnum(isolate);
-        jsNodePortTypeEnum
-            .set_const("Input", static_cast<int>(NodePortType::Input))
-            .set_const("Output", static_cast<int>(NodePortType::Output))
-            .set_const("Both", static_cast<int>(NodePortType::Both))
-            .set_const("Field", static_cast<int>(NodePortType::Field))
-            ;
-        module.set("NodePortType", jsNodePortTypeEnum);
-
-        v8pp::class_<SightNodePort> jsNodePortClass(isolate);
-        jsNodePortClass.ctor<>()
-                .set("portName", &SightNodePort::portName)
-                .set("id", &SightNodePort::id)
-                .set("setKind", &SightNodePort::setKind);
-        module.set("SightNodePort", jsNodePortClass);
-
-        v8pp::class_<SightJsNode> jsNodeClass(isolate);
-        jsNodeClass
-                .ctor<>()
-                .set("nodeName", &SightJsNode::nodeName)
-                .set("nodeId", &SightJsNode::nodeId)
-                .set("addPort", &SightJsNode::addPort);
-        module.set("SightJsNode", jsNodeClass);
-
         // functions ...
-        module.set("nextNodeOrPortId", &nextNodeOrPortId);
         module.set("addNode", &v8AddNode);
 
         auto currentContext = context;
-        currentContext->Global()->Set(currentContext, v8pp::to_v8(isolate, "sight"), module.new_instance());
+        currentContext->Global()->Set(currentContext, v8pp::to_v8(isolate, "sight"), module.new_instance()).ToChecked();
+        
         auto addTemplateNodeFunc = v8pp::wrap_function(isolate, "addTemplateNode", v8AddTemplateNode);
-        currentContext->Global()->Set(currentContext, v8pp::to_v8(isolate, "addTemplateNode"), addTemplateNodeFunc);
+        currentContext->Global()->Set(currentContext, v8pp::to_v8(isolate, "addTemplateNode"), addTemplateNodeFunc).ToChecked();
         auto addTypeFunc = v8pp::wrap_function(isolate, "addType", &v8AddType);
-        currentContext->Global()->Set(currentContext, v8pp::to_v8(isolate, "addType"), addTypeFunc);
+        currentContext->Global()->Set(currentContext, v8pp::to_v8(isolate, "addType"), addTypeFunc).ToChecked();
 
         v8pp::class_<GenerateOptions> generateOptionsClass(isolate);
         generateOptionsClass
@@ -1129,27 +1389,7 @@ namespace sight {
                     };
 
                     auto functionObject = isOutput ? v8pp::wrap_function(isolate, name, emptyFunc) : v8pp::wrap_function(isolate, name, t);
-                    switch (item.type) {
-                        case IntTypeFloat:
-                            functionObject->Set(context, v8pp::to_v8(isolate, "value"), v8pp::to_v8(isolate, item.value.f));
-                            break;
-                        case IntTypeDouble:
-                            functionObject->Set(context, v8pp::to_v8(isolate, "value"), v8pp::to_v8(isolate, item.value.d));
-                            break;
-                        case IntTypeString:
-                            functionObject->Set(context, v8pp::to_v8(isolate, "value"), v8pp::to_v8(isolate, (const char*)item.value.string));
-                            break;
-                        case IntTypeInt:
-                            functionObject->Set(context, v8pp::to_v8(isolate, "value"), v8pp::to_v8(isolate, item.value.i));
-                            break;
-                        case IntTypeBool:
-                            functionObject->Set(context, v8pp::to_v8(isolate, "value"), v8pp::to_v8(isolate, item.value.b));
-                            break;
-                        default:
-                            dbg("type error", item.type);
-                            break;
-                    }
-
+                    functionObject->Set(context, v8pp::to_v8(isolate, "value"), getPortValue(isolate, item));
                     functionObject->Set(context, v8pp::to_v8(isolate, "isConnect"), v8pp::to_v8(isolate, item.isConnect()));
 
                     arg$->Set(context, v8pp::to_v8(isolate, name), functionObject);

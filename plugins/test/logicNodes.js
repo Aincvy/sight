@@ -52,7 +52,11 @@ addTemplateNode({
 });
 
 function externalOnDestroyed(node) {
-    print("external onDestroyed");
+    print("external onDestroyed", node.id);
+    let field1 = node.portValue('field1');
+    if (field1) {
+        print(field1.get());
+    }
 }
 
 addTemplateNode({
@@ -71,8 +75,37 @@ addTemplateNode({
     __meta_events: {
         // call after instantiate, called by ui thread.([ui thread] in below.)
         // node is the node data, not the template node.
-        onInstantiate() {
+        onInstantiate(node) {
             print("this is run by ui thread. onInstantiate");
+            // print(node.id, node.name);
+            print(node.templateAddress());
+
+            checkTinyData(node, {index: 1});
+            let data  = tinyData(node);
+            if (typeof data === 'object' && typeof data.index === 'number') {
+                data.index += 10;
+                print(data.index);
+                if(data.msg){
+                    print(data.msg);
+                } else {
+                    data.msg = '' + node.id;
+                }
+            } else {
+                print('data not ready.');
+            }
+
+            // let field1 = node.portValue('field1');
+            // if (field1){
+            //     print(field1.get());
+            //     field1.set('fff');
+            // } 
+
+            let type = node.portValue('type');
+            if(type){
+                let typeValue = type.get();
+                print(`typeValue: ${typeValue}`);
+                // print(typeValue.index, typeValue.name);
+            }
         },
 
         // node isn't the template node.
@@ -85,12 +118,14 @@ addTemplateNode({
     field1: {
         type: 'String',
         showValue: true,
+        defaultValue: 'abcd',
         // [ui thread]
         onValueChange(node, newValue) {
             // update value to auto-complete list.
 
         },
     },
+    type: 'InOrOut',
 
 });
 

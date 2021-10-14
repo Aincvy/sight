@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <cstdio>
+#include <iterator>
 #include <string>
 #include <sys/types.h>
 #include <utility>
@@ -26,6 +27,7 @@
 #include "imgui.h"
 #include "sight_widgets.h"
 #include "v8pp/convert.hpp"
+#include "v8pp/class.hpp"
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui_canvas.h"
@@ -869,7 +871,7 @@ namespace sight {
 
         auto tmp = dynamic_cast<const SightJsNode*>(this);
         if (tmp) {
-            tmp->onInstantiate(currentUIStatus()->isolate);
+            tmp->onInstantiate(currentUIStatus()->isolate, p);
         }
         return p;
     }
@@ -980,7 +982,9 @@ namespace sight {
         // call events
         if (templateNode) {
             auto t = dynamic_cast<const SightJsNode*>(templateNode);
-            t->onDestroyed(currentUIStatus()->isolate);
+            if (t) {
+                t->onDestroyed(currentUIStatus()->isolate, this);
+            }
         }
 
         auto nodeFunc = [] (std::vector<SightNodePort> & list){
@@ -992,6 +996,58 @@ namespace sight {
         };
 
         CALL_NODE_FUNC(this);
+    }
+
+    SightNodePortHandle SightNode::findPort(const char* name, int orderSize, int order[]) {
+        static constexpr int defaultOrder[] = { 
+            static_cast<int>(NodePortType::Field), 
+            static_cast<int>(NodePortType::Input), 
+            static_cast<int>(NodePortType::Output) 
+        };
+
+        if (orderSize <= 0) {
+            // use normal methods
+            orderSize = 3;
+            order = (int*)defaultOrder;
+        }
+
+        SightNodePortHandle portHandle = {};
+        auto func = [&portHandle, name, this](std::vector<SightNodePort> const& list) {
+            for (const auto& item : list) {
+                if (item.portName == name) {
+                    portHandle.node = this;
+                    portHandle.portId = item.id;
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
+        for( int i = 0; i < orderSize; i++){
+            switch (static_cast<NodePortType>(order[i])) {
+            case NodePortType::Input:
+                if (func(this->inputPorts)) {
+                    goto result;
+                }
+                break;
+            case NodePortType::Output:
+                if (func(this->outputPorts)) {
+                    goto result;
+                }
+                break;
+            case NodePortType::Field:
+                if (func(this->fields)) {
+                    goto result;
+                }
+                break;
+            default:
+                break;
+            }
+        }
+
+        result:
+        return portHandle;
     }
 
     SightJsNode::SightJsNode() {
@@ -1045,7 +1101,7 @@ namespace sight {
         YAML::Emitter out;
         out << YAML::BeginMap;
         // file header
-        out << YAML::Key << "who-am-i" << YAML::Value << "sight-graph";
+        out << YAML::Key << whoAmI << YAML::Value << "sight-graph";
         // nodes
         out << YAML::Key << "nodes";
         out << YAML::Value << YAML::BeginMap;
@@ -1732,7 +1788,7 @@ namespace sight {
 
     }
 
-    SightNodePort * SightNodePortHandle::get() const {
+    SightNodePort* SightNodePortHandle::get() const {
         if (!node) {
             return nullptr;
         }
@@ -1749,6 +1805,12 @@ namespace sight {
             }
         }
 
+        for(auto& item: node->fields){
+            if (item.id == portId) {
+                return &item;
+            }
+        }
+
         return nullptr;
     }
 
@@ -1758,6 +1820,10 @@ namespace sight {
 
     SightNodePort &SightNodePortHandle::operator*() const {
         return *get();
+    }
+
+    SightNodePortHandle::operator bool() const {
+        return this->node && this->portId > 0;
     }
 
     int addTemplateNode(const SightNodeTemplateAddress &templateAddress) {
@@ -1969,6 +2035,13 @@ namespace sight {
         }
     }
 
+    void SightNodeValue::stringCopy(std::string const& str) {
+        stringCheck(str.size());
+
+        sprintf(largeString.pointer, "%s", str.c_str());
+        largeString.size = str.size();
+    }
+
     ScriptFunctionWrapper::ScriptFunctionWrapper(Function const& f)
         : function(f)
     {
@@ -2013,11 +2086,14 @@ namespace sight {
         }
     }
 
-    void ScriptFunctionWrapper::operator()(Isolate* isolate) const {
+    void ScriptFunctionWrapper::operator()(Isolate* isolate, SightNode* node) const {
         if (function.IsEmpty()) {
             dbg(sourceCode);
             return;
         }
+        using namespace v8;
+
+        // v8pp::class_<SightNode> nodeClass(isolate);
 
         v8::HandleScope handleScope(isolate);
         auto f = function.Get(isolate);
@@ -2025,11 +2101,17 @@ namespace sight {
         auto recv = v8::Object::New(isolate);
         
         std::string name = v8pp::from_v8<std::string>(isolate, f->GetName());
-        dbg(name);
+        dbg(name, node);
         
-        auto result = f->Call(context, recv, 0, nullptr);
+        Local<Value> args[1];
+        args[0] = v8pp::class_<SightNode>::reference_external(isolate, node);
+        dbg(v8pp::from_v8<SightNode*>(isolate, args[0]));
+        dbg(args[0]->IsExternal());
+        auto result = f->Call(context, recv, 1, args);
+        v8pp::class_<SightNode>::unreference_external(isolate, node);
         if (result.IsEmpty()) {
             return;
         }
+        
     }
 }

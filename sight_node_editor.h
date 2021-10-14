@@ -58,6 +58,7 @@ namespace sight {
         void stringInit();
         void stringCheck(size_t needSize);
         void stringFree();
+        void stringCopy(std::string const& str);
     };
 
     struct SightNodePortOptions {
@@ -162,6 +163,8 @@ namespace sight {
 
         SightNodePort* operator->() const;
         SightNodePort& operator*() const;
+
+        operator bool() const;
         
     };
 
@@ -244,6 +247,16 @@ namespace sight {
          */
         void reset() override;
 
+        /**
+         * @brief 
+         * 
+         * @param name 
+         * @param order 
+         * @return SightNodePortHandle 
+         */
+        SightNodePortHandle findPort(const char* name, int orderSize = 0, int order[] = nullptr);
+
+
     protected:
         enum class CopyFromType {
             Clone,
@@ -271,7 +284,7 @@ namespace sight {
 
         void compile(Isolate* isolate);
 
-        void operator()(Isolate* isolate) const;
+        void operator()(Isolate* isolate, SightNode* node) const;
     };
 
     /**

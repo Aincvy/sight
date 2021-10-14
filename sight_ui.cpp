@@ -1070,6 +1070,7 @@ namespace sight {
         v8::Context::Scope contextScope(context);
         bindBaseFunctions(isolate, context);
         bindTinyData(isolate, context);
+        bindNodeTypes(isolate, context);
         dbg("v8 runtime init over.", isolate);
 
         // Create window with graphics context

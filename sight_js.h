@@ -107,6 +107,8 @@ namespace sight{
 
     void bindBaseFunctions(v8::Isolate* isolate, const v8::Local<v8::Context>& context);
 
+    void bindNodeTypes(v8::Isolate* isolate, const v8::Local<v8::Context>& context);
+
     v8::Isolate* getJsIsolate();
 
 }

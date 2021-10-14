@@ -645,13 +645,13 @@ namespace sight {
 
     void TypeInfoRender::initData() {
         switch (kind) {
-            case TypeInfoRenderKind::Default:
+        case TypeInfoRenderKind::Default:
             break;
-            case TypeInfoRenderKind::ComboBox:
-                auto& data = this->data.comboBox; 
-                data.selected = 0;
-                data.list = new std::vector<std::string>();
-                break;
+        case TypeInfoRenderKind::ComboBox:
+            auto& data = this->data.comboBox;
+            data.selected = 0;
+            data.list = new std::vector<std::string>();
+            break;
         }
     }
 
