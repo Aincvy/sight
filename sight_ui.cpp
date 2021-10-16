@@ -89,10 +89,10 @@ namespace sight {
                 ImGui::EndMenu();
             }
 
-            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.open)) {
-                dbg("open graph file");
+            // if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.open)) {
+            //     dbg("open graph file");
                 
-            }
+            // }
             if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.save, g_UIStatus->keybindings->saveFile.tipsText())) {
                 dbg("save graph");
                 saveAnyThing();
@@ -386,7 +386,7 @@ namespace sight {
                         dbg("1");
                         node->nodeName = nameBuf;
                     }
-
+            
                     // fields
                     ImGui::Text("Ports");
                     ImGui::Separator();
@@ -886,6 +886,7 @@ namespace sight {
                 for (int i = 0; i < size; ++i) {
                     auto p = pointer[i];
                     addTemplateNode(*p);
+                    p->dispose();    // free SightJsNode first.
                     delete p;
                 }
                 pluginManager()->getPluginStatus().addTemplateNodesFinished = true;

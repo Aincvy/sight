@@ -120,12 +120,46 @@ addTemplateNode({
         showValue: true,
         defaultValue: 'abcd',
         // [ui thread]
-        onValueChange(node, newValue) {
+        onValueChange(node) {
             // update value to auto-complete list.
-
+            print('onValueChange', this.id, this.get());
         },
     },
-    type: 'InOrOut',
+    type: {
+        type: 'InOrOut',
+
+        onValueChange(node) {
+            // update value to auto-complete list.
+            print('InOrOut onValueChange', this.id);
+            let newValue = this.get();
+            if(newValue.index == 0){
+                let port = node.portValue('out');
+                port.show(false);
+                port.deleteLinks();
+                node.portValue('in').show(true);
+            } else {
+                let port = node.portValue('in');
+                port.show(false);
+                port.deleteLinks();
+                node.portValue('out').show(true);
+            }
+        },
+    },
+
+    in: {
+        type: 'Object',
+        kind: 'input',
+        showValue: false,
+        show: true,
+    },
+    out: {
+        type: 'Object',
+        kind: 'output',
+        showValue: false,
+        show: false,
+    },
+
+    button: 'button',
 
 });
 

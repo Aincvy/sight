@@ -165,6 +165,8 @@ namespace sight {
      */
     void helpMarker(const char* desc);
 
+    bool checkBox(const char* label, bool *v, bool readonly = false);
+
     /**
      * @brief 
      * 

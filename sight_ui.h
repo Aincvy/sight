@@ -139,6 +139,7 @@ namespace sight {
         ImU32 readonlyText = grey;
         // ImU32 nodeIdText = IM_COL32(40,56,69,255);
         ImVec4 nodeIdText = rgb(51, 184, 255);
+        ImVec4 errorText = rgba(239, 35, 60, 255);
 
         UIColors();
     };

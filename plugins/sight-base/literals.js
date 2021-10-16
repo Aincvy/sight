@@ -218,20 +218,137 @@ addTemplateNode({
         generateCodeWork($) {
             $.varName.value = $.object();
         },
+        onReverseActive($, $$){
+            return $.varName.value;
+        },
+    },
+    __meta_events: {
+        onInstantiate(node) {
+            // names: key=node.id, value: varName
+            checkTinyData(node, { names: {}});
+            let data = tinyData(node);
+            // fix var name first.
+            let realNames = Object.values(data.names);
+            let portVarName = node.portValue('varName');
+            let oldName = portVarName.get();
+            print(oldName);
+            if(realNames.length > 0 && realNames.includes(oldName)){
+                let i = 0;
+                while(true){
+                    let tmp = oldName + (++i);
+                    if(!realNames.includes(tmp)){
+                        print(tmp);
+                        portVarName.set(tmp);
+                        oldName = tmp;
+
+                        break;
+                    }
+                }
+            }
+
+            // put in cache
+            data.names[node.id] = oldName;
+        }
     },
     __meta_inputs: {
-        object: 'Object',
+        in: 'Object',
     },
     __meta_outputs: {
+        out: {
+            type: 'Object',
+            show: false,
+        },
     },
 
     type: {
-        type: 'InOrOut'
+        type: 'InOrOut',
+        onValueChange(node) {
+            let newValue = this.get();
+            let portVarName = node.portValue('varName');
+            if (newValue.index == 0) {
+                // in
+                let port = node.portValue('out');
+                port.show(false);
+                port.deleteLinks();
+                node.portValue('in').show(true);
+            } else {
+                // out
+                let port = node.portValue('in');
+                port.show(false);
+                port.deleteLinks();
+                node.portValue('out').show(true);
+                // node.portValue('varName').readonly(true);
+                
+                // delete name
+                let data = tinyData(node);
+                delete data.names[node.id];
+
+                // change name
+                let realNames = Object.values(data.names);
+                if(realNames.length > 0){
+                    portVarName.set(realNames[0]);
+                } else {
+                    portVarName.set('');
+                }
+            }
+
+            portVarName.errorMsg('');
+        },
     },
 
     varName: {
         type: 'String',
         defaultValue: 'varName',
+        onValueChange(node) {
+            // update var name.
+            let data = tinyData(node);
+            // fix var name first.
+            let realNames = Object.values(data.names);
+            let portVarName = node.portValue('varName');
+            let portType = node.portValue('type');
+            let type = portType.get();
+            let oldName = portVarName.get();
+            if(oldName === data.names[node.id]){
+                return;
+            }
+
+            if(type.index == 0){
+                // in
+                if (realNames.includes(oldName)) {
+                    portVarName.errorMsg('repeat name');
+                    return;
+                } else {
+                    portVarName.errorMsg('');
+                }
+
+                data.names[node.id] = oldName;
+            } else {
+                // out
+                if (!realNames.includes(oldName)) {
+                    portVarName.errorMsg('invalid var name');
+                    return;
+                } else {
+                    portVarName.errorMsg('');
+                }
+            }
+        },
+
+        onAutoComplete(node, text) {
+            let portType = node.portValue('type');
+            if(portType.get().index == 0){
+                return undefined;
+            }
+
+            let data = tinyData(node);
+            let realNames = Object.values(data.names);
+            if(!text){
+                return realNames;
+            }
+
+            // this should be have a filter.
+            return realNames;
+        }
+
     },
 
 });
@@ -252,7 +369,7 @@ addTemplateNode({
 
     varName: {
         type: 'String',
-        defaultValue: 'varName',
+        defaultValue: 'name',
     },
 
 });

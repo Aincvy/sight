@@ -373,6 +373,7 @@ namespace sight {
         addTypeInfo({ .name = "String", .intValue = IntTypeString }, { color, IconType::Circle });
         addTypeInfo({ .name = "LargeString", .intValue = IntTypeLargeString }, { color, IconType::Circle });
         addTypeInfo({ .name = "Object", .intValue = IntTypeObject }, { color, IconType::Circle });
+        addTypeInfo({ .name = "button", .intValue = IntTypeButton }, { color, IconType::Circle });
 
         // type alias
         typeMap["Number"] = IntTypeFloat;
@@ -665,7 +666,9 @@ namespace sight {
         }
     }
 
-    void TypeInfoRender::operator()(const char* labelBuf, SightNodeValue& value) const{
+    void TypeInfoRender::operator()(const char* labelBuf, SightNodePort* port) const{
+        SightNodeValue& value = port->value;
+        auto & options = port->options;
         switch (kind) {
         case TypeInfoRenderKind::Default:
             ImGui::Text(" ");
@@ -677,6 +680,9 @@ namespace sight {
                 break;
             }
 
+            if (options.readonly) {
+                ImGui::BeginDisabled();
+            }
             // this will not working on graph, but works on inspector.
             // maybe i will fix it on someday.
             // fixme: https://github.com/thedmd/imgui-node-editor/issues/101
@@ -684,13 +690,20 @@ namespace sight {
                 auto & list = *data.list;
                 for( int i = 0; i < list.size(); i++){
                     if (ImGui::Selectable(list[i].c_str(), value.i == i)) {
-                        value.i = i;
+                        if (value.i != i) {
+                            value.i = i;
+                            onNodePortValueChange(port);
+                        }
                     }
                 }
 
                 ImGui::EndCombo();
             }
-            
+
+            if (options.readonly) {
+                ImGui::EndDisabled();
+            }
+
             break;
         }
     }

@@ -355,6 +355,7 @@ addTemplateNode({
         },
         
         // node isn't the template node.
+        // [ui thread]
         onDestroyed(node){
 
         }
@@ -364,11 +365,24 @@ addTemplateNode({
     field1: {
         type: 'String',
         showValue: true,
-        // [ui thread]
-        onValueChange(node, newValue){
+        // [ui thread]  
+        onValueChange(node ){
             // update value to auto-complete list.
-            
+            // this = current nodePort
         },
+
+        /**
+         * Every character input will trigger this function.
+         * Please make sure this function has a quickly response.
+         * 
+         * this:   current nodePort
+         * @param {*} node the node object  [external reference]
+         * @param {*} text current text
+         * @returns   string array. 
+         */
+        onAutoComplete(node, text) {
+            return [];
+        }
     },
 
 });

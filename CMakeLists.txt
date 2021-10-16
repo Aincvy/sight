@@ -27,6 +27,7 @@ target_sources(sight PRIVATE
         sight_plugin.cpp
         sight_widgets.cpp
         sight_keybindings.cpp
+        sight_external_widgets.cpp
 )
 
 # depend

@@ -11,6 +11,7 @@
 #include "imgui.h"
 #include "imgui_node_editor.h"
 
+#include "sight_defines.h"
 #include "sight_ui.h"
 #include "sight_memory.h"
 
@@ -37,6 +38,8 @@ namespace sight {
     struct SightNodeConnection;
     class SightNodeGraph;
     struct SightNode;
+    struct SightJsNode;
+    struct SightJsNodePort;
 
     union SightNodeValue{
         int i;
@@ -63,6 +66,12 @@ namespace sight {
 
     struct SightNodePortOptions {
         bool showValue = false;
+        // if false, this node port will be hidden.
+        bool show = true;
+        std::string errorMsg;
+        bool readonly = false;
+        // render as a combo box 
+        std::vector<std::string> alternatives;
     };
 
     /**
@@ -82,6 +91,7 @@ namespace sight {
         // connections
         std::vector<SightNodeConnection*> connections;
         SightNode* node = nullptr;
+        const SightJsNodePort* templateNodePort = nullptr;
 
         /**
          * Set kind from int.
@@ -187,7 +197,7 @@ namespace sight {
         std::string nodeName;
         uint nodeId;
         // this node's template node.  Real template node's `templateNode` must be nullptr.
-        SightNode const* templateNode = nullptr;
+        const SightJsNode* templateNode = nullptr;
         SightNodeGraph* graph = nullptr;
 
         // chainInPort and chainOutPort are point to inputPorts and outputPorts
@@ -205,14 +215,6 @@ namespace sight {
          * @param port
          */
         void addPort(const SightNodePort & port);
-
-        /**
-         * instantiate a node by this node.
-         * if this node is a template, then instantiate one.
-         * else it will instantiate one by this node's template.
-         * @return a new node, you should `delete` the object when you do not need it.
-         */
-        SightNode* instantiate(bool generateId = true) const;
 
         /**
          * clone this node
@@ -268,7 +270,16 @@ namespace sight {
          * @param node
          * @param isTemplate   if true, node will as a template node.
          */
-        void copyFrom(const SightNode* node, bool isTemplate, CopyFromType copyFromType = CopyFromType::Clone);
+        void copyFrom(const SightNode* node, CopyFromType copyFromType = CopyFromType::Clone);
+    };
+
+    enum class JsEventType {
+        Default,
+        AutoComplete,
+    };
+
+    struct a{
+
     };
 
     struct ScriptFunctionWrapper {
@@ -285,10 +296,24 @@ namespace sight {
         void compile(Isolate* isolate);
 
         void operator()(Isolate* isolate, SightNode* node) const;
+        void operator()(Isolate* isolate, SightNodePort* thisNodePort, const char* text = nullptr,JsEventType eventType = JsEventType::Default) const;
     };
 
     /**
-     * js node
+     * @brief 
+     * 
+     */
+    struct SightJsNodePort : public SightNodePort {
+        
+
+        // events, called by ui thread.
+        ScriptFunctionWrapper onValueChange;
+
+        ScriptFunctionWrapper onAutoComplete;
+    };
+
+    /**
+     * js node  / template node
      */
     struct SightJsNode : public SightNode{
 
@@ -302,19 +327,39 @@ namespace sight {
         ScriptFunctionWrapper onInstantiate;
         ScriptFunctionWrapper onDestroyed;
 
+        std::vector<SightJsNodePort*> inputPorts;
+        std::vector<SightJsNodePort*> outputPorts;
+        // no input/output ports.
+        std::vector<SightJsNodePort*> fields;
+
+        std::vector<SightJsNodePort> originalInputPorts;
+        std::vector<SightJsNodePort> originalOutputPorts;
+        // no input/output ports.
+        std::vector<SightJsNodePort> originalFields;
 
         SightJsNodeOptions options;
 
         SightJsNode();
         ~SightJsNode() = default;
 
+        /**
+         *
+         * @param port
+         */
+        void addPort(const SightJsNodePort& port);
+
+        void compact();
 
         void compileFunctions(Isolate* isolate);
 
-
-        // todo delete this function. (When use another way to impl entity)
-        SightJsNode & operator=(SightNode const & sightNode);
-
+        /**
+         * instantiate a node by this node.
+         * if this node is a template, then instantiate one.
+         * else it will instantiate one by this node's template.
+         * @return a new node, you should `delete` the object when you do not need it.
+         */
+        SightNode* instantiate(bool generateId = true) const;
+        
     };
 
     enum class SightAnyThingType {
@@ -358,20 +403,26 @@ namespace sight {
         // name or address
         std::string name;
         //
-        SightJsNode templateNode;
+        SightJsNode* templateNode = nullptr;
         //
         std::vector<SightNodeTemplateAddress> children;
 
         SightNodeTemplateAddress();
         ~SightNodeTemplateAddress();
         explicit SightNodeTemplateAddress(std::string name);
-        SightNodeTemplateAddress(std::string name, const SightJsNode& templateNode);
-        SightNodeTemplateAddress(std::string name, const SightNode& templateNode);
+        SightNodeTemplateAddress(std::string name, SightJsNode* templateNode);
 
         /**
          * If has children, then show them, otherwise, show self.
          */
         void showContextMenu(const ImVec2 &openPopupPosition);
+
+        /**
+         * @brief Free external memory.
+         * The destructor do not call this function.
+         * Please call this function only if you know what you are doing.
+         */
+        void dispose();
     };
 
     struct SightNodeGraphExternalData{
@@ -534,6 +585,9 @@ namespace sight {
         // node template | for render
         std::vector<SightNodeTemplateAddress> templateAddressList;
 
+        SightArray<SightJsNode> templateNodeArray{LITTLE_ARRAY_SIZE * 2};
+        SightArray<SightJsNodePort> templateNodePortArray{ MEDIUM_ARRAY_SIZE };
+
         NodeEditorStatus();
         ~NodeEditorStatus();
 
@@ -581,6 +635,8 @@ namespace sight {
     void nodeEditorFrameEnd();
 
     int showNodeEditorGraph(UIStatus const& uiStatus);
+
+    void onNodePortValueChange(SightNodePort* port);
 
     /**
      * @brief 
@@ -654,7 +710,7 @@ namespace sight {
      * @param node
      * @return
      */
-    SightJsNode* findTemplateNode(const SightNode *node);
+    const SightJsNode* findTemplateNode(const SightNode *node);
     SightJsNode* findTemplateNode(const char* path);
 
     /**

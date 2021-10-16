@@ -17,6 +17,7 @@ namespace sight {
 
     union SightNodeValue;
     class SightNodeGraph;
+    struct SightNodePort;
 
     enum TypeIntValues {
         IntTypeProcess = 1,
@@ -34,6 +35,8 @@ namespace sight {
         IntTypeObject,
         // a large string.
         IntTypeLargeString,
+        // render as a button
+        IntTypeButton,
 
         IntTypeNext = 3000,
     };
@@ -91,7 +94,7 @@ namespace sight {
         void initData();
         void freeData();
 
-        void operator()(const char* labelBuf, SightNodeValue & value) const;
+        void operator()(const char* labelBuf, SightNodePort* port) const;
 
         /**
          * @brief Does this render has a render function ?

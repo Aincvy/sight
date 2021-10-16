@@ -321,6 +321,18 @@ namespace sight {
         }
     }
 
+    bool checkBox(const char* label, bool *v, bool readonly) {
+        if (readonly) {
+            auto t = *v;
+            ImGui::BeginDisabled();
+            ImGui::Checkbox(label, &t);
+            ImGui::EndDisabled();
+            return false;
+        } else {
+            return ImGui::Checkbox(label, v);
+        }
+    }
+
     SightKey::SightKey(ushort code)
         : code(code) {
     }

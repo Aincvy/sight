@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <cstdio>
+#include <cstring>
 #include <iterator>
 #include <string>
 #include <sys/types.h>
@@ -13,6 +14,7 @@
 #include <algorithm>
 #include <fstream>
 
+#include "sight_defines.h"
 #include "dbg.h"
 #include "sight.h"
 #include "sight_defines.h"
@@ -349,7 +351,7 @@ namespace sight {
 
             auto chainOutPort = node->chainOutPort;
             if (chainOutPort) {
-                ImGui::SameLine();
+                ImGui::SameLine(215);
                 ed::BeginPin(chainOutPort->id, ed::PinKind::Output);
                 showNodePortIcon(typeProcess.style->iconType, typeProcess.style->color, chainOutPort->isConnect());
                 ed::EndPin();
@@ -358,16 +360,35 @@ namespace sight {
 
             // fields
             for (auto &item: node->fields) {
-                ImGui::Text("%s", item.portName.c_str());
+                if (!item.options.show) {
+                    continue;
+                }
+
+                auto & options = item.options;
+                bool showErrorMsg = false;
+                if (options.errorMsg.empty()) {
+                    ImGui::Text("%8s", item.portName.c_str());
+                } else {
+                    ImGui::TextColored(currentUIStatus()->uiColors->errorText, "%8s", item.portName.c_str());
+                    if (ImGui::IsItemHovered()) {
+                        // show error msg
+                        showErrorMsg = true;
+                    }
+                }
                 ImGui::SameLine();
-                showNodePortValue(&item);
+                showNodePortValue(&item, true);
+
+                if (showErrorMsg) {
+                    ImGui::TextColored(currentUIStatus()->uiColors->errorText, "%8s", options.errorMsg.c_str());
+                }
             }
 
             // inputPorts
             ImGui::BeginGroup();
-            for (auto &item : node->inputPorts) {
-                if (item.portName.empty()) {
-                    continue;       // do not show the chain port. (Process port)
+            bool hasInputShow = false;
+            for (auto& item : node->inputPorts) {
+                if (item.portName.empty() || !item.options.show) {
+                    continue;     // do not show the chain port. (Process port)
                 }
 
                 ed::BeginPin(item.id, ed::PinKind::Input);
@@ -385,13 +406,18 @@ namespace sight {
                 ImGui::SameLine();
                 ImGui::Text("%s", item.portName.c_str());
                 ed::EndPin();
+
+                hasInputShow = true;
+            }
+            if (!hasInputShow) {
+                ImGui::Dummy(ImVec2(35, 20));
             }
 
             ImGui::EndGroup();
             ImGui::SameLine();
             ImGui::BeginGroup();
             for (SightNodePort &item : node->outputPorts) {
-                if (item.portName.empty()) {
+                if (item.portName.empty() || !item.options.show) {
                     continue;       // do not show the chain port. (Process port)
                 }
 
@@ -399,14 +425,14 @@ namespace sight {
                 if (item.type == IntTypeProcess || !item.options.showValue){
 
                 } else {
-                    showNodePortValue(&item, 120);
+                    showNodePortValue(&item, true);
                     ImGui::SameLine();
                 }
 
                 ed::BeginPin(item.id, ed::PinKind::Output);
                 ed::PinPivotAlignment(ImVec2(1.0f, 0.5f));
                 ed::PinPivotSize(ImVec2(0, 0));
-                ImGui::Text("%s", item.portName.c_str());
+                ImGui::Text("%8s", item.portName.c_str());
                 ImGui::SameLine();
 
                 // port icon
@@ -528,8 +554,8 @@ namespace sight {
                 if (uiStatus.keybindings->duplicateNode) {
                     dbg("duplicate node");
                     auto tmpNode = uiStatus.selection.node; 
-                    if (tmpNode) {
-                        auto node = tmpNode->instantiate();
+                    if (tmpNode && tmpNode->templateNode) {
+                        auto node = tmpNode->templateNode->instantiate();
                         auto pos = ed::GetNodePosition(tmpNode->nodeId);
                         auto size = ed::GetNodeSize(tmpNode->nodeId);
                         ed::SetNodePosition(node->nodeId, ImVec2(pos.x, pos.y + size.y + 10));
@@ -612,6 +638,27 @@ namespace sight {
         ed::SetCurrentEditor(nullptr);
     }
 
+    void onNodePortValueChange(SightNodePort* port) {
+        auto node = port->node;
+        node->graph->editing = true;
+        if (!port->templateNodePort) {
+            return;
+        }
+
+        auto isolate = currentUIStatus()->isolate;
+        auto templateNodePort = port->templateNodePort;
+
+        templateNodePort->onValueChange(isolate, port);
+    }
+
+    void onNodePortAutoComplete(SightNodePort* port){
+        if (!port->templateNodePort) {
+            return;
+        }
+
+        port->templateNodePort->onAutoComplete(currentUIStatus()->isolate, port, port->value.string, JsEventType::AutoComplete);
+    }
+
     void showNodePortValue(SightNodePort* port, bool fromGraph, int width, int type) {
         char labelBuf[NAME_BUF_SIZE];
         sprintf(labelBuf, "## %d", port->id);
@@ -622,78 +669,162 @@ namespace sight {
             type = port->getType();
             usePortType = true;
         }
+
+        auto & options = port->options;
         switch (type) {
         case IntTypeFloat:
-            if (ImGui::DragFloat(labelBuf, &port->value.f, 0.5f)) {
-                port->node->graph->editing = true;
+        {
+            int flags = options.readonly ? ImGuiSliderFlags_ReadOnly : 0;
+            if (ImGui::DragFloat(labelBuf, &port->value.f, 0.5f, 0, 0, "%.3f", flags)) {
+                onNodePortValueChange(port);
             }
             break;
+        }
         case IntTypeDouble:
-            if (ImGui::InputDouble(labelBuf, &port->value.d)) {
-                port->node->graph->editing = true;
+        {
+            int flags = options.readonly ? ImGuiInputTextFlags_ReadOnly : 0;
+            if (ImGui::InputDouble(labelBuf, &port->value.d, 0,0,"%.6f", flags)) {
+                onNodePortValueChange(port);
             }
             break;
+        }
         case IntTypeLong:
         case IntTypeInt:
-            if (ImGui::DragInt(labelBuf, &port->value.i)) {
-                port->node->graph->editing = true;
+        {
+            int flags = options.readonly ? ImGuiSliderFlags_ReadOnly : 0;
+            if (ImGui::DragInt(labelBuf, &port->value.i, 1,0,0,"%d",flags)) {
+                onNodePortValueChange(port);
             }
             break;
+        }
         case IntTypeString:
-            ImGui::SetNextItemWidth(width + width / 2.0f);
-            if (ImGui::InputText(labelBuf, port->value.string, std::size(port->value.string))) {
-                port->node->graph->editing = true;
+        {
+            int flags = options.readonly ? ImGuiInputTextFlags_ReadOnly : 0;
+            width = width + width / 2.0f;
+            bool showed = false;
+            if (fromGraph) {
+                
+            } else {
+                // only show in inspector
+                if (!options.alternatives.empty()) {
+                    // ImGui::Text("%8s", "");
+                    // ImGui::SameLine();
+                    ImGui::SetNextItemWidth(width);
+                    std::string comboLabel = labelBuf;
+                    comboLabel += ".combo";
+                    if (ImGui::BeginCombo(comboLabel.c_str(), port->value.string, ImGuiComboFlags_NoArrowButton)) {
+                        std::string filterLabel = comboLabel + ".filter";
+                        static char filterText[NAME_BUF_SIZE] = {0};
+                        ImGui::InputText(filterLabel.c_str(), filterText, std::size(filterText));
+                        for (const auto& item : options.alternatives) {
+                            if (strlen(filterText) > 0 && !startsWith(item, filterText)) {
+                                continue;
+                            }
+                            if (ImGui::Selectable(item.c_str(), item == port->value.string)) {
+                                snprintf(port->value.string, std::size(port->value.string), "%s", item.c_str());
+                                onNodePortValueChange(port);
+                            }
+                        }
+                        ImGui::EndCombo();
+                    }
+
+                    showed = true;
+                }
             }
+
+            if (!showed) {
+                ImGui::SetNextItemWidth(width);
+                if (ImGui::InputText(labelBuf, port->value.string, std::size(port->value.string), flags)) {
+                    onNodePortAutoComplete(port);
+                }
+                if (ImGui::IsItemActivated()) {
+                    onNodePortAutoComplete(port);
+                }
+                if (ImGui::IsItemDeactivatedAfterEdit()) {
+                    dbg(1);
+                    onNodePortValueChange(port);
+                }
+            }
+            
             break;
+        }
         case IntTypeBool:
-            if (ImGui::Checkbox(labelBuf, &port->value.b)) {
-                port->node->graph->editing = true;
+        {
+            if (checkBox(labelBuf, &port->value.b, options.readonly)) {
+                onNodePortValueChange(port);
             }
             break;
+        }
         case IntTypeColor:
-            if (ImGui::ColorEdit3(labelBuf, port->value.vector4)) {
-                port->node->graph->editing = true;
+        {
+            int flags = options.readonly ? ImGuiColorEditFlags_DefaultOptions_ | ImGuiColorEditFlags_NoInputs : 0;
+            if (ImGui::ColorEdit3(labelBuf, port->value.vector4, flags)) {
+                onNodePortValueChange(port);
             }
             break;
+        }
         case IntTypeVector3:
+        {
+            int flags = options.readonly ? ImGuiSliderFlags_ReadOnly : 0;
             ImGui::SetNextItemWidth(width * 2);
-            if (ImGui::DragFloat3(labelBuf,  port->value.vector3)) {
-                port->node->graph->editing = true;
+            if (ImGui::DragFloat3(labelBuf, port->value.vector3,1,0,0,"%.3f", flags)) {
+                onNodePortValueChange(port);
             }
             break;
+        }
         case IntTypeVector4:
+        {
+            int flags = options.readonly ? ImGuiSliderFlags_ReadOnly : 0;
             ImGui::SetNextItemWidth(width * 2);
-            if (ImGui::DragFloat4(labelBuf, port->value.vector4)) {
-                port->node->graph->editing = true;
-            }
-            break;    
-        case IntTypeChar:
-            ImGui::SetNextItemWidth(width / 3.0f);
-            if (ImGui::InputText(labelBuf, port->value.string, 2)) {
-                port->node->graph->editing = true;
+            if (ImGui::DragFloat4(labelBuf, port->value.vector4, 1,0,0,"%.3f",flags)) {
+                onNodePortValueChange(port);
             }
             break;
+        }
+        case IntTypeChar:
+        {
+            int flags = options.readonly ? ImGuiInputTextFlags_ReadOnly : 0;
+            ImGui::SetNextItemWidth(width / 3.0f);
+            if (ImGui::InputText(labelBuf, port->value.string, 2,0)) {
+                onNodePortValueChange(port);
+            }
+            break;
+        }
         case IntTypeLargeString:
+        {
             if (fromGraph) {
                 ImGui::Text("%s", port->value.largeString.pointer);
                 helpMarker("Please edit it in external editor or Inspector window.");
             } else {
+                int flags = options.readonly ? ImGuiInputTextFlags_ReadOnly : 0;
                 auto nWidth = width + width / 2.0f;
                 if (ImGui::InputTextMultiline(labelBuf, port->value.largeString.pointer, port->value.largeString.bufferSize,
-                                              ImVec2(nWidth, 150))) {
-                    port->node->graph->editing = true;
+                                              ImVec2(nWidth, 150), flags)) {
+                }
+                if (ImGui::IsItemDeactivatedAfterEdit()) {
+                    dbg(1);
+                    onNodePortValueChange(port);
                 }
             }
             break;
-        default:{
+        }
+        case IntTypeButton:
+        {
+            if (ImGui::Button("button")) {
+                dbg("=1");
+            }
+            break;
+        }
+        default:
+        {
             bool isFind = false;
-            auto & typeInfo = currentProject()->getTypeInfo(static_cast<uint>(type), &isFind);
+            auto& typeInfo = currentProject()->getTypeInfo(static_cast<uint>(type), &isFind);
             if (isFind) {
-                // has type info           
+                // has type info
                 if (usePortType && typeInfo.render.asIntType > 0) {
                     showNodePortValue(port, width, typeInfo.render.asIntType);
                 } else {
-                    typeInfo.render(labelBuf, port->value);
+                    typeInfo.render(labelBuf, port);
                 }
             } else {
                 ImGui::LabelText(labelBuf, "Unknown type of %d", port->getType());
@@ -832,58 +963,14 @@ namespace sight {
 
     SightNode *SightNode::clone() const{
         auto p = new SightNode();
-        p->copyFrom(this, false, CopyFromType::Clone);
+        p->copyFrom(this, CopyFromType::Clone);
         return p;
     }
 
-    SightNode *SightNode::instantiate(bool generateId) const {
-        if (this->templateNode) {
-            return this->templateNode->instantiate();
-        }
-
-        dbg(this->nodeName);
-        auto p = new SightNode();
-        p->copyFrom(this, true, CopyFromType::Instantiate);
-        p->tryAddChainPorts();
-        p->graph = CURRENT_GRAPH;
-
-        if (generateId) {
-            // generate id
-            auto nodeFunc = [](std::vector<SightNodePort>& list) {
-                for (auto& item : list) {
-                    item.id = nextNodeOrPortId();
-
-                    // check type
-                    auto t = item.getType();
-                    if (!isBuiltInType(t)) {
-                        bool isFind = false;
-                        auto typeInfo = currentProject()->getTypeInfo(t, &isFind);
-                        if (isFind) {
-                            typeInfo.initValue(item.value);
-                        }
-                    }
-                }
-            };
-
-            p->nodeId = nextNodeOrPortId();
-            CALL_NODE_FUNC(p);
-        }
-
-        auto tmp = dynamic_cast<const SightJsNode*>(this);
-        if (tmp) {
-            tmp->onInstantiate(currentUIStatus()->isolate, p);
-        }
-        return p;
-    }
-
-    void SightNode::copyFrom(const SightNode* node, bool isTemplate, CopyFromType copyFromType) {
+    void SightNode::copyFrom(const SightNode* node, CopyFromType copyFromType) {
         this->nodeId = node->nodeId;
         this->nodeName = node->nodeName;
-        if (isTemplate) {
-            this->templateNode = node;
-        } else {
-            this->templateNode = node->templateNode;
-        }
+        this->templateNode = node->templateNode;
 
         auto copyFunc = [copyFromType](std::vector<SightNodePort> const& src, std::vector<SightNodePort>& dst) {
             for (const auto &item : src) {
@@ -1054,14 +1141,103 @@ namespace sight {
 
     }
 
+    void SightJsNode::addPort(const SightJsNodePort& port) {
+        if (port.kind == NodePortType::Input) {
+            this->originalInputPorts.push_back(port);
+        } else if (port.kind == NodePortType::Output) {
+            this->originalOutputPorts.push_back(port);
+        } else if (port.kind == NodePortType::Both) {
+            this->originalInputPorts.push_back(port);
+            this->originalOutputPorts.push_back(port);
+        } else if (port.kind == NodePortType::Field) {
+            this->originalFields.push_back(port);
+        }
+    }
+
+
+    void SightJsNode::compact() {
+        
+        auto & array = g_NodeEditorStatus->templateNodePortArray;
+
+        for( const auto& item: this->originalFields){
+            auto p = array.add(item);
+            this->fields.push_back(p);
+        }
+        this->originalFields.clear();
+
+        for (const auto& item : this->originalInputPorts) {
+            auto p = array.add(item);
+            this->inputPorts.push_back(p);
+        }
+        this->originalInputPorts.clear();
+
+        for (const auto& item : this->originalOutputPorts) {
+            auto p = array.add(item);
+            this->outputPorts.push_back(p);
+        }
+        this->originalOutputPorts.clear();
+    }
+
     void SightJsNode::compileFunctions(Isolate* isolate) {
+        auto nodeFunc = [isolate](std::vector<SightJsNodePort*> const& list){
+            for( const auto& item: list){
+                item->onValueChange.compile(isolate);
+                item->onAutoComplete.compile(isolate);
+            }
+        };
+
+        CALL_NODE_FUNC(this);
+
         onInstantiate.compile(isolate);
         onDestroyed.compile(isolate);
     }
 
-    SightJsNode &SightJsNode::operator=(SightNode const & rhs) {
-        this->copyFrom( &rhs, false);
-        return *this;
+    SightNode* SightJsNode::instantiate(bool generateId) const {
+        dbg(this->nodeName);
+        auto p = new SightNode();
+        
+        auto portCopyFunc = [](std::vector<SightJsNodePort*> const& src, std::vector<SightNodePort> & dst){
+            for( const auto& item: src){
+                auto copy = (SightNodePort) *item;
+                copy.templateNodePort = item;
+                dst.push_back(copy);
+            }
+        };
+        portCopyFunc(this->inputPorts, p->inputPorts);
+        portCopyFunc(this->outputPorts, p->outputPorts);
+        portCopyFunc(this->fields, p->fields);
+        p->nodeName = this->nodeName;
+        p->templateNode = this;
+        p->tryAddChainPorts();
+        p->graph = CURRENT_GRAPH;
+
+        if (generateId) {
+            // generate id
+            auto nodeFunc = [](std::vector<SightNodePort>& list) {
+                for (auto& item : list) {
+                    item.id = nextNodeOrPortId();
+
+                    // check type
+                    auto t = item.getType();
+                    if (!isBuiltInType(t)) {
+                        bool isFind = false;
+                        auto typeInfo = currentProject()->getTypeInfo(t, &isFind);
+                        if (isFind) {
+                            typeInfo.initValue(item.value);
+                        }
+                    }
+                }
+            };
+
+            p->nodeId = nextNodeOrPortId();
+            CALL_NODE_FUNC(p);
+        }
+
+        auto tmp = dynamic_cast<const SightJsNode*>(this);
+        if (tmp) {
+            tmp->onInstantiate(currentUIStatus()->isolate, p);
+        }
+        return p;
     }
 
     void SightNodeConnection::removeRefs(SightNodeGraph *graph) {
@@ -1312,6 +1488,7 @@ namespace sight {
                         port.value.b = valueNode.as<bool>();
                         break;
                     case IntTypeProcess:
+                    case IntTypeButton:
                         // dbg("IntTypeProcess" , portName);
                         break;
                     case IntTypeChar:
@@ -1378,11 +1555,12 @@ namespace sight {
                 if (!templateNodeAddress.empty()) {
                     if (isLoadEntity) {
                         // entity should be into template
-                        SightNodeTemplateAddress address = {
-                                templateNodeAddress,
-                                sightNode
-                        };
-                        addTemplateNode(address);
+                        // fixme: load entity
+                        // SightNodeTemplateAddress address = {
+                        //         templateNodeAddress,
+                        //         sightNode
+                        // };
+                        // addTemplateNode(address);
                     }
 
                     auto templateNode = g_NodeEditorStatus->findTemplateNode(templateNodeAddress.c_str());
@@ -1400,7 +1578,6 @@ namespace sight {
                         sightNode = *nodePointer;
                         delete nodePointer;
                     }
-//                    sightNode.templateNode = templateNode;
                 } else {
                     dbg(sightNode.nodeName, "entity do not have templateNodeAddress, jump it.");
                 }
@@ -1599,7 +1776,7 @@ namespace sight {
         idMap.erase(id);
 
         connections.erase(result);
-        dbg("delete connection" );
+        dbg(id);
         return CODE_OK;
     }
 
@@ -1670,7 +1847,7 @@ namespace sight {
                 if (iter->name == pointer->part) {
                     if (!pointer->next) {
                         // the node
-                        result = &iter->templateNode;
+                        result = iter->templateNode;
                     }
 
                     findElement = true;
@@ -1745,7 +1922,7 @@ namespace sight {
             if (ImGui::MenuItem(name.c_str())) {
                 //
                 // dbg("it will create a new node.", this->name);
-                auto node = this->templateNode.instantiate();
+                auto node = this->templateNode->instantiate();
                 ed::SetNodePosition(node->nodeId, openPopupPosition);
                 addNode(node);
             }
@@ -1760,15 +1937,24 @@ namespace sight {
         }
     }
 
+    void SightNodeTemplateAddress::dispose() {
+        if (templateNode) {
+            // try use array first, if it's not an element of the array, then delete it.
+            if (!g_NodeEditorStatus->templateNodeArray.remove(templateNode)) {
+                delete templateNode;
+            }
+            templateNode = nullptr;
+        }
+    }
+
     SightNodeTemplateAddress::SightNodeTemplateAddress() {
 
     }
 
 
-    SightNodeTemplateAddress::SightNodeTemplateAddress(std::string name, const SightJsNode& templateNode)
-        : name(std::move(name)), templateNode(templateNode)
-    {
-
+    SightNodeTemplateAddress::SightNodeTemplateAddress(std::string name, SightJsNode* templateNode)
+        : name(std::move(name))
+        , templateNode(templateNode) {
     }
 
     SightNodeTemplateAddress::~SightNodeTemplateAddress() {
@@ -1776,12 +1962,6 @@ namespace sight {
 //            delete templateNode;
 //            templateNode = nullptr;
 //        }
-    }
-
-    SightNodeTemplateAddress::SightNodeTemplateAddress(std::string name, const SightNode& templateNode)
-        :name(std::move(name))
-    {
-        this->templateNode = templateNode;
     }
 
     SightNodeTemplateAddress::SightNodeTemplateAddress(std::string name) : name(std::move(name)) {
@@ -1832,8 +2012,8 @@ namespace sight {
             return -1;
         }
 
-        SightJsNode templateNode = templateAddress.templateNode;
-        templateNode.fullTemplateAddress = templateAddress.name;
+        SightJsNode* templateNode = templateAddress.templateNode;
+        templateNode->fullTemplateAddress = templateAddress.name;
         auto address = resolveAddress(templateAddress.name);
         auto pointer = address;
         // compare and put.
@@ -1843,8 +2023,13 @@ namespace sight {
             bool findElement = false;
             if (!pointer->next) {
                 // no next, this is the last element, it should be the node's name.
-                list->push_back(SightNodeTemplateAddress(pointer->part, templateNode));
-                list->back().templateNode.compileFunctions(currentUIStatus()->isolate);
+                // list->push_back(SightNodeTemplateAddress(pointer->part, templateNode));
+                // list->back().templateNode.compileFunctions(currentUIStatus()->isolate);
+                // auto status = g_NodeEditorStatus;
+                templateNode->compact();
+                auto tmpPointer = g_NodeEditorStatus->templateNodeArray.add( *templateNode);
+                tmpPointer->compileFunctions(currentUIStatus()->isolate);
+                list->push_back(SightNodeTemplateAddress(pointer->part, tmpPointer));
                 break;
             }
 
@@ -1857,7 +2042,7 @@ namespace sight {
             }
 
             if (!findElement) {
-                list->push_back(SightNodeTemplateAddress(pointer->part ));
+                list->push_back(SightNodeTemplateAddress(pointer->part));
                 list = & list->back().children;
             }
 
@@ -1925,8 +2110,9 @@ namespace sight {
             address += createEntityData.name;
         }
         templateAddress.name = address;
-        templateAddress.templateNode = node;
-        addTemplateNode(templateAddress);
+        // fixme: add entity
+        // templateAddress.templateNode = node;
+        // addTemplateNode(templateAddress);
 
         // convert to SightNode, and add it to entity graph.
         auto graph = g_NodeEditorStatus->entityGraph;
@@ -1948,19 +2134,8 @@ namespace sight {
         return graph->load("./entity.yaml", true);
     }
 
-    SightJsNode *findTemplateNode(const SightNode *node) {
-        auto templateNode = node->templateNode;
-        if (templateNode) {
-            while (templateNode->templateNode) {
-                templateNode = templateNode->templateNode;
-            }
-        } else {
-            templateNode = node;
-        }
-
-        auto temp = const_cast<SightNode*>(templateNode);
-        auto jsNode = (SightJsNode*) temp;
-        return jsNode;
+    const SightJsNode* findTemplateNode(const SightNode *node) {
+        return node->templateNode;
     }
 
     SightJsNode* findTemplateNode(const char* path) {
@@ -2081,6 +2256,7 @@ namespace sight {
                 dbg(t2->IsFunction());
                 if (t2->IsFunction()) {
                     function = Function(isolate, t2.As<v8::Function>());
+                    sourceCode.clear();
                 }
             }
         }
@@ -2093,25 +2269,65 @@ namespace sight {
         }
         using namespace v8;
 
-        // v8pp::class_<SightNode> nodeClass(isolate);
-
         v8::HandleScope handleScope(isolate);
         auto f = function.Get(isolate);
         auto context = isolate->GetCurrentContext();
         auto recv = v8::Object::New(isolate);
         
-        std::string name = v8pp::from_v8<std::string>(isolate, f->GetName());
-        dbg(name, node);
-        
         Local<Value> args[1];
         args[0] = v8pp::class_<SightNode>::reference_external(isolate, node);
-        dbg(v8pp::from_v8<SightNode*>(isolate, args[0]));
-        dbg(args[0]->IsExternal());
         auto result = f->Call(context, recv, 1, args);
         v8pp::class_<SightNode>::unreference_external(isolate, node);
         if (result.IsEmpty()) {
             return;
         }
         
+    }
+
+    void ScriptFunctionWrapper::operator()(Isolate* isolate, SightNodePort* thisNodePort, const char* text, JsEventType eventType) const {
+        if (function.IsEmpty() || !thisNodePort) {
+            dbg(sourceCode);
+            return;
+        }
+        using namespace v8;
+
+        v8::HandleScope handleScope(isolate);
+        auto f = function.Get(isolate);
+        auto context = isolate->GetCurrentContext();
+        auto node = thisNodePort->node;
+        auto recv = nodePortValue(isolate, { node, thisNodePort->id});
+
+        // prepare args
+        Local<Value> args[2];
+        args[0] = v8pp::class_<SightNode>::reference_external(isolate, node);
+        args[1] = Object::New(isolate);
+        if (eventType == JsEventType::AutoComplete) {
+            if (text) {
+                args[1] = v8pp::to_v8(isolate, text);
+            }
+        } 
+
+        // call function
+        auto mayResult = f->Call(context, recv, std::size(args), args);
+        v8pp::class_<SightNode>::unreference_external(isolate, node);
+        if (mayResult.IsEmpty()) {
+            return;
+        }
+
+        // after call function
+        if (eventType == JsEventType::AutoComplete) {
+            // 
+            auto result = mayResult.ToLocalChecked();
+            auto & options = thisNodePort->options;
+            options.alternatives.clear();
+            if (!result->IsNullOrUndefined()) {
+                if (result->IsArray()) {
+                    auto list = v8pp::from_v8<std::vector<std::string>>(isolate, result);
+                    options.alternatives.assign(list.begin(), list.end());
+                } else if (IS_V8_STRING(result)) {
+                    options.alternatives.push_back(v8pp::from_v8<std::string>(isolate, result));
+                }
+            }
+        }
     }
 }
