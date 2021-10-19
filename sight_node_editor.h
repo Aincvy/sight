@@ -83,7 +83,7 @@ namespace sight {
         // input/output ...
         NodePortType kind;
 
-        // IntTypeValues ...
+        // IntTypeValues ... use getType(), this maybe a fake type. 
         uint type;
         SightNodeValue value;
         SightNodePortOptions options;
@@ -123,7 +123,6 @@ namespace sight {
          * @return
          */
         const char* getDefaultValue() const;
-
     };
 
     /**
@@ -143,6 +142,9 @@ namespace sight {
 
         uint leftPortId() const;
         uint rightPortId() const;
+
+        SightNodePort* findLeftPort() const;
+        SightNodePort* findRightPort() const;
     };
 
     /**
@@ -276,6 +278,8 @@ namespace sight {
     enum class JsEventType {
         Default,
         AutoComplete,
+        // onConnect or onDisconnect
+        Connect,
     };
 
     struct a{
@@ -296,7 +300,20 @@ namespace sight {
         void compile(Isolate* isolate);
 
         void operator()(Isolate* isolate, SightNode* node) const;
-        void operator()(Isolate* isolate, SightNodePort* thisNodePort, const char* text = nullptr,JsEventType eventType = JsEventType::Default) const;
+        void operator()(Isolate* isolate, SightNodePort* thisNodePort, JsEventType eventType = JsEventType::Default, void* pointer = nullptr) const;
+        v8::MaybeLocal<v8::Value> operator()(Isolate* isolate, SightNode* node, v8::Local<v8::Value> arg1, v8::Local<v8::Value> arg2) const;
+
+        operator bool() const;
+
+        private:
+
+        /**
+         * @brief 
+         * 
+         * @return true  function is ready 
+         * @return false function not ready
+         */
+        bool checkFunction(Isolate* isolate) const;
     };
 
     /**
@@ -310,6 +327,8 @@ namespace sight {
         ScriptFunctionWrapper onValueChange;
 
         ScriptFunctionWrapper onAutoComplete;
+        ScriptFunctionWrapper onConnect;
+        ScriptFunctionWrapper onDisconnect;
     };
 
     /**
@@ -326,6 +345,8 @@ namespace sight {
         // events ,  called by ui thread.
         ScriptFunctionWrapper onInstantiate;
         ScriptFunctionWrapper onDestroyed;
+        ScriptFunctionWrapper onReload;
+        ScriptFunctionWrapper onMsg;
 
         std::vector<SightJsNodePort*> inputPorts;
         std::vector<SightJsNodePort*> outputPorts;
@@ -358,7 +379,7 @@ namespace sight {
          * else it will instantiate one by this node's template.
          * @return a new node, you should `delete` the object when you do not need it.
          */
-        SightNode* instantiate(bool generateId = true) const;
+        SightNode* instantiate(bool generateId = true, bool callEvent = true) const;
         
     };
 
@@ -501,6 +522,7 @@ namespace sight {
         SightNodeConnection* findConnection(int id);
 
         SightNodePort* findPort(uint id);
+        SightNodePortHandle findPortHandle(uint id);
 
         /**
          *
@@ -542,6 +564,8 @@ namespace sight {
         bool isBroken() const;
 
         SightNodeGraphExternalData& getExternalData();
+
+        void callNodeEventsAfterLoad();
 
     private:
 

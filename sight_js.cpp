@@ -127,7 +127,7 @@ namespace sight {
                     }
                 }
             }
-            dbg("unhandled type error", port.type);
+            dbg("unhandled type error", port.getType());
             break;
         }
         }
@@ -277,6 +277,23 @@ namespace sight {
             }
         };
 
+        auto type = [portHandle](uint v) {
+            if (portHandle) {
+                if (v > 0) {
+                    portHandle->type = v;
+                } else {
+                    return portHandle->type;
+                }
+            }
+            return 0U;
+        };
+        auto resetType = [portHandle]() {
+            if (portHandle) {
+                auto p = portHandle.get();
+                p->type = p->templateNodePort->type;
+            }
+        };
+
         auto port = portHandle.get();
         object->Set(context, v8pp::to_v8(isolate, "get"), v8pp::wrap_function(isolate, "get", get)).ToChecked();
         object->Set(context, v8pp::to_v8(isolate, "set"), v8pp::wrap_function(isolate, "set", set)).ToChecked();
@@ -286,6 +303,8 @@ namespace sight {
         v8pp::set_const(isolate, object, "show", v8pp::wrap_function(isolate, "show", show));
         v8pp::set_const(isolate, object, "errorMsg", v8pp::wrap_function(isolate, "errorMsg", errorMsg));
         v8pp::set_const(isolate, object, "readonly", v8pp::wrap_function(isolate, "readonly", readonly));
+        v8pp::set_const(isolate, object, "type", v8pp::wrap_function(isolate, "type", type));
+        v8pp::set_const(isolate, object, "resetType", v8pp::wrap_function(isolate, "resetType", resetType));
 
         return object;
     }
@@ -297,6 +316,34 @@ namespace sight {
         }
 
         return nodePortValue(isolate, portHandle);
+    }
+
+    Local<Value> connectionValue(v8::Isolate* isolate, SightNodeConnection* connection, SightNodePort* selfNodePort){
+        if (!connection) {
+            return v8::Undefined(isolate);
+        }
+
+        auto object = Object::New(isolate);
+        auto context = isolate->GetCurrentContext();
+        auto g = getCurrentGraph();
+
+        auto left =  nodePortValue(isolate, g->findPortHandle(connection->left));
+        auto right = nodePortValue(isolate, g->findPortHandle(connection->right));
+        v8pp::set_const(isolate, object, "id", connection->connectionId);
+        v8pp::set_const(isolate, object, "left", left);
+        v8pp::set_const(isolate, object, "right", right);
+        if (!selfNodePort) {
+        } else {
+            if (connection->left == selfNodePort->id) {
+                v8pp::set_const(isolate, object, "self", left);
+                v8pp::set_const(isolate, object, "target", right);
+            } else {
+                v8pp::set_const(isolate, object, "self", right);
+                v8pp::set_const(isolate, object, "target", left);
+            }
+        }
+
+        return object;
     }
 
 
@@ -523,41 +570,122 @@ namespace sight {
 
         // print func
         void v8Print(const FunctionCallbackInfo<Value>& args) {
-            auto isolate = args.GetIsolate();
+            auto isolate = args.GetIsolate();            
             auto context = isolate->GetCurrentContext();
+            auto stackTrace = v8::StackTrace::CurrentStackTrace(isolate, 10, v8::StackTrace::kOverview);
+            std::stringstream ss;
+            if (stackTrace->GetFrameCount() > 0) {
+                auto frame = stackTrace->GetFrame(isolate, 0);
+                ss << "[";
+                if (!frame->GetScriptName().IsEmpty()) {
+                    ss << v8pp::from_v8<std::string>(isolate, frame->GetScriptName());
+                }
+                ss << ":";
+                ss << frame->GetLineNumber();
+                ss << " (";
+                if (!frame->GetFunctionName().IsEmpty()) {
+                    ss << v8pp::from_v8<std::string>(isolate, frame->GetFunctionName());
+                }
+                ss << ")] ";
+            }
+            auto traceMsg = ss.str();
+
             for( int i = 0; i < args.Length(); i++){
                 auto arg = args[i];
 
                 if (IS_V8_STRING(arg)) {
                     std::string msg = v8pp::from_v8<std::string>(isolate, arg);
-                    dbg(msg);
+                    printf("%s%s\n", traceMsg.c_str(), msg.c_str());
                 } else if (IS_V8_NUMBER(arg)) {
                     if (arg->IsInt32() ) {
                         int msg = arg->Int32Value(context).ToChecked();
-                        dbg(msg);
+                        // dbg(msg);
+                        printf("%s%d\n", traceMsg.c_str(), msg);
                     } else if (arg->IsUint32()) {
                         uint msg = arg->Uint32Value(context).ToChecked();
-                        dbg(msg);
+                        // dbg(msg);
+                        printf("%s%d\n", traceMsg.c_str(), msg);
                     } else {
                         auto msg = arg->NumberValue(context).ToChecked();
-                        dbg(msg);
+                        // dbg(msg);
+                        printf("%s%f\n", traceMsg.c_str(), msg);
                     }
                 } else if (arg->IsObject()) {
                     // dbg("print object is waited for impl.");
                     auto str = v8pp::json_str(isolate, arg);
                     auto msg = str.c_str();
-                    dbg(msg);
+                    // dbg(msg);
+                    printf("%s%s\n", traceMsg.c_str(), msg);
                 } else if (arg->IsUndefined()) {
                     constexpr const char* msg = "undefined";
-                    dbg(msg);
+                    // dbg(msg);
+                    printf("%s%s\n", traceMsg.c_str(), msg);
                 } else if (arg->IsNull()) {
                     constexpr const char* msg = "null";
-                    dbg(msg);
+                    // dbg(msg);
+                    printf("%s%s\n", traceMsg.c_str(), msg);
+                } else if (arg->IsExternal()) {
+                    constexpr const char* msg = "external";
+                    // dbg(msg);
+                    printf("%s%s\n", traceMsg.c_str(), msg);
+                } else if (arg->IsBoolean() || arg->IsBooleanObject()) {
+                    const char* msg = arg->BooleanValue(isolate) ? "true" : "false";
+                    // dbg(msg);
+                    printf("%s%s\n", traceMsg.c_str(), msg);
                 }
                 else {
                     dbg("no-handled-type");
                 }
             }
+        }
+
+        void v8Tell(const FunctionCallbackInfo<Value>& args) {
+            auto isolate = args.GetIsolate();
+            HandleScope handleScope(isolate);
+
+            auto object = Object::New(isolate);
+            auto context =isolate->GetCurrentContext();
+            auto stringFlag = v8pp::to_v8(isolate, "flag");
+            object->Set(context, stringFlag, v8pp::to_v8(isolate, false)).ToChecked();
+            if (args.Length() < 2) {
+                args.GetReturnValue().Set(object);
+                return;
+            }
+
+            SightNode* targetNode = nullptr;
+            auto arg1 = args[0];
+            if (arg1->IsUint32()) {
+                auto id = arg1->Uint32Value(context).ToChecked();
+                targetNode = getCurrentGraph()->findNode(id);
+            } else if (arg1->IsObject()) {
+                // maybe a wrap object
+                targetNode = v8pp::class_<SightNode>::unwrap_object(isolate, arg1);
+            } 
+            if (!targetNode) {
+                args.GetReturnValue().Set(object);
+                return;
+            }
+            auto templateNode = targetNode->templateNode;
+            if (!templateNode->onMsg) {
+                args.GetReturnValue().Set(object);
+                return;
+            }
+
+            auto type = args[1];
+            Local<Value> msg = v8::Undefined(isolate);
+            if (args.Length() >= 3) {
+                msg = args[2];
+            }
+
+            auto result = templateNode->onMsg(isolate, targetNode, type, msg);
+            if (result.IsEmpty()) {
+                args.GetReturnValue().Set(object);
+                return;
+            }
+
+            object->Set(context, stringFlag, v8pp::to_v8(isolate, true)).ToChecked();
+            object->Set(context, v8pp::to_v8(isolate, "result"), result.ToLocalChecked()).ToChecked();
+            args.GetReturnValue().Set(object);
         }
 
         void v8AddType(const FunctionCallbackInfo<Value>& args) {
@@ -679,8 +807,17 @@ namespace sight {
             auto templateNode = sightNode;
             std::string address;
 
+            auto eventHandleFunc = [isolate, &context](Local<Object> option, const char* key, ScriptFunctionWrapper& f) {
+                auto temp = option->Get(context, v8pp::to_v8(isolate, key));
+                Local<Value> tempVal;
+                if (!temp.IsEmpty() && (tempVal = temp.ToLocalChecked())->IsFunction()) {
+                    auto source = functionProtoToString(isolate, context, tempVal.As<Function>());
+                    f = source;
+                }
+            };
+
             // func
-            auto nodePortWork = [isolate, &context](Local<Value> key,Local<Value> value, NodePortType nodePortType, bool allowPortType = false)
+            auto nodePortWork = [isolate, &context, &eventHandleFunc](Local<Value> key,Local<Value> value, NodePortType nodePortType, bool allowPortType = false)
                     -> SightJsNodePort {
                 // lambda body.
                 std::string portName = v8pp::from_v8<std::string>(isolate, key);
@@ -751,17 +888,14 @@ namespace sight {
                     }
 
                     // events
-                    temp = option->Get(context, v8pp::to_v8(isolate, "onValueChange"));
-                    if (!temp.IsEmpty() && (tempVal = temp.ToLocalChecked())->IsFunction()) {
-                        auto source = functionProtoToString(isolate, context, tempVal.As<Function>());
-                        port.onValueChange = source;
-                    }
+                    eventHandleFunc(option, "onValueChange", port.onValueChange);
+                    eventHandleFunc(option, "onAutoComplete", port.onAutoComplete);
+                    eventHandleFunc(option, "onConnect", port.onConnect);
+                    eventHandleFunc(option, "onDisconnect", port.onDisconnect);
 
-                    temp = option->Get(context, v8pp::to_v8(isolate, "onAutoComplete"));
-                    if (!temp.IsEmpty() && (tempVal = temp.ToLocalChecked())->IsFunction()) {
-                        auto source = functionProtoToString(isolate, context, tempVal.As<Function>());
-                        port.onAutoComplete = source;
-                    }
+                    // if (!port.onValueChange.sourceCode.empty()) {
+                    //     dbg(port.onValueChange.sourceCode);
+                    // }
                 }
 
                 return port;
@@ -905,6 +1039,10 @@ namespace sight {
                             templateNode->onInstantiate = sourceCode;
                         } else if (keyString == "onDestroyed") {
                             templateNode->onDestroyed = sourceCode;
+                        } else if (keyString == "onReload") {
+                            templateNode->onReload = sourceCode;
+                        } else if (keyString == "onMsg") {
+                            templateNode->onMsg = sourceCode;
                         }
                     }
                 }
@@ -1014,6 +1152,9 @@ namespace sight {
     void bindBaseFunctions(v8::Isolate* isolate, const v8::Local<v8::Context>& context) {
         auto printFunc = v8pp::wrap_function(isolate, "print", &v8Print);
         context->Global()->Set(context, v8pp::to_v8(isolate, "print"), printFunc).ToChecked();
+
+        auto tellFunc = v8pp::wrap_function(isolate, "tell", &v8Tell);
+        context->Global()->Set(context, v8pp::to_v8(isolate, "tell"), tellFunc).ToChecked();
     }
 
     void bindNodeTypes(v8::Isolate* isolate, const v8::Local<v8::Context>& context) {
@@ -1021,9 +1162,9 @@ namespace sight {
 
         auto v8StringSight = v8pp::to_v8(isolate, "sight");
         auto maySightModel = context->Global()->Get(context, v8StringSight);
-        dbg(maySightModel.IsEmpty());
         auto sightModel = maySightModel.ToLocalChecked();
-        v8pp::module module = sightModel->IsNullOrUndefined() ? v8pp::module(isolate) : v8pp::module{ isolate, sightModel.As<ObjectTemplate>() };
+        auto sightModelNotExists = sightModel->IsNullOrUndefined();
+        v8pp::module module = sightModelNotExists ? v8pp::module(isolate) : v8pp::module{ isolate, sightModel.As<ObjectTemplate>() };
 
         v8pp::module jsNodePortTypeEnum(isolate);
         jsNodePortTypeEnum
@@ -1032,7 +1173,15 @@ namespace sight {
             .set_const("Both", static_cast<int>(NodePortType::Both))
             .set_const("Field", static_cast<int>(NodePortType::Field));
         module.set("NodePortType", jsNodePortTypeEnum);
-        
+
+        v8pp::class_<SightNodePortOptions> nodePortOptionsClass(isolate);
+        nodePortOptionsClass
+            .ctor<>()
+            .set("show", &SightNodePortOptions::show)
+            .set("showValue", &SightNodePortOptions::showValue);
+        nodePortOptionsClass.auto_wrap_objects(true);
+        module.set("SightNodePortOptions", nodePortOptionsClass);
+
         v8pp::class_<SightNodePort> nodePortClass(isolate);
         nodePortClass.ctor<>()
             .set("portName", &SightNodePort::portName)
@@ -1054,14 +1203,9 @@ namespace sight {
             ;
         module.set("SightNode", nodeClass);
 
-        v8pp::class_<SightNodePortOptions> nodePortOptionsClass(isolate);
-        nodePortOptionsClass
-            .ctor<>()
-            .set("show", &SightNodePortOptions::show)
-            .set("showValue", &SightNodePortOptions::showValue);
-        module.set("SightNodePortOptions", nodePortOptionsClass);
 
-        if (maySightModel.IsEmpty()) {
+
+        if (sightModelNotExists) {
             context->Global()->Set(context, v8StringSight, module.new_instance()).ToChecked();
         }
     }

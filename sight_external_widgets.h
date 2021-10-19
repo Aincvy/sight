@@ -14,7 +14,7 @@ namespace sight {
     /**
      * @brief 
      * Copied from https://github.com/ocornut/imgui/issues/1658#issuecomment-427426154.
-     * Do not use for now.
+     * It has some questions about focused.
      * @param id 
      * @param buffer 
      * @param bufferlen 

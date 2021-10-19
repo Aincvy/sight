@@ -51,7 +51,8 @@ addTemplateNode({
 
 });
 
-function externalOnDestroyed(node) {
+function externalOnDestroyed() {
+    let node = this;
     print("external onDestroyed", node.id);
     let field1 = node.portValue('field1');
     if (field1) {
@@ -75,9 +76,9 @@ addTemplateNode({
     __meta_events: {
         // call after instantiate, called by ui thread.([ui thread] in below.)
         // node is the node data, not the template node.
-        onInstantiate(node) {
+        onInstantiate() {
             print("this is run by ui thread. onInstantiate");
-            // print(node.id, node.name);
+            let node = this;
             print(node.templateAddress());
 
             checkTinyData(node, {index: 1});
@@ -106,6 +107,10 @@ addTemplateNode({
                 print(`typeValue: ${typeValue}`);
                 // print(typeValue.index, typeValue.name);
             }
+
+            let tmpPort = new sight.SightNodePort();
+            print(tmpPort.options);
+            print(tmpPort.options.show, tmpPort.options.showValue);
         },
 
         // node isn't the template node.

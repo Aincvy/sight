@@ -223,9 +223,10 @@ addTemplateNode({
         },
     },
     __meta_events: {
-        onInstantiate(node) {
-            // names: key=node.id, value: varName
-            checkTinyData(node, { names: {}});
+        onInstantiate() {
+            let node = this;
+            // names: key: node.id, value: varName;  out: key: varName, value: node.id array
+            checkTinyData(node, { names: {}, out: {}});
             let data = tinyData(node);
             // fix var name first.
             let realNames = Object.values(data.names);
@@ -248,10 +249,77 @@ addTemplateNode({
 
             // put in cache
             data.names[node.id] = oldName;
-        }
+        },
+
+        // called after graph load
+        onReload(){
+            checkTinyData(this, { names: {}, out: {} });
+            let data = tinyData(this);
+            let name = this.portValue('varName').get();
+            let portIn = this.portValue('in');
+            let portOut = this.portValue('out');
+            if(this.portValue('type').get().index == 0){
+                // in
+                data.names[this.id] = name;
+                portIn.show(true);
+                portOut.show(false);
+            }  else {
+                // out
+                portIn.show(false);
+                portOut.show(true);
+                if(!data.out[name]){
+                    data.out[name] = [];
+                }
+                data.out[name].push(this.id);
+                print(name, data.out[name]);
+            }
+        },
+
+        onMsg(type, msg){
+            print(this.id, type, msg);
+            print('line 3');
+            if(type === 1){
+                this.portValue('varName').set(msg);
+            } else if(type === 2) {
+                this.portValue('out').type(msg);
+            } else if ( type === 3){
+                this.portValue('out').resetType();
+            }
+        },
     },
     __meta_inputs: {
-        in: 'Object',
+        in: {
+            type: 'Object',
+            onConnect(node, connection) {
+                print(connection.self.id, connection.target.id);
+                let type = connection.target.type(0);
+                this.type(type);
+
+                // effect out nodes.
+                let data = tinyData(node);
+                let name = node.portValue('varName').get();
+                print(name, data.out[name]);
+                if(data.out[name]){
+                    data.out[name].forEach(element => {
+                        tell(element, 2, type);
+                    });
+                }
+            },
+
+            onDisconnect(node, connection) {
+                this.resetType();
+
+                // effect out nodes.
+                let data = tinyData(node);
+                let name = node.portValue('varName').get();
+                if (data.out[name]) {
+                    data.out[name].forEach(element => {
+                        tell(element, 3, 0);
+                    });
+                }
+            },
+        }
+        
     },
     __meta_outputs: {
         out: {
@@ -265,12 +333,24 @@ addTemplateNode({
         onValueChange(node) {
             let newValue = this.get();
             let portVarName = node.portValue('varName');
+            let data = tinyData(node);
+
             if (newValue.index == 0) {
                 // in
                 let port = node.portValue('out');
                 port.show(false);
                 port.deleteLinks();
                 node.portValue('in').show(true);
+
+                // delete out
+                let name = portVarName.get();
+                if (data.out[name]) {
+                    let array = data.out[name];
+                    let index = array.indexOf(node.id);
+                    if(index > -1){
+                        array.splice(index, 1);
+                    }
+                }
             } else {
                 // out
                 let port = node.portValue('in');
@@ -280,13 +360,18 @@ addTemplateNode({
                 // node.portValue('varName').readonly(true);
                 
                 // delete name
-                let data = tinyData(node);
                 delete data.names[node.id];
 
                 // change name
                 let realNames = Object.values(data.names);
                 if(realNames.length > 0){
-                    portVarName.set(realNames[0]);
+                    let name = realNames[0];
+                    portVarName.set(name);
+                    
+                    if(!data.out[name]){
+                        data.out[name] = [];
+                    }
+                    data.out[name].push(node.id);
                 } else {
                     portVarName.set('');
                 }
@@ -307,33 +392,62 @@ addTemplateNode({
             let portVarName = node.portValue('varName');
             let portType = node.portValue('type');
             let type = portType.get();
-            let oldName = portVarName.get();
-            if(oldName === data.names[node.id]){
+            let nowName = portVarName.get();
+            let oldName = data.names[node.id];
+            if(nowName === oldName){
                 return;
             }
-
+            
+            let out = data.out;
             if(type.index == 0){
                 // in
-                if (realNames.includes(oldName)) {
+                if (realNames.includes(nowName)) {
                     portVarName.errorMsg('repeat name');
                     return;
                 } else {
                     portVarName.errorMsg('');
                 }
 
-                data.names[node.id] = oldName;
+                data.names[node.id] = nowName;
+                if(out){
+                    //  rename key
+                    delete Object.assign(out, { [nowName]: out[oldName] })[oldName];
+                    let array = out[nowName];
+                    if(array && array.length > 0){
+                        array.forEach(element => {
+                            tell(element, 1, nowName);
+                        });
+                    }
+                }
             } else {
                 // out
-                if (!realNames.includes(oldName)) {
+
+                // delete old name
+                if(out[oldName]){
+                    let array = out[oldName];
+                    let index = array.indexOf(node.id);
+                    if (index > -1) {
+                        array.splice(index, 1);
+                    }
+                }
+                
+                // check name valid
+                if (!realNames.includes(nowName)) {
                     portVarName.errorMsg('invalid var name');
                     return;
                 } else {
                     portVarName.errorMsg('');
                 }
+
+                // add new name
+                if (!out[nowName]) {
+                    out[nowName] = [];
+                }
+                out[nowName].push(node.id);
             }
         },
 
-        onAutoComplete(node, text) {
+        onAutoComplete(node) {
             let portType = node.portValue('type');
             if(portType.get().index == 0){
                 return undefined;
@@ -341,11 +455,6 @@ addTemplateNode({
 
             let data = tinyData(node);
             let realNames = Object.values(data.names);
-            if(!text){
-                return realNames;
-            }
-
-            // this should be have a filter.
             return realNames;
         }
 

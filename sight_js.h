@@ -17,6 +17,7 @@ namespace sight{
     struct SightNode;
     struct SightNodePort;
     struct SightNodePortHandle;
+    struct SightNodeConnection;
 
     enum class JsCommandType {
         JsCommandHolder,
@@ -118,5 +119,6 @@ namespace sight{
 
     v8::Local<v8::Value> nodePortValue(v8::Isolate* isolate, SightNode* node, const char* portName);
 
+    v8::Local<v8::Value> connectionValue(v8::Isolate* isolate, SightNodeConnection* connection, SightNodePort* selfNodePort = nullptr);
 }
 

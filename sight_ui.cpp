@@ -497,11 +497,11 @@ namespace sight {
                     createEntityData.resetFieldsStatus(true, true);
                 }
                 ImGui::SameLine();
-                if (ImGui::Button("^")) {
+                if (ImGui::ArrowButton("^", ImGuiDir_Up)) {
                     createEntityData.moveItemUp();
                 }
                 ImGui::SameLine();
-                if (ImGui::Button("v")) {
+                if (ImGui::ArrowButton("v", ImGuiDir_Down)) {
                     createEntityData.moveItemDown();
                 }
                 ImGui::SameLine();
@@ -1468,7 +1468,7 @@ namespace sight {
 
             auto p = lastField();
             sprintf(p->name, "%s", item.portName.c_str());
-            sprintf(p->type, "%s", getTypeName(item.type).c_str());
+            sprintf(p->type, "%s", getTypeName(item.getType()).c_str());
             sprintf(p->defaultValue, "%s", item.getDefaultValue());
         }
 

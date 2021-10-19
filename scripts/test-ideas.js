@@ -336,6 +336,7 @@ addTemplateNode({
     __meta_events: {
         // call after instantiate, called by ui thread.([ui thread] in below.)
         // node is the node data, not the template node.
+        // only called on a new node.  (load graph will not call this event)
         onInstantiate(node){
             checkTinyData(node, { names: []});
 
@@ -358,7 +359,17 @@ addTemplateNode({
         // [ui thread]
         onDestroyed(node){
 
-        }
+        },
+
+        // only called after graph load.
+        // [ui thread]
+        onReload(){
+
+        },
+
+        onMsg(type, msg){
+
+        },
 
     },
 
@@ -382,7 +393,30 @@ addTemplateNode({
          */
         onAutoComplete(node, text) {
             return [];
-        }
+        }, 
+
+        onConnect(node, connection){
+            // connection.deny();
+        },
+
+        onDisconnect(node, connection){
+
+        },
+
     },
 
 });
+
+/**
+ * Sync function, the target node will be call the `onMsg()` function immediately.
+ * @param {*} node node or node.id; target node; or an array.
+ * @param {*} type int in normal, flag a type.
+ * @param {*} msg a object or string or int, 
+ * @returns flag: does target node handle msg?  result: target function returns.
+ */
+function tell(node, type, msg){
+    return {
+        flag: true,
+        result: {}
+    };
+}
