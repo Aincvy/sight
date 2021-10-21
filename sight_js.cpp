@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <iterator>
+#include <map>
 #include <stdio.h>
 #include <sstream>
 #include "dbg.h"
@@ -91,27 +92,27 @@ namespace sight {
     }
 
 
-    Local<Value> getPortValue(Isolate* isolate, SightNodePort const& port) {
-        switch (port.getType()) {
+    Local<Value> getPortValue(Isolate* isolate, int type, SightNodeValue const& value) {
+        switch (type) {
         case IntTypeProcess:
             break;
         case IntTypeFloat:
-            return v8pp::to_v8(isolate, port.value.f);
+            return v8pp::to_v8(isolate, value.f);
         case IntTypeDouble:
-            return v8pp::to_v8(isolate, port.value.d);
+            return v8pp::to_v8(isolate, value.d);
         case IntTypeString:
-            return v8pp::to_v8(isolate, (const char*)port.value.string);
+            return v8pp::to_v8(isolate, (const char*)value.string);
         case IntTypeInt:
         case IntTypeLong:
-            return v8pp::to_v8(isolate, port.value.i);
+            return v8pp::to_v8(isolate, value.i);
         case IntTypeBool:
-            return v8pp::to_v8(isolate, port.value.b);
+            return v8pp::to_v8(isolate, value.b);
         case IntTypeLargeString:
-            return v8pp::to_v8(isolate, (const char*)port.value.largeString.pointer);
+            return v8pp::to_v8(isolate, (const char*)value.largeString.pointer);
         default:
         {
-            if (!isBuiltInType(port.getType())) {
-                auto [typeInfo, find] = currentProject()->findTypeInfo(port.getType());
+            if (!isBuiltInType(type)) {
+                auto [typeInfo, find] = currentProject()->findTypeInfo(type);
                 if (find) {
                     auto& render = typeInfo.render;
                     switch (render.kind) {
@@ -120,14 +121,14 @@ namespace sight {
                     case TypeInfoRenderKind::ComboBox:
                     {
                         auto object = Object::New(isolate);
-                        v8pp::set_const(isolate, object, "index", port.value.i);
-                        v8pp::set_const(isolate, object, "name", render.data.comboBox.list->at(port.value.i));
+                        v8pp::set_const(isolate, object, "index", value.i);
+                        v8pp::set_const(isolate, object, "name", render.data.comboBox.list->at(value.i));
                         return object;
                     }
                     }
                 }
             }
-            dbg("unhandled type error", port.getType());
+            dbg("unhandled type error", type);
             break;
         }
         }
@@ -235,7 +236,7 @@ namespace sight {
             }
 
             // get value
-            return getPortValue(isolate, *port);
+            return getPortValue(isolate, port->getType(), port->value);
         };
         auto set = [portHandle, isolate](Local<Value> arg) {
             return setPortValue(isolate, portHandle.get(), arg);
@@ -345,7 +346,6 @@ namespace sight {
 
         return object;
     }
-
 
     namespace {
 
@@ -1096,7 +1096,6 @@ namespace sight {
                 v8::ArrayBuffer::Allocator::NewDefaultAllocator();
         auto isolate = v8::Isolate::New(createParams);
         auto isolate_scope = std::make_unique<v8::Isolate::Scope>(isolate);
-        dbg(isolate);
 
         g_V8Runtime = new V8Runtime{
                 std::move(platform),
@@ -1149,22 +1148,28 @@ namespace sight {
         context->Global()->Set(context, v8pp::to_v8(isolate, "checkTinyData"), checkTinyData).ToChecked();
     }
 
-    void bindBaseFunctions(v8::Isolate* isolate, const v8::Local<v8::Context>& context) {
+    void bindBaseFunctions(v8::Isolate* isolate, const v8::Local<v8::Context>& context, v8pp::module & module) {
+        auto global = context->Global();
+
         auto printFunc = v8pp::wrap_function(isolate, "print", &v8Print);
-        context->Global()->Set(context, v8pp::to_v8(isolate, "print"), printFunc).ToChecked();
+        global->Set(context, v8pp::to_v8(isolate, "print"), printFunc).ToChecked();
 
         auto tellFunc = v8pp::wrap_function(isolate, "tell", &v8Tell);
-        context->Global()->Set(context, v8pp::to_v8(isolate, "tell"), tellFunc).ToChecked();
+        global->Set(context, v8pp::to_v8(isolate, "tell"), tellFunc).ToChecked();
+
+        // auto initTypes = Object::New(isolate);
+        v8pp::module initTypes(isolate);
+
+        initTypes.set_const("JS", MODULE_INIT_JS);
+        initTypes.set_const( "UI", MODULE_INIT_UI);
+        initTypes.set_const( "js", MODULE_INIT_JS);
+        initTypes.set_const("ui", MODULE_INIT_UI);
+        module.set_const("InitType", initTypes);
+
     }
 
-    void bindNodeTypes(v8::Isolate* isolate, const v8::Local<v8::Context>& context) {
+    void bindNodeTypes(v8::Isolate* isolate, const v8::Local<v8::Context>& context, v8pp::module& module) {
         HandleScope handleScope(isolate);
-
-        auto v8StringSight = v8pp::to_v8(isolate, "sight");
-        auto maySightModel = context->Global()->Get(context, v8StringSight);
-        auto sightModel = maySightModel.ToLocalChecked();
-        auto sightModelNotExists = sightModel->IsNullOrUndefined();
-        v8pp::module module = sightModelNotExists ? v8pp::module(isolate) : v8pp::module{ isolate, sightModel.As<ObjectTemplate>() };
 
         v8pp::module jsNodePortTypeEnum(isolate);
         jsNodePortTypeEnum
@@ -1203,11 +1208,6 @@ namespace sight {
             ;
         module.set("SightNode", nodeClass);
 
-
-
-        if (sightModelNotExists) {
-            context->Global()->Set(context, v8StringSight, module.new_instance()).ToChecked();
-        }
     }
 
     v8::Isolate* getJsIsolate() {
@@ -1223,19 +1223,17 @@ namespace sight {
         if (!g_V8Runtime) {
             return -1;
         }
+        context->SetSecurityToken(v8pp::to_v8(isolate,  "this-is-sight"));
 
         v8pp::module module(isolate);
 
         // functions ...
         module.set("addNode", &v8AddNode);
-
-        auto currentContext = context;
-        currentContext->Global()->Set(currentContext, v8pp::to_v8(isolate, "sight"), module.new_instance()).ToChecked();
         
         auto addTemplateNodeFunc = v8pp::wrap_function(isolate, "addTemplateNode", v8AddTemplateNode);
-        currentContext->Global()->Set(currentContext, v8pp::to_v8(isolate, "addTemplateNode"), addTemplateNodeFunc).ToChecked();
+        context->Global()->Set(context, v8pp::to_v8(isolate, "addTemplateNode"), addTemplateNodeFunc).ToChecked();
         auto addTypeFunc = v8pp::wrap_function(isolate, "addType", &v8AddType);
-        currentContext->Global()->Set(currentContext, v8pp::to_v8(isolate, "addType"), addTypeFunc).ToChecked();
+        context->Global()->Set(context, v8pp::to_v8(isolate, "addType"), addTypeFunc).ToChecked();
 
         v8pp::class_<GenerateOptions> generateOptionsClass(isolate);
         generateOptionsClass
@@ -1243,7 +1241,10 @@ namespace sight {
                 .set("isPart", &GenerateOptions::isPart)
                 ;
 
-        bindBaseFunctions(isolate, context);
+        bindBaseFunctions(isolate, context, module);
+        bindNodeTypes(isolate, context, module);
+
+        context->Global()->Set(context, v8pp::to_v8(isolate, "sight"), module.new_instance()).ToChecked();
         logDebug("init js bindings over!");
         return 0;
     }
@@ -1410,12 +1411,11 @@ namespace sight {
      * @param filepath
      * @return
      */
-    int runJsFile(const char *filepath, std::promise<int>* promise /* = nullptr */) {
+    int runJsFile(v8::Isolate* isolate, const char* filepath, std::promise<int>* promise, v8::Local<v8::Object> module) {
         if (!g_V8Runtime) {
-            return -1;
+            return CODE_FAIL;
         }
 
-        auto isolate = g_V8Runtime->isolate;
         v8::HandleScope handle_scope(isolate);
         auto context = isolate->GetCurrentContext();
 
@@ -1424,29 +1424,60 @@ namespace sight {
         v8::Local<v8::String> sourceCode = readFile(isolate, filepath).ToLocalChecked();
 
         //
-        
-        v8::Local<v8::String> module = v8::String::NewFromUtf8(isolate, "module").ToLocalChecked();
-        v8::Local<v8::String> exports = v8::String::NewFromUtf8(isolate, "exports").ToLocalChecked();
-        v8::Local<v8::String> params = v8::String::NewFromUtf8(isolate, "params").ToLocalChecked();
-        v8::Local<v8::String> arguments[] = {module, exports, params};
-        v8::ScriptCompiler::Source source(sourceCode);
+
+        Local<Integer> lineOffset = Integer::New(isolate, 0);
+        ScriptOrigin scriptOrigin(v8pp::to_v8(isolate, filepath), lineOffset, lineOffset);
+        v8::ScriptCompiler::Source source(sourceCode, scriptOrigin);
         Local<Object> context_extensions[0];
-        auto mayFunction = v8::ScriptCompiler::CompileFunctionInContext(context, &source, 3, arguments,
-                                                                                0, context_extensions);
+        MaybeLocal<Function> mayFunction;
+
+        if (module.IsEmpty()) {
+            mayFunction = v8::ScriptCompiler::CompileFunctionInContext(context, &source, 0, nullptr, 0, context_extensions);
+        } else {
+            v8::Local<v8::String> paramModule = v8::String::NewFromUtf8(isolate, "module").ToLocalChecked();
+            v8::Local<v8::String> paramExports = v8::String::NewFromUtf8(isolate, "exports").ToLocalChecked();
+            v8::Local<v8::String> arguments[] { paramModule, paramExports};
+
+            mayFunction = v8::ScriptCompiler::CompileFunctionInContext(context, &source, std::size(arguments), arguments,
+                                                                       0, context_extensions);
+        }
+        
         if (mayFunction.IsEmpty()) {
             dbg("js file compile error", filepath);
-            return -2;
+            if (promise) {
+                promise->set_value(0);
+            }
+
+            if (tryCatch.HasCaught()) {
+                //
+                ReportException(isolate, &tryCatch);
+            }
+            return CODE_FILE_ERROR;
         }
         Local<Function> function = mayFunction.ToLocalChecked();
         Local<Object> recv = Object::New(isolate);
-        recv->Set(context, String::NewFromUtf8(isolate, "test").ToLocalChecked(),
-                  String::NewFromUtf8(isolate, "value-from-cpp").ToLocalChecked());
+        MaybeLocal<Value> result;
 
-        Local<Value> args[3];
-        args[0] = Object::New(isolate);
-        args[1] = Object::New(isolate);
-        args[2] = Object::New(isolate);
-        function->Call(context, recv, 3, args);
+        if (module.IsEmpty()) {
+            result = function->Call(context, recv, 0, nullptr);
+        } else {
+            auto mayExports = module->Get(context, v8pp::to_v8(isolate, "exports"));
+            Local<Value> exports;
+            if (mayExports.IsEmpty() || (exports = mayExports.ToLocalChecked()).IsEmpty() || exports->IsNullOrUndefined()) {
+                exports = Object::New(isolate);
+                module->Set(context, v8pp::to_v8(isolate, "exports"), exports).ToChecked();
+            }
+            // check globals
+            auto temp =  module->Get(context, v8pp::to_v8(isolate, "globals"));
+            if (temp.IsEmpty() || temp.ToLocalChecked()->IsNullOrUndefined()) {
+                module->Set(context, v8pp::to_v8(isolate, "globals"), Object::New(isolate)).ToChecked();
+            }
+
+            // call function
+            Local<Value> args[] = { module, exports };
+            result = function->Call(context, recv, std::size(args), args);
+        }
+        
         if (tryCatch.HasCaught()) {
             dbg("js file has error", filepath);
             if (promise) {
@@ -1455,13 +1486,13 @@ namespace sight {
 
             //
             ReportException(isolate, &tryCatch);
-            return 1;
+            return CODE_FAIL;
         }
 
         if (promise) {
             promise->set_value(1);
         }
-        return 0;
+        return CODE_OK;
     }
 
     std::string analysisGenerateFunction(Isolate* isolate, Local<Function> function, Local<Context> context, GenerateFunctionStatus* status = nullptr){
@@ -1621,7 +1652,7 @@ namespace sight {
                     };
 
                     auto functionObject = isOutput ? v8pp::wrap_function(isolate, name, emptyFunc) : v8pp::wrap_function(isolate, name, t);
-                    functionObject->Set(context, v8pp::to_v8(isolate, "value"), getPortValue(isolate, item)).ToChecked();
+                    functionObject->Set(context, v8pp::to_v8(isolate, "value"), getPortValue(isolate, item.getType(), item.value)).ToChecked();
                     functionObject->Set(context, v8pp::to_v8(isolate, "isConnect"), v8pp::to_v8(isolate, item.isConnect())).ToChecked();
 
                     arg$->Set(context, v8pp::to_v8(isolate, name), functionObject).ToChecked();
@@ -1821,39 +1852,41 @@ namespace sight {
             auto command = queue.front();
 
             switch (command.type) {
-                case JsCommandType::Destroy:
-                    goto break_commands_loop;
-                case JsCommandType::File:
-                    runJsFile(command.args.argString, nullptr);
-                    flushJsNodeCache(command.args.promise);
-                    break;
-                case JsCommandType::JsCommandHolder:
-                    // do nothing.
-                    break;
-                case JsCommandType::ParseGraph:
-                    parseGraph(command.args.argString);
-                    break;
-                case JsCommandType::InitPluginManager:
-                {
-                    pluginManager()->init(g_V8Runtime->isolate);
-                    pluginManager()->loadPlugins();
-                    break;
-                }
-                case JsCommandType::RunFile:
-                    runJsFile(command.args.argString, command.args.promise);
-                    break;
-                case JsCommandType::FlushNodeCache:
-                    flushJsNodeCache(command.args.promise);
-                    break;
-                case JsCommandType::InitParser:
-                    initParser();
-                    break;
-                case JsCommandType::EndInit:
-                    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-                    addUICommand(UICommandType::JsEndInit);
-                    break;
-                default:
-                    break;
+            case JsCommandType::Destroy:
+                goto break_commands_loop;
+            case JsCommandType::File:
+                runJsFile(g_V8Runtime->isolate, command.args.argString, nullptr);
+                flushJsNodeCache(command.args.promise);
+                break;
+            case JsCommandType::JsCommandHolder:
+                // do nothing.
+                break;
+            case JsCommandType::ParseGraph:
+                parseGraph(command.args.argString);
+                break;
+            case JsCommandType::InitPluginManager:
+            {
+                pluginManager()->init(g_V8Runtime->isolate);
+                pluginManager()->loadPlugins();
+                break;
+            }
+            case JsCommandType::RunFile:
+                runJsFile(g_V8Runtime->isolate, command.args.argString, command.args.promise);
+                break;
+            case JsCommandType::FlushNodeCache:
+                flushJsNodeCache(command.args.promise);
+                break;
+            case JsCommandType::InitParser:
+                initParser();
+                break;
+            case JsCommandType::EndInit:
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                addUICommand(UICommandType::JsEndInit);
+                break;
+            case JsCommandType::Test:
+                break;
+            default:
+                break;
             }
 
             command.args.dispose();
@@ -1915,7 +1948,92 @@ namespace sight {
         return 0;
     }
 
+    v8::Local<v8::Function> recompileFunction(v8::Isolate* isolate, std::string sourceCode) {
+        auto context = isolate->GetCurrentContext();
 
+        trim(sourceCode);
+        if (!startsWith(sourceCode, "function")) {
+            sourceCode = "function " + sourceCode;
+        }
+        sourceCode = "return " + sourceCode;
+
+        v8::ScriptCompiler::Source source(v8pp::to_v8(isolate, sourceCode.c_str()));
+        auto mayFunction = v8::ScriptCompiler::CompileFunctionInContext(context, &source, 0, nullptr, 0, nullptr);
+        Local<Value> tmp;
+        if (!mayFunction.IsEmpty() && (tmp = mayFunction.ToLocalChecked())->IsFunction()) {
+            tmp = tmp.As<Function>()->Call(context, Object::New(isolate), 0, nullptr).ToLocalChecked();
+            if (tmp->IsFunction()) {
+                return tmp.As<Function>();
+            }
+        }
+
+        return {};
+    }
+
+    void registerToGlobal(v8::Isolate* isolate, std::map<std::string, std::string>* map) {
+        HandleScope handleScope(isolate);
+        auto context = isolate->GetCurrentContext();
+
+        auto object = Object::New(isolate);
+        for (const auto& [name, code] : *map) {
+            auto f = recompileFunction(isolate, code);
+            if (!f.IsEmpty()) {
+                object->Set(context, v8pp::to_v8(isolate, name), f).ToChecked();
+            }
+        }
+
+        registerToGlobal(isolate, object);
+    }
+
+    void registerToGlobal(v8::Isolate* isolate, v8::Local<v8::Value> object) {
+        if (object.IsEmpty() || object->IsNullOrUndefined()) {
+            return;
+        }
+
+        registerToGlobal(isolate, object.As<Object>());
+    }
+
+    void registerToGlobal(v8::Isolate* isolate, v8::Local<v8::Object> object, std::map<std::string, std::string>* outFunctionCode) {
+        // register
+        auto context = isolate->GetCurrentContext();
+        auto global = context->Global();
+
+        auto keys = object->GetOwnPropertyNames(context).ToLocalChecked();
+        for (int i = 0; i < keys->Length(); i++) {
+            auto key = keys->Get(context, i).ToLocalChecked();
+            auto value = object->Get(context, key).ToLocalChecked();
+            std::string keyString = v8pp::from_v8<std::string>(isolate, key);
+
+            if (value->IsFunction()) {
+                // only register function
+                if (outFunctionCode) {
+                    // out code
+                    auto function = value.As<Function>();
+                    outFunctionCode->insert({ keyString, functionProtoToString(isolate, context, function) });
+                }
+
+                if (isValid(global->Get(context, key))) {
+                    dbg("repeat key, ignore this one", keyString);
+                    continue;
+                }
+
+                if (!global->Set(context, key, value).ToChecked()) {
+                    dbg("set failed", keyString);
+                }
+            }
+        }
+    }
+
+    void registerGlobals(v8::Local<v8::Value> value) {
+        if (value.IsEmpty() || !value->IsObject()) {
+            return;
+        }
+
+        auto map = new std::map<std::string, std::string>();
+        registerToGlobal(g_V8Runtime->isolate, value.As<Object>(), map);
+
+        // send map to ui thread.
+        // addUICommand(UICommandType::RegScriptGlobalFunctions, map);
+        delete map;
+    }
 }
-
-

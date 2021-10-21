@@ -696,7 +696,11 @@ namespace sight {
         auto isolate = currentUIStatus()->isolate;
         auto templateNodePort = port->templateNodePort;
 
-        templateNodePort->onValueChange(isolate, port);
+        templateNodePort->onValueChange(isolate, port, JsEventType::ValueChange, (void*) & port->oldValue);
+        if (port->getType() == IntTypeLargeString) {
+            port->oldValue.stringFree();
+        }
+        port->oldValue = port->value.copy(port->getType());
     }
 
     void onNodePortAutoComplete(SightNodePort* port){
@@ -729,6 +733,8 @@ namespace sight {
         {
             int flags = options.readonly ? ImGuiSliderFlags_ReadOnly : 0;
             if (ImGui::DragFloat(labelBuf, &port->value.f, 0.5f, 0, 0, "%.3f", flags)) {
+            }
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
                 onNodePortValueChange(port);
             }
             break;
@@ -737,6 +743,8 @@ namespace sight {
         {
             int flags = options.readonly ? ImGuiInputTextFlags_ReadOnly : 0;
             if (ImGui::InputDouble(labelBuf, &port->value.d, 0,0,"%.6f", flags)) {
+            }
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
                 onNodePortValueChange(port);
             }
             break;
@@ -746,6 +754,9 @@ namespace sight {
         {
             int flags = options.readonly ? ImGuiSliderFlags_ReadOnly : 0;
             if (ImGui::DragInt(labelBuf, &port->value.i, 1,0,0,"%d",flags)) {
+                // onNodePortValueChange(port, oldValue);
+            }
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
                 onNodePortValueChange(port);
             }
             break;
@@ -793,7 +804,6 @@ namespace sight {
                     onNodePortAutoComplete(port);
                 }
                 if (ImGui::IsItemDeactivatedAfterEdit()) {
-                    dbg(1);
                     onNodePortValueChange(port);
                 }
             }
@@ -1261,6 +1271,7 @@ namespace sight {
                 auto copy = (SightNodePort) *item;
                 copy.templateNodePort = item;
                 dst.push_back(copy);
+                dst.back().oldValue = dst.back().value;
             }
         };
         portCopyFunc(this->inputPorts, p->inputPorts);
@@ -1496,7 +1507,7 @@ namespace sight {
             return -1;
         }
 
-        int status = 0;
+        int status = CODE_OK;
         try {
             auto root = YAML::Load(fin);
 
@@ -1536,7 +1547,7 @@ namespace sight {
                     // todo add node port to list 
                     this->broken = true;
                     dbg(portName, "not found");
-                    return ;
+                    return CODE_FAIL;
                 }
 
                 auto & port = *pointer;
@@ -1610,6 +1621,9 @@ namespace sight {
                     } break;
                     }
                 }
+
+                port.oldValue = port.value;
+                return CODE_OK;
             };
 
             for (const auto &nodeKeyPair : nodeRoot) {
@@ -1659,7 +1673,7 @@ namespace sight {
                     if (!templateNode) {
                         dbg(templateNodeAddress, " template not found.");
                         broken = true;
-                        status = 1;
+                        status = CODE_FAIL;
                     } 
                 } else {
                     dbg(sightNode.nodeName, "entity do not have templateNodeAddress, jump it.");
@@ -1687,7 +1701,7 @@ namespace sight {
             fprintf(stderr, "read file %s error!\n", path);
             fprintf(stderr, "%s\n", e.what());
             this->reset();
-            return -2;    // bad file
+            return CODE_FILE_ERROR;    // bad file
         } 
 
         // return 0;
@@ -1941,7 +1955,14 @@ namespace sight {
         }
 
         graph = new SightNodeGraph();
-        if (graph->load(path) != 0) {
+        if (graph->load(path) != CODE_OK) {
+            // if (!graph->isBroken()) {
+            //     // create one.
+            //     graph->save();
+            // } else {
+
+            // }
+
             // create one.
             graph->save();
         }
@@ -2185,6 +2206,7 @@ namespace sight {
                     type,
                     {},
                     {},
+                    {},
                     std::vector<SightNodeConnection*>(),
             };
             // todo distinguish type
@@ -2329,10 +2351,19 @@ namespace sight {
         largeString.size = str.size();
     }
 
+    SightNodeValue SightNodeValue::copy(int type) const {
+        SightNodeValue tmp;
+        if (type == IntTypeLargeString) {
+            // large string
+            tmp.stringCopy(this->largeString.pointer);
+        } else {
+            memcpy(tmp.string, this->string, std::size(this->string));
+        }
+        return tmp;
+    }
+
     ScriptFunctionWrapper::ScriptFunctionWrapper(Function const& f)
-        : function(f)
-    {
-        
+        : function(f) {
     }
 
     ScriptFunctionWrapper::ScriptFunctionWrapper(std::string const& code)
@@ -2347,29 +2378,35 @@ namespace sight {
         }
         using namespace v8;
 
-        trim(sourceCode);
-        if (!startsWith(sourceCode, "function")) {
-            sourceCode = "function " + sourceCode;
-        }
-        sourceCode = "return " + sourceCode;
-        dbg(sourceCode);
+        // trim(sourceCode);
+        // if (!startsWith(sourceCode, "function")) {
+        //     sourceCode = "function " + sourceCode;
+        // }
+        // sourceCode = "return " + sourceCode;
+        // dbg(sourceCode);
 
-        auto context = isolate->GetCurrentContext();
-        HandleScope handleScope(isolate);
-        v8::ScriptCompiler::Source source(v8pp::to_v8(isolate, sourceCode.c_str()));
-        auto mayFunction = v8::ScriptCompiler::CompileFunctionInContext(context, &source, 0, nullptr, 0, nullptr);
-        if (mayFunction.IsEmpty()) {
-            dbg("compile failed");
-        } else {
-            auto recv = Object::New(isolate);
-            auto t1 = mayFunction.ToLocalChecked()->Call(context, recv, 0, nullptr);
-            if (!t1.IsEmpty()) {
-                auto t2 = t1.ToLocalChecked();
-                if (t2->IsFunction()) {
-                    function = Function(isolate, t2.As<v8::Function>());
-                    sourceCode.clear();
-                }
-            }
+        // auto context = isolate->GetCurrentContext();
+        // HandleScope handleScope(isolate);
+        // v8::ScriptCompiler::Source source(v8pp::to_v8(isolate, sourceCode.c_str()));
+        // auto mayFunction = v8::ScriptCompiler::CompileFunctionInContext(context, &source, 0, nullptr, 0, nullptr);
+        // if (mayFunction.IsEmpty()) {
+        //     dbg("compile failed");
+        // } else {
+        //     auto recv = Object::New(isolate);
+        //     auto t1 = mayFunction.ToLocalChecked()->Call(context, recv, 0, nullptr);
+        //     if (!t1.IsEmpty()) {
+        //         auto t2 = t1.ToLocalChecked();
+        //         if (t2->IsFunction()) {
+        //             function = Function(isolate, t2.As<v8::Function>());
+        //             sourceCode.clear();
+        //         }
+        //     }
+        // }
+
+        auto f = recompileFunction(isolate, sourceCode);
+        if (!f.IsEmpty()) {
+            function = Function(isolate, f);
+            sourceCode.clear();
         }
     }
 
@@ -2413,6 +2450,8 @@ namespace sight {
 
         } else if (eventType == JsEventType::Connect) {
             args[1] = connectionValue(isolate, (SightNodeConnection *)pointer, thisNodePort);
+        } else if (eventType == JsEventType::ValueChange) {
+            args[1] = getPortValue(isolate, thisNodePort->getType(), *((const SightNodeValue*)pointer));
         }
 
         // call function

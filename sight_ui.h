@@ -31,6 +31,13 @@ namespace sight {
         // node editor part
         AddNode = 200,
         AddTemplateNode = 201,
+
+        // script part
+
+        // clean data after used.
+        RegScriptGlobalFunctions = 300,
+        RunScriptFile,
+
     };
 
     /**
@@ -267,6 +274,8 @@ namespace sight {
      */
     int addUICommand(UICommandType type, void *data, size_t dataLength = 0, bool needFree = true);
 
+    int addUICommand(UICommandType type, const char *argString, int length = 0, bool needFree = true);
+
     /**
      *
      * @param command
@@ -318,5 +327,7 @@ namespace sight {
      * @param callback 
      */
     void openSaveModal(const char* title, const char* content, std::function<void(SaveOperationResult)> const& callback);
+
+    bool isUICommandFree();
 
 }

@@ -78,6 +78,8 @@ addTemplateNode({
         // node is the node data, not the template node.
         onInstantiate() {
             print("this is run by ui thread. onInstantiate");
+            test_ui();
+            print(typeof Array.prototype.remove);
             let node = this;
             print(node.templateAddress());
 
@@ -149,6 +151,14 @@ addTemplateNode({
                 node.portValue('out').show(true);
             }
         },
+    },
+
+    number: {
+        type: 'Number',
+
+        onValueChange(node, oldValue){
+            print(this.get(), oldValue);
+        }
     },
 
     in: {

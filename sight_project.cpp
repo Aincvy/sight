@@ -668,6 +668,7 @@ namespace sight {
 
     void TypeInfoRender::operator()(const char* labelBuf, SightNodePort* port) const{
         SightNodeValue& value = port->value;
+        auto oldValue = port->value;
         auto & options = port->options;
         switch (kind) {
         case TypeInfoRenderKind::Default:

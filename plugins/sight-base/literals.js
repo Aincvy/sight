@@ -267,17 +267,17 @@ addTemplateNode({
                 // out
                 portIn.show(false);
                 portOut.show(true);
-                if(!data.out[name]){
-                    data.out[name] = [];
-                }
-                data.out[name].push(this.id);
-                print(name, data.out[name]);
+                // if(!data.out[name]){
+                //     data.out[name] = [];
+                // }
+                // data.out[name].push(this.id);
+                checkValue1(data.out, name, [], a => a.push(this.id));
+                // print(name, data.out[name]);
             }
         },
 
         onMsg(type, msg){
-            print(this.id, type, msg);
-            print('line 3');
+            // print(this.id, type, msg);
             if(type === 1){
                 this.portValue('varName').set(msg);
             } else if(type === 2) {
@@ -299,11 +299,14 @@ addTemplateNode({
                 let data = tinyData(node);
                 let name = node.portValue('varName').get();
                 print(name, data.out[name]);
-                if(data.out[name]){
-                    data.out[name].forEach(element => {
-                        tell(element, 2, type);
-                    });
-                }
+                // if(data.out[name]){
+                //     data.out[name].forEach(element => {
+                //         tell(element, 2, type);
+                //     });
+                // }
+                loopIf(data.out[name], element => {
+                    tell(element, 2, type);
+                });
             },
 
             onDisconnect(node, connection) {
@@ -357,7 +360,6 @@ addTemplateNode({
                 port.show(false);
                 port.deleteLinks();
                 node.portValue('out').show(true);
-                // node.portValue('varName').readonly(true);
                 
                 // delete name
                 delete data.names[node.id];
@@ -384,7 +386,7 @@ addTemplateNode({
     varName: {
         type: 'String',
         defaultValue: 'varName',
-        onValueChange(node) {
+        onValueChange(node, oldName) {
             // update var name.
             let data = tinyData(node);
             // fix var name first.
@@ -393,14 +395,11 @@ addTemplateNode({
             let portType = node.portValue('type');
             let type = portType.get();
             let nowName = portVarName.get();
-            let oldName = data.names[node.id];
-            if(nowName === oldName){
-                return;
-            }
-            
+
             let out = data.out;
             if(type.index == 0){
                 // in
+                
                 if (realNames.includes(nowName)) {
                     portVarName.errorMsg('repeat name');
                     return;
@@ -411,7 +410,8 @@ addTemplateNode({
                 data.names[node.id] = nowName;
                 if(out){
                     //  rename key
-                    delete Object.assign(out, { [nowName]: out[oldName] })[oldName];
+                    // delete Object.assign(out, { [nowName]: out[oldName] })[oldName];
+                    renameKey(out, nowName, oldName);
                     let array = out[nowName];
                     if(array && array.length > 0){
                         array.forEach(element => {
@@ -421,14 +421,12 @@ addTemplateNode({
                 }
             } else {
                 // out
+                print(1, oldName);
 
                 // delete old name
                 if(out[oldName]){
                     let array = out[oldName];
-                    let index = array.indexOf(node.id);
-                    if (index > -1) {
-                        array.splice(index, 1);
-                    }
+                    array.remove(node.id);
                 }
                 
                 // check name valid
@@ -440,10 +438,7 @@ addTemplateNode({
                 }
 
                 // add new name
-                if (!out[nowName]) {
-                    out[nowName] = [];
-                }
-                out[nowName].push(node.id);
+                checkValue1(out, nowName, [], a => a.push(node.id));
             }
         },
 

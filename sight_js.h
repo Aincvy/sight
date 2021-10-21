@@ -5,11 +5,16 @@
 #pragma once
 
 #include <future>
+#include <map>
 
 #include "sight.h"
 #include "shared_queue.h"
 
 #include "v8.h"
+#include "v8pp/module.hpp"
+
+#define MODULE_INIT_JS 0
+#define MODULE_INIT_UI 1
 
 namespace sight{
 
@@ -18,6 +23,7 @@ namespace sight{
     struct SightNodePort;
     struct SightNodePortHandle;
     struct SightNodeConnection;
+    union SightNodeValue;
 
     enum class JsCommandType {
         JsCommandHolder,
@@ -36,6 +42,7 @@ namespace sight{
         // this command will nofity ui thread, js thread is init end.
         // do not add this command twice.
         EndInit,
+        Test,
 
     };
 
@@ -79,7 +86,8 @@ namespace sight{
      * @param filepath
      * @return
      */
-    int runJsFile(const char *filepath, std::promise<int>* promise = nullptr);
+    int runJsFile(v8::Isolate* isolate, const char* filepath, std::promise<int>* promise = nullptr, v8::Local<v8::Object> module = {});
+
 
     /**
      * only call this function from js thread.
@@ -109,16 +117,36 @@ namespace sight{
      */
     void bindTinyData(v8::Isolate* isolate, const v8::Local<v8::Context>& context);
 
-    void bindBaseFunctions(v8::Isolate* isolate, const v8::Local<v8::Context>& context);
+    void bindBaseFunctions(v8::Isolate* isolate, const v8::Local<v8::Context>& context, v8pp::module & module);
 
-    void bindNodeTypes(v8::Isolate* isolate, const v8::Local<v8::Context>& context);
+    void bindNodeTypes(v8::Isolate* isolate, const v8::Local<v8::Context>& context, v8pp::module& module);
 
     v8::Isolate* getJsIsolate();
+
+    v8::Local<v8::Value> getPortValue(v8::Isolate* isolate, int type, SightNodeValue const& value);
 
     v8::Local<v8::Value> nodePortValue(v8::Isolate* isolate, SightNodePortHandle portHandle);
 
     v8::Local<v8::Value> nodePortValue(v8::Isolate* isolate, SightNode* node, const char* portName);
 
     v8::Local<v8::Value> connectionValue(v8::Isolate* isolate, SightNodeConnection* connection, SightNodePort* selfNodePort = nullptr);
+
+    v8::Local<v8::Function> recompileFunction(v8::Isolate* isolate, std::string sourceCode);
+
+    void registerToGlobal(v8::Isolate* isolate, std::map<std::string, std::string>* map);
+
+    void registerToGlobal(v8::Isolate* isolate, v8::Local<v8::Value> object);
+
+    void registerToGlobal(v8::Isolate* isolate, v8::Local<v8::Object> object, std::map<std::string, std::string>* outFunctionCode = nullptr);
+
+    void registerGlobals(v8::Local<v8::Value> value);
+
+    inline bool isValid(v8::Local<v8::Value> value){
+        return !value.IsEmpty() && !value->IsNullOrUndefined();
+    }
+
+    inline bool isValid(v8::MaybeLocal<v8::Value> value){
+        return !value.IsEmpty() && isValid(value.ToLocalChecked());
+    }
 }
 

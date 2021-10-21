@@ -15,14 +15,17 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "sight_widgets.h"
+#include "v8pp/convert.hpp"
 
 #include <algorithm>
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
 #include <iterator>
+#include <map>
 #include <stdio.h>
 #include <future>
+#include <atomic>
 
 #include <filesystem>
 
@@ -43,6 +46,7 @@ static void glfw_error_callback(int error, const char* description)
 
 
 static sight::UIStatus* g_UIStatus = nullptr;
+static std::atomic<bool> uiCommandFree = true;
 
 namespace sight {
 
@@ -172,19 +176,6 @@ namespace sight {
             }
         }
 
-        auto abc() {
-            struct {
-                int a;
-                float b;
-            } s {101,201};
-            return s;
-        }
-
-        void t() {
-            auto [a, b] = abc();
-            dbg(a, b);
-        }
-
         void showMainCustomMenu(){
             if (ImGui::MenuItem("Trigger")) {
                 // auto p = findTemplateNode("test/http/HttpGetReqNode");
@@ -192,7 +183,7 @@ namespace sight {
                 // if (p) {
                 //     dbg(serializeJsNode(*p));
                 // }
-                t();
+                addJsCommand(JsCommandType::Test, "/Volumes/mac_extend/Project/sight/scripts/run_in_test.js");
             }
             if (ImGui::MenuItem("Crash")) {
                 // produce a crash for test.
@@ -892,10 +883,29 @@ namespace sight {
                 pluginManager()->getPluginStatus().addTemplateNodesFinished = true;
                 break;
             } 
+            case UICommandType::RegScriptGlobalFunctions: {
+                std::map<std::string, std::string>* map = (std::map<std::string, std::string>*) command->args.data;
+                command->args.data = nullptr;
+                registerToGlobal(g_UIStatus->isolate, map);
+                delete map;
+                break;
+            }
+            case UICommandType::RunScriptFile:{
+                auto isolate = g_UIStatus->isolate;
+                auto module = v8::Object::New(isolate);
+                if (runJsFile(isolate, command->args.argString, nullptr, module) == CODE_OK) {
+                    // 
+                    dbg("ok");
+                    registerToGlobal(isolate, module->Get(isolate->GetCurrentContext(), v8pp::to_v8(isolate, "globals")).ToLocalChecked());
+                };
 
-        }
+                break;
+            }
+
+            }
 
         command->args.dispose();
+        uiCommandFree = true;
     }
 
     void runUICommandCallback(uv_async_t *handle){
@@ -992,6 +1002,13 @@ namespace sight {
         g_UIStatus->v8GlobalContext.Reset(isolate, context);
         v8::Context::Scope contextScope(context);
 
+        // bind types and functions
+        v8pp::module module(isolate);
+        bindBaseFunctions(isolate, context, module);
+        bindTinyData(isolate, context);
+        bindNodeTypes(isolate, context, module);
+        context->Global()->Set(context, v8pp::to_v8(isolate, "sight"), module.new_instance()).ToChecked();
+
         // load plugins
         addJsCommand(JsCommandType::InitParser);
         addJsCommand(JsCommandType::InitPluginManager);
@@ -1053,7 +1070,7 @@ namespace sight {
 
         glfwDestroyWindow(window);
 
-        dbg("end loading", g_UIStatus->isolate);
+        dbg("end loading");
         return 0;
     }
 
@@ -1067,11 +1084,7 @@ namespace sight {
         v8::Isolate::Scope isolateScope(isolate);
         v8::HandleScope handle_scope(isolate);
         v8::Local<v8::Context> context = g_UIStatus->v8GlobalContext.Get(isolate);
-        //         Enter the context
         v8::Context::Scope contextScope(context);
-        bindBaseFunctions(isolate, context);
-        bindTinyData(isolate, context);
-        bindNodeTypes(isolate, context);
         dbg("v8 runtime init over.", isolate);
 
         // Create window with graphics context
@@ -1202,7 +1215,25 @@ namespace sight {
         return addUICommand(command);
     }
 
+    int addUICommand(UICommandType type, const char *argString, int length, bool needFree) {
+        UICommand command = {
+            type,
+            {
+                .argString = argString,
+                .argStringLength = length,
+                .needFree = needFree,
+            }
+        };
+
+        return addUICommand(command);
+    }
+
     int addUICommand(UICommand &command) {
+        while (!uiCommandFree) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+
+        uiCommandFree = false;
         auto async = g_UIStatus->uvAsync;
         async->data = copyObject(&command, sizeof(UICommand));
         uv_async_send(async);
@@ -1271,6 +1302,10 @@ namespace sight {
         askData.callback = callback;
 
         g_UIStatus->windowStatus.popupSaveModal = true;
+    }
+
+    bool isUICommandFree() {
+        return uiCommandFree;
     }
 
 

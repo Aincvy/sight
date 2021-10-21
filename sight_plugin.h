@@ -23,6 +23,8 @@ namespace sight {
 
     class Plugin {
     public:
+        using V8ObjectType = v8::Persistent<v8::Object, v8::CopyablePersistentTraits<v8::Object>>;
+
         Plugin(PluginManager* pluginManager, std::string name, std::string path, std::string version, std::string author);
 
         /**
@@ -50,6 +52,8 @@ namespace sight {
         std::string version;
         std::string author;
         bool disabled = false;
+        // every plugin share one module.
+        V8ObjectType module = {};
 
         PluginManager* pluginManager = nullptr;
 

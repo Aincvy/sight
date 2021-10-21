@@ -37,6 +37,8 @@ namespace sight {
             }
             if (data) {
                 free(data);
+                data = nullptr;
+                dataLength = 0;
             }
         }
     }

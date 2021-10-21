@@ -51,7 +51,7 @@ namespace sight {
             char * pointer;
             size_t size;
             size_t bufferSize;
-        } largeString;     // todo largeString
+        } largeString;     // largeString
         float vector2[2];
         float vector3[3];
         float vector4[4];
@@ -62,6 +62,24 @@ namespace sight {
         void stringCheck(size_t needSize);
         void stringFree();
         void stringCopy(std::string const& str);
+
+        SightNodeValue copy(int type) const;
+
+        SightNodeValue() = default;
+        /**
+         * @brief Construct a new Sight Node Value object
+         * Use `copy` function.
+         * @param rhs 
+         */
+        SightNodeValue(SightNodeValue const& rhs) = default;
+        /**
+         * @brief 
+         * Use `copy` function.
+         * @param rhs 
+         * @return SightNodeValue& 
+         */
+        SightNodeValue& operator=(SightNodeValue const& rhs) = default;
+
     };
 
     struct SightNodePortOptions {
@@ -86,6 +104,8 @@ namespace sight {
         // IntTypeValues ... use getType(), this maybe a fake type. 
         uint type;
         SightNodeValue value;
+        // last value.
+        SightNodeValue oldValue;
         SightNodePortOptions options;
 
         // connections
@@ -280,10 +300,7 @@ namespace sight {
         AutoComplete,
         // onConnect or onDisconnect
         Connect,
-    };
-
-    struct a{
-
+        ValueChange,
     };
 
     struct ScriptFunctionWrapper {
@@ -571,7 +588,7 @@ namespace sight {
 
         // save and read path.
         std::string filepath;
-        bool broken;
+        bool broken = false;
 
         // real nodes
         SightArray<SightNode> nodes;

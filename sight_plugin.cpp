@@ -6,13 +6,17 @@
 #include "dbg.h"
 #include "sight.h"
 #include "filesystem"
+#include "sight_ui.h"
 #include "sight_util.h"
 #include "sight_js.h"
 
 #include "v8pp/convert.hpp"
+#include "v8pp/call_v8.hpp"
+#include <cstring>
 #include <unistd.h>
 
 #define FILE_NAME_PACKAGE "package.js"
+#define FILE_NAME_EXPORTS_UI "exports-ui.js"
 
 namespace sight {
 
@@ -155,6 +159,7 @@ namespace sight {
         }
 
         // load other files.
+        auto module = v8::Object::New(isolate);
         directory_iterator begin{ this->path}, end{};
         for (auto it = begin; it != end ; ++it) {
             if (!it->is_regular_file()) {
@@ -164,18 +169,30 @@ namespace sight {
             if (!it->path().has_extension() || it->path().extension() != ".js"){
                 continue;
             }
-            if (it->path().filename() == FILE_NAME_PACKAGE)
-            {
+            auto filename = it->path().filename();
+            if (filename == FILE_NAME_PACKAGE) {
                 continue;
             }
-            
 
             auto fullPath = std::filesystem::canonical(it->path());
-            auto code = runJsFile(fullPath.c_str());
+            if (filename == FILE_NAME_EXPORTS_UI) {
+                addUICommand(UICommandType::RunScriptFile, strdup(fullPath.c_str()), 0 ,true);
+                continue;
+            }
+
+            auto code = runJsFile(isolate, fullPath.c_str(), nullptr, module);
             if (code != 0) {
                 dbg("js run failed", fullPath.c_str());
                 return CODE_PLUGIN_FILE_ERROR;
             }
+        }
+
+        this->module = V8ObjectType(isolate, module);
+        // register global functions
+        registerGlobals(module->Get(context, v8pp::to_v8(isolate, "globals")).ToLocalChecked());
+        auto onInit = module->Get(context, v8pp::to_v8(isolate, "onInit")).ToLocalChecked();
+        if (onInit->IsFunction()) {
+            v8pp::call_v8(isolate, onInit.As<v8::Function>(), v8::Object::New(isolate), MODULE_INIT_JS);
         }
 
         return CODE_OK;
@@ -183,7 +200,7 @@ namespace sight {
 
     int Plugin::load() {
         if (!std::filesystem::exists(path)) {
-            CODE_FAIL;
+            return CODE_FAIL;
         }
 
         if (!endsWith(path, "/")) {

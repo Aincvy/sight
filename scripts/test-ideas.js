@@ -420,3 +420,10 @@ function tell(node, type, msg){
         result: {}
     };
 }
+
+function require(path){
+
+}
+
+require("plugin:sight-base");
+require("./abc.js");
