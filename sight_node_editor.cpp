@@ -988,8 +988,10 @@ namespace sight {
         
     }
 
-    void SightNodePort::setKind(int intKind) {
-        this->kind = NodePortType(intKind);
+    SightNodePort::SightNodePort(NodePortType kind, uint type, const SightJsNodePort* templateNodePort)
+        : templateNodePort(templateNodePort) {
+        this->kind = kind;
+        this->type = type;
     }
 
     bool SightNodePort::isConnect() const {
@@ -1000,6 +1002,30 @@ namespace sight {
         return static_cast<int>(connections.size());
     }
 
+    uint SightNodePort::getId() const {
+        return id;
+    }
+
+    int SightNodePort::clearLinks() {
+        auto g = getGraph();
+        if (!g) {
+            return -1;
+        }
+        
+        std::vector<int> ids;
+        std::transform(connections.begin(), connections.end(), std::back_inserter(ids), [](SightNodeConnection* c) {
+            return c->connectionId;
+        });
+        dbg(ids);
+        uint count = 0;
+        for (const auto& item : ids) {
+            if (g->delConnection(item) == CODE_OK) {
+                count++;
+            }
+        }
+
+        return count;
+    }
 
     const char *SightNodePort::getDefaultValue() const {
         return this->value.string;
@@ -1007,7 +1033,7 @@ namespace sight {
 
     uint SightNodePort::getType() const {
         if (templateNodePort) {
-            return templateNodePort->getType();
+            return templateNodePort->type;
         }
         return this->type;
     }
@@ -1121,8 +1147,8 @@ namespace sight {
 
             if (!find) {
                 list.push_back({
-                    .kind = kind,
-                    .type = IntTypeProcess,
+                    kind,
+                    IntTypeProcess,
                 });
             }
         };
@@ -1206,6 +1232,10 @@ namespace sight {
         return portHandle;
     }
 
+    uint SightNode::getNodeId() const {
+        return this->nodeId;
+    }
+
     SightJsNode::SightJsNode() {
 
     }
@@ -1268,7 +1298,7 @@ namespace sight {
         
         auto portCopyFunc = [](std::vector<SightJsNodePort*> const& src, std::vector<SightNodePort> & dst){
             for( const auto& item: src){
-                auto copy = (SightNodePort) *item;
+                auto copy = item->instantiate();
                 copy.templateNodePort = item;
                 dst.push_back(copy);
                 dst.back().oldValue = dst.back().value;
@@ -1893,7 +1923,7 @@ namespace sight {
         return CODE_OK;
     }
 
-    int SightNodeGraph::delConnection(int id) {
+    int SightNodeGraph::delConnection(int id, bool removeRefs) {
         auto result = std::find_if(connections.begin(), connections.end(),
                                    [id](const SightNodeConnection &c) { return c.connectionId == id; });
         if (result == connections.end()) {
@@ -1901,7 +1931,9 @@ namespace sight {
         }
 
         // deal refs.
-        result->removeRefs();
+        if (removeRefs) {
+            result->removeRefs();
+        }
         idMap.erase(id);
 
         connections.erase(result);
@@ -2199,23 +2231,24 @@ namespace sight {
 
         while (c) {
             // input
-            SightNodePort port = {
-                    c->name,
-                    nextNodeOrPortId(),
-                    NodePortType::Input,
-                    type,
-                    {},
-                    {},
-                    {},
-                    std::vector<SightNodeConnection*>(),
-            };
-            // todo distinguish type
-            sprintf(port.value.string, "%s", c->defaultValue);
-            node->inputPorts.push_back(port);
+            // todo entity 
+            // SightNodePort port = {
+            //         c->name,
+            //         nextNodeOrPortId(),
+            //         NodePortType::Input,
+            //         type,
+            //         {},
+            //         {},
+            //         {},
+            //         std::vector<SightNodeConnection*>(),
+            // };
+            // // todo distinguish type
+            // sprintf(port.value.string, "%s", c->defaultValue);
+            // node->inputPorts.push_back(port);
 
-            // output
-            port.id = nextNodeOrPortId();
-            node->outputPorts.push_back(port);
+            // // output
+            // port.id = nextNodeOrPortId();
+            // node->outputPorts.push_back(port);
 
             c = c->next;
         }
@@ -2516,5 +2549,41 @@ namespace sight {
         }
 
         return true;
+    }
+
+    void SightBaseNodePort::setKind(int intKind) {
+        this->kind = NodePortType(intKind);
+    }
+
+    uint SightBaseNodePort::getType() const {
+        return this->type;
+    }
+
+    const char* SightBaseNodePort::getPortName() const {
+        return portName.c_str();
+    }
+
+    SightNodeGraph* SightNodePort::getGraph() {
+        if (this->node) {
+            return this->node->graph;
+        }
+        return nullptr;
+    }
+
+    const SightNodeGraph* SightNodePort::getGraph() const {
+        return const_cast<SightNodePort*>(this)->getGraph();
+    }
+
+    SightJsNodePort::SightJsNodePort(std::string const& name, NodePortType kind)
+    {
+        this->portName = name;
+        this->kind = kind;
+    }
+
+    SightNodePort SightJsNodePort::instantiate() const {
+        SightNodePort tmp = { this->kind, this->type, this};
+        tmp.value = this->value;
+        tmp.portName = this->portName;
+        return tmp;
     }
 }

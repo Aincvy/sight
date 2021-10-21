@@ -136,7 +136,7 @@ namespace sight {
         return v8::Undefined(isolate);
     }
 
-    bool setPortValue(Isolate* isolate, SightNodePort* port, Local<Value> value) {
+    bool setPortValue(Isolate* isolate, SightBaseNodePort* port, Local<Value> value) {
         if (!port) {
             return false;
         }
@@ -247,16 +247,7 @@ namespace sight {
             }
 
             auto nodePort = portHandle.get();
-            auto g = getCurrentGraph();
-            std::vector<int> ids;
-            std::transform(nodePort->connections.begin(), nodePort->connections.end(), std::back_inserter(ids), [](SightNodeConnection *c) { return c->connectionId;});
-            dbg(ids);
-            uint count = 0;
-            for( const auto& item: ids){
-                if (g->delConnection(item) == CODE_OK) {
-                    count++;
-                }
-            }
+            auto count = nodePort->clearLinks();
 
             return v8pp::to_v8(isolate, count);
         };
@@ -434,11 +425,7 @@ namespace sight {
 
             const SightNode* t1 = node;
             if (node->templateNode) {
-                t1 = node->templateNode;
-            }
-            auto t = dynamic_cast<SightJsNode const*>(t1);
-            if (t) {
-                args.GetReturnValue().Set(v8pp::to_v8(isolate, t->fullTemplateAddress.c_str()));
+                args.GetReturnValue().Set(v8pp::to_v8(isolate, node->templateNode->fullTemplateAddress.c_str()));
             }
         }
 
@@ -786,7 +773,7 @@ namespace sight {
             }, true);
         }
 
-        void v8AddNode(SightJsNode& node) {
+        void v8AddNode(SightNode const& node) {
             g_NodeCache.push_back(node);
         }
 
@@ -823,7 +810,6 @@ namespace sight {
                 std::string portName = v8pp::from_v8<std::string>(isolate, key);
                 SightJsNodePort port = {
                     portName,
-                    0,
                     nodePortType
                 };
 
@@ -1183,14 +1169,16 @@ namespace sight {
         nodePortOptionsClass
             .ctor<>()
             .set("show", &SightNodePortOptions::show)
-            .set("showValue", &SightNodePortOptions::showValue);
+            .set("showValue", &SightNodePortOptions::showValue)
+            .set("errorMsg", &SightNodePortOptions::errorMsg);
         nodePortOptionsClass.auto_wrap_objects(true);
         module.set("SightNodePortOptions", nodePortOptionsClass);
 
         v8pp::class_<SightNodePort> nodePortClass(isolate);
         nodePortClass.ctor<>()
-            .set("portName", &SightNodePort::portName)
-            .set("id", &SightNodePort::id)
+            .set("portName", v8pp::property(&SightNodePort::getPortName))
+            .set("name", v8pp::property(&SightNodePort::getPortName))
+            .set("id", v8pp::property(&SightNodePort::getId))
             .set("setKind", &SightNodePort::setKind)
             .set("options", &SightNodePort::options);
         module.set("SightNodePort", nodePortClass);
@@ -1200,12 +1188,11 @@ namespace sight {
             .ctor<>()
             .set("nodeName", &SightNode::nodeName)
             .set("name", &SightNode::nodeName)
-            .set("nodeId", &SightNode::nodeId)
-            .set("id", &SightNode::nodeId)
+            .set("nodeId", v8pp::property(&SightNode::getNodeId))
+            .set("id", v8pp::property(&SightNode::getNodeId))
             .set("addPort", &SightNode::addPort)
             .set("templateAddress", &v8NodeTemplateAddress)
-            .set("portValue", &v8NodePortValue)
-            ;
+            .set("nodePortValue", &v8NodePortValue);
         module.set("SightNode", nodeClass);
 
     }
@@ -1412,9 +1399,10 @@ namespace sight {
      * @return
      */
     int runJsFile(v8::Isolate* isolate, const char* filepath, std::promise<int>* promise, v8::Local<v8::Object> module) {
-        if (!g_V8Runtime) {
+        if (!isolate) {
             return CODE_FAIL;
         }
+        dbg(filepath);
 
         v8::HandleScope handle_scope(isolate);
         auto context = isolate->GetCurrentContext();
@@ -1492,6 +1480,7 @@ namespace sight {
         if (promise) {
             promise->set_value(1);
         }
+        dbg("js file success ran.");
         return CODE_OK;
     }
 

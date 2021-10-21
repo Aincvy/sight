@@ -92,26 +92,16 @@ namespace sight {
         std::vector<std::string> alternatives;
     };
 
-    /**
-     * Port, or you can call it pin.
-     */
-    struct SightNodePort {
+
+    struct SightBaseNodePort {
         std::string portName;
-        uint id;
         // input/output ...
         NodePortType kind;
-
-        // IntTypeValues ... use getType(), this maybe a fake type. 
-        uint type;
-        SightNodeValue value;
-        // last value.
-        SightNodeValue oldValue;
         SightNodePortOptions options;
 
-        // connections
-        std::vector<SightNodeConnection*> connections;
-        SightNode* node = nullptr;
-        const SightJsNodePort* templateNodePort = nullptr;
+        uint type;
+
+        SightNodeValue value;
 
         /**
          * Set kind from int.
@@ -119,6 +109,32 @@ namespace sight {
          * @param intKind
          */
         void setKind(int intKind);
+
+        virtual uint getType() const;
+
+        const char* getPortName() const;
+    };
+
+    /**
+     * Port, or you can call it pin.
+     */
+    struct SightNodePort : public SightBaseNodePort {
+        uint id;
+
+        // IntTypeValues ... use getType(), this maybe a fake type. 
+        // uint type;
+        
+        // last value.
+        SightNodeValue oldValue;
+        
+        // connections
+        std::vector<SightNodeConnection*> connections;
+        SightNode* node = nullptr;
+        const SightJsNodePort* templateNodePort = nullptr;
+
+        SightNodePort() = default;
+        ~SightNodePort() = default;
+        SightNodePort(NodePortType kind, uint type, const SightJsNodePort* templateNodePort = nullptr);
 
         /**
          * Does this port has 1 or more connections ?
@@ -136,13 +152,25 @@ namespace sight {
          * IntTypeValues
          * @return
          */
-        uint getType() const;
+        uint getType() const override;
 
         /**
          *
          * @return
          */
         const char* getDefaultValue() const;
+
+        uint getId() const;
+
+        /**
+         * @brief 
+         * 
+         * @return int count, -1 if graph not found.
+         */
+        int clearLinks();
+
+        SightNodeGraph* getGraph();
+        const SightNodeGraph* getGraph() const;
     };
 
     /**
@@ -212,10 +240,14 @@ namespace sight {
 
     };
 
+    struct SightBaseNode {
+
+    };
+
     /**
      * a real node.
      */
-    struct SightNode : public ResetAble {
+    struct SightNode : public ResetAble, SightBaseNode {
         std::string nodeName;
         uint nodeId;
         // this node's template node.  Real template node's `templateNode` must be nullptr.
@@ -280,6 +312,7 @@ namespace sight {
          */
         SightNodePortHandle findPort(const char* name, int orderSize = 0, int order[] = nullptr);
 
+        uint getNodeId() const;
 
     protected:
         enum class CopyFromType {
@@ -337,7 +370,7 @@ namespace sight {
      * @brief 
      * 
      */
-    struct SightJsNodePort : public SightNodePort {
+    struct SightJsNodePort : public SightBaseNodePort {
         
 
         // events, called by ui thread.
@@ -346,24 +379,21 @@ namespace sight {
         ScriptFunctionWrapper onAutoComplete;
         ScriptFunctionWrapper onConnect;
         ScriptFunctionWrapper onDisconnect;
+
+        SightJsNodePort() = default;
+        ~SightJsNodePort() = default;
+        SightJsNodePort(std::string const& name, NodePortType kind);
+
+        SightNodePort instantiate() const;
     };
 
     /**
      * js node  / template node
      */
-    struct SightJsNode : public SightNode{
+    struct SightJsNode {
 
+        std::string nodeName;
         std::string fullTemplateAddress;
-
-        // called by js thread
-        v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function>> generateCodeWork;
-        v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function>> onReverseActive;
-
-        // events ,  called by ui thread.
-        ScriptFunctionWrapper onInstantiate;
-        ScriptFunctionWrapper onDestroyed;
-        ScriptFunctionWrapper onReload;
-        ScriptFunctionWrapper onMsg;
 
         std::vector<SightJsNodePort*> inputPorts;
         std::vector<SightJsNodePort*> outputPorts;
@@ -376,6 +406,16 @@ namespace sight {
         std::vector<SightJsNodePort> originalFields;
 
         SightJsNodeOptions options;
+
+        // called by js thread
+        v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function>> generateCodeWork;
+        v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function>> onReverseActive;
+
+        // events ,  called by ui thread.
+        ScriptFunctionWrapper onInstantiate;
+        ScriptFunctionWrapper onDestroyed;
+        ScriptFunctionWrapper onReload;
+        ScriptFunctionWrapper onMsg;
 
         SightJsNode();
         ~SightJsNode() = default;
@@ -514,7 +554,7 @@ namespace sight {
          * @param id
          * @return
          */
-        int delConnection(int id);
+        int delConnection(int id, bool removeRefs = true);
 
         /**
          * Find a node by id
