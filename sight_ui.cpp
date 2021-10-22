@@ -639,12 +639,12 @@ namespace sight {
                     // show some project basic info.
                     auto p = currentProject();
                     ImGui::Text("Path: %s", p->getBaseDir().c_str());
-                    ImGui::Text("Loaded Plugins: 0");
+                    ImGui::Text("Loaded Plugins: %u", pluginManager()->getLoadedPluginCount());
                     
                     auto memUsage = currentProcessUsageInfo();
                     ImGui::Text("Memory Usage.");
-                    ImGui::Text(" Virtual Memory(mb): %.2f", memUsage.virtualMemBytes / 1024.0 / 1024);
-                    ImGui::Text("Resident Memory(mb): %.2f", memUsage.residentMemBytes / 1024.0 / 1024);
+                    ImGui::Text("   Virtual Memory(mb): %.2f", memUsage.virtualMemBytes / 1024.0 / 1024);
+                    ImGui::Text("  Resident Memory(mb): %.2f", memUsage.residentMemBytes / 1024.0 / 1024);
 
                 } else if (panelTypes) {
                     // show types.
@@ -684,7 +684,27 @@ namespace sight {
                     }
                 } else if (panelPlugins) {
                     // show loaded plugins.
+                    auto map = pluginManager()->getSnapshotMap();
+                    auto pluginNames = pluginManager()->getSortedPluginNames();
+                    for (const auto& key : pluginNames) {
+                        auto value = map[key];
+                        ImGui::Text("%s", key.c_str());
+                        ImGui::Text("%7s: %s", "Author", value->getAuthor());
+                        ImGui::Text("%7s: %s", "Version", value->getVersion());
+                        ImGui::Text("%7s: %s", "Path", value->getPath());
+                        ImGui::Text("%7s: %s", "Status", value->getPluginStatusString());
+                        
+                        constexpr const char* reloadLabel = "Reload";
+                        std::string labelBuf = reloadLabel;
+                        labelBuf += "##";
+                        labelBuf += key;
 
+                        if (ImGui::Button(labelBuf.c_str())) {
+                            // send reload 
+                            addJsCommand(JsCommandType::PluginReload, strdup(key.c_str()), key.length(), true);
+                        }
+                        ImGui::Separator();
+                    }
                 }
                 ImGui::EndChild();
                 ImGui::EndGroup();
@@ -868,7 +888,7 @@ namespace sight {
                 for (int i = 0; i < size; ++i) {
                     addNode(nodePointer[i]);
                 }
-                pluginManager()->getPluginStatus().addNodesFinished = true;
+                // pluginManager()->getPluginStatus().addNodesFinished = true;
                 break;
             }
             case UICommandType::AddTemplateNode:{
@@ -880,7 +900,7 @@ namespace sight {
                     p->dispose();    // free SightJsNode first.
                     delete p;
                 }
-                pluginManager()->getPluginStatus().addTemplateNodesFinished = true;
+                // pluginManager()->getPluginStatus().addTemplateNodesFinished = true;
                 break;
             } 
             case UICommandType::RegScriptGlobalFunctions: {

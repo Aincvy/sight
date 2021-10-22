@@ -12,8 +12,11 @@
 
 #include "v8pp/convert.hpp"
 #include "v8pp/call_v8.hpp"
+#include <algorithm>
 #include <cstring>
+#include <iterator>
 #include <unistd.h>
+#include <vector>
 
 #define FILE_NAME_PACKAGE "package.js"
 #define FILE_NAME_EXPORTS_UI "exports-ui.js"
@@ -44,11 +47,9 @@ namespace sight {
 
     int PluginManager::loadPlugins() {
         dbg("load plugins");
+        loadedPluginCount = 0;
         
         for (auto it = directory_iterator {"./plugins"}; it != directory_iterator {}; ++it) {
-            while (!pluginStatus.addNodesFinished || !pluginStatus.addTemplateNodesFinished) {
-                usleep(200);
-            }    
             auto plugin = new Plugin(this, it->path().string());
             int i;
             if ((i = plugin->load()) != CODE_OK) {
@@ -57,10 +58,13 @@ namespace sight {
                 }
                 goto loadFailed;
             }
-
+            
             plugin->debugBrieflyInfo();
             flushJsNodeCache();
             this->pluginMap[plugin->getName()] = plugin;
+            if (plugin->getPluginStatus() == PluginStatus::Loaded) {
+                ++loadedPluginCount;
+            }
 
             continue;
             loadFailed:
@@ -71,12 +75,50 @@ namespace sight {
         return 0;
     }
 
-    AtomicPluginStatus& PluginManager::getPluginStatus() {
-        return pluginStatus;
+    absl::flat_hash_map<std::string, Plugin*> & PluginManager::getPluginMap() {
+        return this->pluginMap;
     }
 
-    AtomicPluginStatus const& PluginManager::getPluginStatus() const {
-        return pluginStatus;
+    std::vector<std::string> const& PluginManager::getSortedPluginNames() const {
+        return sortedPluginNames;
+    }
+
+    absl::flat_hash_map<std::string, Plugin*> const& PluginManager::getPluginMap() const {
+        return this->pluginMap;
+    }
+
+    uint PluginManager::getLoadedPluginCount() const {
+        return loadedPluginCount;
+    }
+
+    std::map<std::string, const Plugin*> const& PluginManager::getSnapshotMap(){
+        if (snapshotMap.size() != pluginMap.size()) {
+            snapshotMap.clear();
+            auto & sortedNames = sortedPluginNames;
+            sortedPluginNames.clear();
+            std::transform(pluginMap.begin(), pluginMap.end(), std::back_inserter(sortedNames), [](auto const& a){ return a.first;});
+            dbg(sortedNames);
+
+            std::sort(sortedNames.begin(), sortedNames.end(), [this](auto const& a, auto const& b) {
+                Plugin* t1 = pluginMap[a];
+                Plugin* t2 = pluginMap[b];
+                if ((t1->getPluginStatus() != PluginStatus::Disabled && t2->getPluginStatus() != PluginStatus::Disabled)
+                    || (t1->getPluginStatus() == PluginStatus::Disabled && t2->getPluginStatus() == PluginStatus::Disabled)) {
+                    return a < b;
+                } else if (t2->getPluginStatus() == PluginStatus::Disabled) {
+                    return true;
+                }
+                return false;
+            });
+
+            dbg(sortedNames);
+
+            for( const auto& [name, plugin]: pluginMap){
+                snapshotMap[name] = plugin;
+            }
+
+        }
+        return this->snapshotMap;
     }
 
     v8::Isolate *PluginManager::getIsolate() {
@@ -113,7 +155,7 @@ namespace sight {
     }
 
     int Plugin::loadFromFolder() {
-
+        status = PluginStatus::Loading;
         // load `package.js` first.
         //
         std::string pkgJsPath = path + FILE_NAME_PACKAGE;
@@ -155,7 +197,8 @@ namespace sight {
         }
         if (this->disabled) {
             dbg("plugin disabled", this->name);
-            return CODE_PLUGIN_DISABLED;
+            status = PluginStatus::Disabled;
+            return CODE_OK;
         }
 
         // load other files.
@@ -195,6 +238,7 @@ namespace sight {
             v8pp::call_v8(isolate, onInit.As<v8::Function>(), v8::Object::New(isolate), MODULE_INIT_JS);
         }
 
+        status = PluginStatus::Loaded;
         return CODE_OK;
     }
 
@@ -268,6 +312,30 @@ namespace sight {
         return this->name;
     }
 
+    const char* Plugin::getPath() const {
+        return this->path.c_str();
+    }
+
+    const char* Plugin::getVersion() const {
+        return this->version.c_str();
+    }
+
+    const char* Plugin::getAuthor() const {
+        return this->author.c_str();
+    }
+
+    int Plugin::reload() {
+        return load();
+    }
+
+    PluginStatus Plugin::getPluginStatus() const {
+        return status;
+    }
+
+    const char* Plugin::getPluginStatusString() const {
+        static const char* array[] = { "WaitLoad", "Loading", "Loaded", "Disabled" };
+        return array[static_cast<int>(this->status)];
+    }
 
     PluginManager *pluginManager() {
         return g_pluginManager;

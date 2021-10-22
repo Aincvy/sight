@@ -188,3 +188,33 @@ function name() {
 
     };
 }
+
+
+addTemplateNode({
+    // meta info, start with __meta
+
+    __meta_name: "DynLoad",
+    // used for context menu
+    __meta_address: "entity",
+    __meta_options: {
+        enter: true,
+    },
+    __meta_func: {
+        generateCodeWork($$) {
+            $$.options.isPart = true;
+            print('TestTypes generateCodeWork.');
+        },
+
+    },
+
+    __meta_events: {
+        // call after instantiate, called by ui thread.([ui thread] in below.)
+        // node is the node data, not the template node.
+        onInstantiate() {
+            print('1');
+            print('2');
+        }
+    },
+
+});
+

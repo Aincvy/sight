@@ -408,8 +408,8 @@ namespace sight {
         SightJsNodeOptions options;
 
         // called by js thread
-        v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function>> generateCodeWork;
-        v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function>> onReverseActive;
+        ScriptFunctionWrapper::Function generateCodeWork;
+        ScriptFunctionWrapper::Function onReverseActive;
 
         // events ,  called by ui thread.
         ScriptFunctionWrapper onInstantiate;
@@ -438,6 +438,11 @@ namespace sight {
          */
         SightNode* instantiate(bool generateId = true, bool callEvent = true) const;
         
+        void resetTo(SightJsNode const* node);
+        void resetTo(SightJsNode const& node);
+
+        void reset(); 
+
     };
 
     enum class SightAnyThingType {

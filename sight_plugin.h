@@ -7,6 +7,7 @@
 #include <string>
 #include "vector"
 #include <atomic>
+#include <map>
 #include "absl/container/flat_hash_map.h"
 
 #include "v8.h"
@@ -15,10 +16,11 @@ namespace sight {
 
     class PluginManager;
 
-    struct AtomicPluginStatus {
-        // ui thread change field to true.
-        std::atomic<bool> addNodesFinished = true;
-        std::atomic<bool> addTemplateNodesFinished = true;
+    enum class PluginStatus {
+        WaitLoad = 0,
+        Loading,
+        Loaded,
+        Disabled,
     };
 
     class Plugin {
@@ -46,6 +48,15 @@ namespace sight {
 
         [[nodiscard]] std::string const & getName() const;
 
+        const char* getPath() const;
+        const char* getVersion() const;
+        const char* getAuthor() const;
+
+        int reload();
+
+        PluginStatus getPluginStatus() const;
+        const char* getPluginStatusString() const;
+
     private:
         std::string name;
         std::string path;
@@ -54,6 +65,7 @@ namespace sight {
         bool disabled = false;
         // every plugin share one module.
         V8ObjectType module = {};
+        PluginStatus status = PluginStatus::WaitLoad;
 
         PluginManager* pluginManager = nullptr;
 
@@ -67,6 +79,7 @@ namespace sight {
         void readBaseInfoFromJsObject(v8::Local<v8::Object> object);
 
     };
+
 
     /**
      * se plugin manager from js thread.
@@ -84,11 +97,21 @@ namespace sight {
 
         void addSearchPath(const char* path);
 
-        AtomicPluginStatus& getPluginStatus();
-        AtomicPluginStatus const& getPluginStatus() const;
+        absl::flat_hash_map<std::string, Plugin*> & getPluginMap();
+        absl::flat_hash_map<std::string, Plugin*> const& getPluginMap() const;
+
+        std::map<std::string, const Plugin*> const& getSnapshotMap();
+
+        std::vector<std::string> const& getSortedPluginNames() const;
+
+        uint getLoadedPluginCount() const;
 
     private:
         absl::flat_hash_map<std::string, Plugin*> pluginMap;
+        // 
+        std::map<std::string, const Plugin*> snapshotMap;
+        // used for ui show
+        std::vector<std::string> sortedPluginNames;
 
         /**
          * share with jsThread
@@ -96,8 +119,8 @@ namespace sight {
         v8::Isolate* isolate = nullptr;
 
         std::vector<std::string> searchPaths;
-        AtomicPluginStatus pluginStatus;
 
+        uint loadedPluginCount = 0;
     };
 
     /**

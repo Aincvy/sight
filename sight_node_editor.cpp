@@ -1011,7 +1011,7 @@ namespace sight {
         if (!g) {
             return -1;
         }
-        
+
         std::vector<int> ids;
         std::transform(connections.begin(), connections.end(), std::back_inserter(ids), [](SightNodeConnection* c) {
             return c->connectionId;
@@ -1343,6 +1343,58 @@ namespace sight {
         return p;
     }
 
+    void SightJsNode::resetTo(SightJsNode const* node) {
+        resetTo(*node);
+    }
+
+    void SightJsNode::resetTo(SightJsNode const& node) {
+        this->nodeName = node.nodeName;
+        this->fullTemplateAddress = node.fullTemplateAddress;
+
+        // 
+        auto copyFunc = [](std::vector<SightJsNodePort> &dst, std::vector<SightJsNodePort> const& src) {
+            dst.clear();
+            dst.assign(src.begin(), src.end());
+        };
+        copyFunc(originalFields, node.originalFields);
+        copyFunc(originalInputPorts, node.originalInputPorts);
+        copyFunc(originalOutputPorts, node.originalOutputPorts);
+
+        //
+        auto copyPointerFunc = [](std::vector<SightJsNodePort*>& dst, std::vector<SightJsNodePort*> const& src) {
+            int i = 0;
+            auto& templateNodePortArray = g_NodeEditorStatus->templateNodePortArray;
+            for( ; i < src.size(); i++){
+                if (i >= dst.size()) {
+                    // add
+                    auto t = templateNodePortArray.add(*src[i]);
+                    dst.push_back(t);
+                } else {
+                    // copy
+                    *dst[i] = *src[i];
+                }
+            }
+        };
+        copyPointerFunc(this->fields, node.fields);
+        copyPointerFunc(this->inputPorts, node.inputPorts);
+        copyPointerFunc(this->outputPorts, node.outputPorts);
+
+        this->options = node.options;
+        this->generateCodeWork = node.generateCodeWork;
+        this->onReverseActive = node.onReverseActive;
+        this->onInstantiate = node.onInstantiate;
+        this->onDestroyed = node.onDestroyed;
+        this->onReload = node.onReload;
+        this->onMsg = node.onMsg;
+    }
+
+    void SightJsNode::reset() {
+        this->nodeName.clear();
+        this->fullTemplateAddress.clear();
+        
+        // todo
+    }
+
     void SightNodeConnection::removeRefs(SightNodeGraph *graph) {
         if (!graph) {
             graph = CURRENT_GRAPH;
@@ -1615,6 +1667,7 @@ namespace sight {
                         break;
                     case IntTypeProcess:
                     case IntTypeButton:
+                    case IntTypeObject:
                         // dbg("IntTypeProcess" , portName);
                         break;
                     case IntTypeChar:
@@ -2191,10 +2244,54 @@ namespace sight {
             bool findElement = false;
             if (!pointer->next) {
                 // no next, this is the last element, it should be the node's name.
-                templateNode->compact();
-                auto tmpPointer = g_NodeEditorStatus->templateNodeArray.add( *templateNode);
-                tmpPointer->compileFunctions(currentUIStatus()->isolate);
-                list->push_back(SightNodeTemplateAddress(pointer->part, tmpPointer));
+                // check name exist
+                auto findResult = std::find_if(list->begin(), list->end(), [pointer](SightNodeTemplateAddress const& address) {
+                    return address.name == pointer->part;
+                });
+                if (findResult == list->end()) {
+                    // not found
+                    templateNode->compact();
+                    auto tmpPointer = g_NodeEditorStatus->templateNodeArray.add(*templateNode);
+                    tmpPointer->compileFunctions(currentUIStatus()->isolate);
+                    list->push_back(SightNodeTemplateAddress(pointer->part, tmpPointer));
+                } else {
+                    // find
+                    std::string tmpMsg = "replace template node.";
+                    tmpMsg += pointer->part;
+                    dbg(tmpMsg);
+                    auto willCopy = *templateNode;
+                    // fields, inputPorts, outputPorts
+
+                    // src1: pointers, src2:
+                    auto copyFunc = [](std::vector<SightJsNodePort*>& dst, std::vector<SightJsNodePort*> const& src1, std::vector<SightJsNodePort> const& src2) {
+                        if (!dst.empty()) {
+                            dbg("Oops! dst not empty, clear!");
+                            dst.clear();
+                        }
+                        // copy pointers
+                        dst.assign(src1.begin(), src1.end());
+
+                        // copy data
+                        auto& templateNodePortArray = g_NodeEditorStatus->templateNodePortArray;
+                        for (int i = 0; i < src2.size(); i++) {
+                            if (i >= dst.size()) {
+                                // add
+                                auto t = templateNodePortArray.add(src2[i]);
+                                dst.push_back(t);
+                            } else {
+                                // copy
+                                *dst[i] = src2[i];
+                            }
+                        }
+                    };
+
+                    // copy and compact
+                    copyFunc(willCopy.fields, findResult->templateNode->fields, willCopy.originalFields);
+                    copyFunc(willCopy.inputPorts, findResult->templateNode->inputPorts, willCopy.originalInputPorts);
+                    copyFunc(willCopy.outputPorts, findResult->templateNode->outputPorts, willCopy.originalOutputPorts);
+
+                    *findResult->templateNode = willCopy;
+                }
                 break;
             }
 

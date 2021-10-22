@@ -43,6 +43,8 @@ namespace sight{
         // do not add this command twice.
         EndInit,
         Test,
+        // try to reload a plugin
+        PluginReload,
 
     };
 

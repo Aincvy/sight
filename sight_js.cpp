@@ -1297,7 +1297,7 @@ namespace sight {
             }
             g_NodeCache.clear();
 
-            pluginManager()->getPluginStatus().addNodesFinished = false;
+            // pluginManager()->getPluginStatus().addNodesFinished = false;
             addUICommand(UICommandType::AddNode, nodePointer, size);
         }
 
@@ -1311,7 +1311,7 @@ namespace sight {
             }
             g_TemplateNodeCache.clear();
 
-            pluginManager()->getPluginStatus().addTemplateNodesFinished = false;
+            // pluginManager()->getPluginStatus().addTemplateNodesFinished = false;
             addUICommand(UICommandType::AddTemplateNode, pointer, size);
         }
 
@@ -1842,6 +1842,8 @@ namespace sight {
 
             switch (command.type) {
             case JsCommandType::Destroy:
+                command.args.dispose();
+                queue.pop_front();
                 goto break_commands_loop;
             case JsCommandType::File:
                 runJsFile(g_V8Runtime->isolate, command.args.argString, nullptr);
@@ -1874,8 +1876,16 @@ namespace sight {
                 break;
             case JsCommandType::Test:
                 break;
-            default:
+            case JsCommandType::PluginReload:
+            {
+                auto & map = pluginManager()->getPluginMap();
+                auto iter = map.find(command.args.argString);
+                if (iter != map.end()) {
+                    iter->second->reload();
+                    flushJsNodeCache();
+                }
                 break;
+            }
             }
 
             command.args.dispose();
@@ -2002,8 +2012,8 @@ namespace sight {
                 }
 
                 if (isValid(global->Get(context, key))) {
-                    dbg("repeat key, ignore this one", keyString);
-                    continue;
+                    dbg("repeat key, replace previous one", keyString);
+                    // continue;
                 }
 
                 if (!global->Set(context, key, value).ToChecked()) {
