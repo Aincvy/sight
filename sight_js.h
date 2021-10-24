@@ -6,9 +6,11 @@
 
 #include <future>
 #include <map>
+#include <vector>
 
 #include "sight.h"
 #include "shared_queue.h"
+#include "sight_node_editor.h"
 
 #include "v8.h"
 #include "v8pp/module.hpp"
@@ -24,6 +26,7 @@ namespace sight{
     struct SightNodePortHandle;
     struct SightNodeConnection;
     union SightNodeValue;
+    class SightNodeGraph;
 
     enum class JsCommandType {
         JsCommandHolder,
@@ -51,6 +54,78 @@ namespace sight{
     struct JsCommand {
         JsCommandType type = JsCommandType::JsCommandHolder;
         struct CommandArgs args;
+    };
+
+    /**
+     * @brief js wrapper
+     * 
+     */
+    struct SightNodePortWrapper {
+        SightNodePortHandle portHandle;
+
+        SightNodePortWrapper() = delete;
+        SightNodePortWrapper(SightNodePortHandle portHandle);
+        ~SightNodePortWrapper();
+
+        uint getId() const;
+        const char* getName() const;
+
+        void deleteLinks();
+
+        bool isShow() const;
+        void setShow(bool v);
+
+        const char* getErrorMsg() const;
+        void setErrorMsg(const char* msg);
+
+        bool isReadonly() const;
+        void setReadonly(bool v);
+
+        uint getType() const;
+        void setType(uint v);
+
+        void resetType();
+
+        void updatePointer();
+
+    private:
+        SightNodePort* pointer = nullptr;
+
+    };
+
+    /**
+     * @brief js wrapper | only for read data now.
+     * 
+     */
+    struct SightNodeGraphWrapper {
+
+        SightNodeGraphWrapper() = delete;
+        SightNodeGraphWrapper(SightNodeGraph* graph);
+        ~SightNodeGraphWrapper();
+
+        void buildNodeCache();
+
+        std::vector<SightNode> & getCachedNodes();
+
+        SightNode findNode(uint id);
+
+        /**
+         * @brief find first 
+         * 
+         * @param templateAddress 
+         * @param filter 
+         * @return SightNode 
+         */
+        SightNode findNode(std::string const& templateAddress, v8::Local<v8::Function> filter);
+
+        SightNode test() const;
+        
+        std::vector<SightNode> testArray() const;
+
+    private:
+        SightNodeGraph* graph = nullptr;
+
+        std::vector<SightNode> cachedNodes; 
     };
 
     /**

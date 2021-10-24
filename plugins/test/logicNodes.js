@@ -78,41 +78,7 @@ addTemplateNode({
         // node is the node data, not the template node.
         onInstantiate() {
             print("this is run by ui thread. onInstantiate");
-            test_ui();
-            print(typeof Array.prototype.remove);
-            let node = this;
-            print(node.templateAddress());
 
-            checkTinyData(node, {index: 1});
-            let data  = tinyData(node);
-            if (typeof data === 'object' && typeof data.index === 'number') {
-                data.index += 10;
-                print(data.index);
-                if(data.msg){
-                    print(data.msg);
-                } else {
-                    data.msg = '' + node.id;
-                }
-            } else {
-                print('data not ready.');
-            }
-
-            // let field1 = node.portValue('field1');
-            // if (field1){
-            //     print(field1.get());
-            //     field1.set('fff');
-            // } 
-
-            let type = node.portValue('type');
-            if(type){
-                let typeValue = type.get();
-                print(`typeValue: ${typeValue}`);
-                // print(typeValue.index, typeValue.name);
-            }
-
-            let tmpPort = new sight.SightNodePort();
-            print(tmpPort.options);
-            print(tmpPort.options.show, tmpPort.options.showValue);
         },
 
         // node isn't the template node.
@@ -129,7 +95,17 @@ addTemplateNode({
         // [ui thread]
         onValueChange(node) {
             // update value to auto-complete list.
-            print('onValueChange', this.id, this.get());
+            print('onValueChange', this.id, this.name, this.get());
+            print(this.show, this.errorMsg, this.readonly, this.type);
+
+            let t = this.get();
+            if(t === '123'){
+                this.show = false;
+            } else if( t === '456'){
+                this.errorMsg = 'this is an error msg';
+            } else if( t === '777'){
+                this.errorMsg = '';
+            }
         },
     },
     type: {
@@ -138,18 +114,6 @@ addTemplateNode({
         onValueChange(node) {
             // update value to auto-complete list.
             print('InOrOut onValueChange', this.id);
-            let newValue = this.get();
-            if(newValue.index == 0){
-                let port = node.portValue('out');
-                port.show(false);
-                port.deleteLinks();
-                node.portValue('in').show(true);
-            } else {
-                let port = node.portValue('in');
-                port.show(false);
-                port.deleteLinks();
-                node.portValue('out').show(true);
-            }
         },
     },
 
@@ -174,7 +138,12 @@ addTemplateNode({
         show: false,
     },
 
-    button: 'button',
+    button: {
+        type: 'button',
+        onClick(node){
+            print(1);
+        }
+    },
 
 });
 
@@ -190,31 +159,31 @@ function name() {
 }
 
 
-addTemplateNode({
-    // meta info, start with __meta
+// addTemplateNode({
+//     // meta info, start with __meta
 
-    __meta_name: "DynLoad",
-    // used for context menu
-    __meta_address: "entity",
-    __meta_options: {
-        enter: true,
-    },
-    __meta_func: {
-        generateCodeWork($$) {
-            $$.options.isPart = true;
-            print('TestTypes generateCodeWork.');
-        },
+//     __meta_name: "DynLoad",
+//     // used for context menu
+//     __meta_address: "entity",
+//     __meta_options: {
+//         enter: true,
+//     },
+//     __meta_func: {
+//         generateCodeWork($$) {
+//             $$.options.isPart = true;
+//             print('TestTypes generateCodeWork.');
+//         },
 
-    },
+//     },
 
-    __meta_events: {
-        // call after instantiate, called by ui thread.([ui thread] in below.)
-        // node is the node data, not the template node.
-        onInstantiate() {
-            print('1');
-            print('2');
-        }
-    },
+//     __meta_events: {
+//         // call after instantiate, called by ui thread.([ui thread] in below.)
+//         // node is the node data, not the template node.
+//         onInstantiate() {
+//             print('1');
+//             print('2');
+//         }
+//     },
 
-});
+// });
 

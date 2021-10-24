@@ -314,6 +314,8 @@ namespace sight {
 
         uint getNodeId() const;
 
+        const char* templateAddress() const;
+
     protected:
         enum class CopyFromType {
             Clone,
@@ -379,6 +381,7 @@ namespace sight {
         ScriptFunctionWrapper onAutoComplete;
         ScriptFunctionWrapper onConnect;
         ScriptFunctionWrapper onDisconnect;
+        ScriptFunctionWrapper onClick;
 
         SightJsNodePort() = default;
         ~SightJsNodePort() = default;
@@ -531,9 +534,9 @@ namespace sight {
          * @param leftPortId
          * @param rightPortId
          * @return If create success, the connection's id.
-         * -1: one of left,right is invalid. -2: they are same. -3: same kind.
+         * -1: one of left,right is invalid. -2: they are same. -3: same kind. -4 left only can accept 1 connections
          */
-        uint createConnection(uint leftPortId, uint rightPortId, uint connectionId = 0);
+        int createConnection(uint leftPortId, uint rightPortId, uint connectionId = 0);
 
         /**
          *

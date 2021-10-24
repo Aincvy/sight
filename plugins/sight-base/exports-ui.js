@@ -40,12 +40,8 @@ globals.loopIf = function(array, f){
     }
 }
 
-sight.SightNode.prototype.portValue = function(portName){
-    // print(portName);
-    return this.nodePortValue(portName);
-}
+// node functions
 
-print('start hello');
-async function hello() { return "Hello" };
-hello().then( v => print(v));
-print('end hello ?');
+
+// end of node functions
+

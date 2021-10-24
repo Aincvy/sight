@@ -473,6 +473,10 @@ namespace sight {
         return typeInfoMap;
     }
 
+    std::string Project::getLastOpenGraph() const {
+        return lastOpenGraph;
+    }
+
     std::string Project::pathEntityFolder() const {
         return pathSrcFolder() + "entity/";
     }

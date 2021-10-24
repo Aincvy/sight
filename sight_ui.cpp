@@ -158,7 +158,12 @@ namespace sight {
             }
             ImGui::Separator();
             if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.parseGraph)) {
-                // addJsCommand(JsCommandType::ParseGraph, "./simple.yaml");
+                auto lastOpenGraph = currentProject()->getLastOpenGraph();
+                if (lastOpenGraph.empty()) {
+                    dbg("not open any graph");
+                } else {
+                    addJsCommand(JsCommandType::ParseGraph, strdup((lastOpenGraph + ".yaml").c_str()), 0, true);
+                }
             }
             if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.projectSaveConfig)) {
                 currentProject()->saveConfigFile();
@@ -1105,7 +1110,7 @@ namespace sight {
         v8::HandleScope handle_scope(isolate);
         v8::Local<v8::Context> context = g_UIStatus->v8GlobalContext.Get(isolate);
         v8::Context::Scope contextScope(context);
-        dbg("v8 runtime init over.", isolate);
+        dbg("v8 runtime init over.");
 
         // Create window with graphics context
         glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);

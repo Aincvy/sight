@@ -28,6 +28,7 @@
 #include "v8.h"
 #include "libplatform/libplatform.h"
 
+#include "v8pp/call_v8.hpp"
 #include "v8pp/convert.hpp"
 #include "v8pp/function.hpp"
 #include "v8pp/module.hpp"
@@ -54,7 +55,7 @@ static std::vector<sight::SightNodeTemplateAddress> g_TemplateNodeCache;
 
 namespace sight {
 
-    std::string runGenerateFunction(PersistentFunction const& persistent, Isolate* isolate, SightNode* node);
+    std::string runGenerateFunction(PersistentFunction const& persistent, Isolate* isolate, SightNode* node, Local<Object> graphObject);
 
     /**
      *
@@ -226,7 +227,8 @@ namespace sight {
             return Undefined(isolate);
         }
 
-        auto object = Object::New(isolate);
+        // auto object = Object::New(isolate);
+        auto object = v8pp::class_<SightNodePortWrapper>::import_external(isolate, new SightNodePortWrapper(portHandle));
         auto context = isolate->GetCurrentContext();
 
         auto get = [portHandle, isolate]() -> Local<Value> {
@@ -241,62 +243,9 @@ namespace sight {
         auto set = [portHandle, isolate](Local<Value> arg) {
             return setPortValue(isolate, portHandle.get(), arg);
         };
-        auto deleteLinks = [portHandle, isolate]() {
-            if (!portHandle) {
-                return v8pp::to_v8(isolate, 0);
-            }
 
-            auto nodePort = portHandle.get();
-            auto count = nodePort->clearLinks();
-
-            return v8pp::to_v8(isolate, count);
-        };
-        auto show = [portHandle](bool v = true) {
-            if (portHandle) {
-                portHandle->options.show = v;
-            }
-        };
-
-        auto errorMsg = [portHandle](const char* msg){
-            if (portHandle) {
-                portHandle->options.errorMsg = msg;
-            }
-        };
-
-        auto readonly = [portHandle](bool v){
-            if (portHandle) {
-                portHandle->options.readonly = v;
-            }
-        };
-
-        auto type = [portHandle](uint v) {
-            if (portHandle) {
-                if (v > 0) {
-                    portHandle->type = v;
-                } else {
-                    return portHandle->type;
-                }
-            }
-            return 0U;
-        };
-        auto resetType = [portHandle]() {
-            if (portHandle) {
-                auto p = portHandle.get();
-                p->type = p->templateNodePort->type;
-            }
-        };
-
-        auto port = portHandle.get();
         object->Set(context, v8pp::to_v8(isolate, "get"), v8pp::wrap_function(isolate, "get", get)).ToChecked();
         object->Set(context, v8pp::to_v8(isolate, "set"), v8pp::wrap_function(isolate, "set", set)).ToChecked();
-        v8pp::set_const(isolate, object, "id", port->id);
-        v8pp::set_const(isolate, object, "name", port->portName);
-        v8pp::set_const(isolate, object, "deleteLinks", v8pp::wrap_function(isolate, "deleteLinks", deleteLinks));
-        v8pp::set_const(isolate, object, "show", v8pp::wrap_function(isolate, "show", show));
-        v8pp::set_const(isolate, object, "errorMsg", v8pp::wrap_function(isolate, "errorMsg", errorMsg));
-        v8pp::set_const(isolate, object, "readonly", v8pp::wrap_function(isolate, "readonly", readonly));
-        v8pp::set_const(isolate, object, "type", v8pp::wrap_function(isolate, "type", type));
-        v8pp::set_const(isolate, object, "resetType", v8pp::wrap_function(isolate, "resetType", resetType));
 
         return object;
     }
@@ -342,7 +291,25 @@ namespace sight {
 
         struct GenerateOptions {
             bool isPart = false;
+            bool noCode = false;
         };
+
+
+        struct ParsingGraphData {
+            SightNode* currentNode = nullptr;
+            std::stringstream finalSourceStream {};
+            Local<Object> graphObject {};
+            std::vector<SightNode*> list {};
+
+            void reset();
+        };
+
+        void ParsingGraphData::reset() {
+            this->currentNode = nullptr;
+            this->finalSourceStream.clear();
+            this->graphObject = {};
+            this->list.clear();
+        }
 
         struct V8Runtime {
             std::unique_ptr<v8::Platform> platform;
@@ -350,6 +317,7 @@ namespace sight {
             v8::ArrayBuffer::Allocator *arrayBufferAllocator = nullptr;
             std::unique_ptr<v8::Isolate::Scope> isolateScope;
             SharedQueue<JsCommand> commandQueue;
+            ParsingGraphData parsingGraphData;
         };
 
         struct GenerateFunctionStatus {
@@ -798,7 +766,10 @@ namespace sight {
                 auto temp = option->Get(context, v8pp::to_v8(isolate, key));
                 Local<Value> tempVal;
                 if (!temp.IsEmpty() && (tempVal = temp.ToLocalChecked())->IsFunction()) {
-                    auto source = functionProtoToString(isolate, context, tempVal.As<Function>());
+                    auto copiedFunc = tempVal.As<Function>();
+                    // copiedFunc->SetName(v8pp::to_v8(isolate, key));
+                    auto source = functionProtoToString(isolate, context, copiedFunc);
+                    // dbg(source);
                     f = source;
                 }
             };
@@ -878,6 +849,7 @@ namespace sight {
                     eventHandleFunc(option, "onAutoComplete", port.onAutoComplete);
                     eventHandleFunc(option, "onConnect", port.onConnect);
                     eventHandleFunc(option, "onDisconnect", port.onDisconnect);
+                    eventHandleFunc(option, "onClick", port.onClick);
 
                     // if (!port.onValueChange.sourceCode.empty()) {
                     //     dbg(port.onValueChange.sourceCode);
@@ -1087,7 +1059,7 @@ namespace sight {
                 std::move(platform),
                 isolate,
                 createParams.array_buffer_allocator,
-                std::move(isolate_scope),
+                std::move(isolate_scope)
         };
 
         logDebug("init js over.");
@@ -1192,9 +1164,34 @@ namespace sight {
             .set("id", v8pp::property(&SightNode::getNodeId))
             .set("addPort", &SightNode::addPort)
             .set("templateAddress", &v8NodeTemplateAddress)
-            .set("nodePortValue", &v8NodePortValue);
+            .set("portValue", &v8NodePortValue);
+        nodeClass.auto_wrap_objects(true);
         module.set("SightNode", nodeClass);
 
+        v8pp::class_<SightNodePortWrapper> nodePortWrapperClass(isolate);
+        nodePortWrapperClass
+            .set("id", v8pp::property(&SightNodePortWrapper::getId))
+            .set("portId", v8pp::property(&SightNodePortWrapper::getId))
+            .set("name", v8pp::property(&SightNodePortWrapper::getName))
+            .set("show", v8pp::property(&SightNodePortWrapper::isShow, &SightNodePortWrapper::setShow))
+            .set("errorMsg", v8pp::property(&SightNodePortWrapper::getErrorMsg, &SightNodePortWrapper::setErrorMsg))
+            .set("readonly", v8pp::property(&SightNodePortWrapper::isReadonly, &SightNodePortWrapper::setReadonly))
+            .set("type", v8pp::property(&SightNodePortWrapper::getType, &SightNodePortWrapper::setType))
+            .set("deleteLinks", &SightNodePortWrapper::deleteLinks)
+            .set("resetType", &SightNodePortWrapper::resetType)
+            ;
+        module.set("SightNodePortWrapper", nodePortOptionsClass);
+
+        v8pp::class_<SightNodeGraphWrapper> nodeGraphWrapperClass(isolate);
+        nodeGraphWrapperClass
+            .set("nodes", v8pp::property(&SightNodeGraphWrapper::getCachedNodes))
+            .set("test", v8pp::property(&SightNodeGraphWrapper::test))
+            .set("testArray", v8pp::property(&SightNodeGraphWrapper::testArray))
+            .set("testFunc", &SightNodeGraphWrapper::test)
+            .set("testArrayFunc", &SightNodeGraphWrapper::testArray)
+            ;
+
+        module.set("SightNodeGraphWrapper", nodeGraphWrapperClass);
     }
 
     v8::Isolate* getJsIsolate() {
@@ -1224,9 +1221,9 @@ namespace sight {
 
         v8pp::class_<GenerateOptions> generateOptionsClass(isolate);
         generateOptionsClass
-                .ctor<>()
-                .set("isPart", &GenerateOptions::isPart)
-                ;
+            .ctor<>()
+            .set("isPart", &GenerateOptions::isPart)
+            .set("noCode", &GenerateOptions::noCode);
 
         bindBaseFunctions(isolate, context, module);
         bindNodeTypes(isolate, context, module);
@@ -1581,7 +1578,7 @@ namespace sight {
         return body;
     }
 
-    MaybeLocal<Value> runGenerateCode(std::string const &functionCode ,Isolate* isolate, Local<Context> & context, SightNode* node,
+    MaybeLocal<Value> runGenerateCode(std::string const &functionCode ,Isolate* isolate, Local<Context> & context, SightNode* node, Local<Object> graphObject,
                                       GenerateOptions* options = nullptr, GenerateFunctionStatus* status = nullptr){
         dbg(functionCode.c_str());
         if (status) {
@@ -1600,7 +1597,7 @@ namespace sight {
         auto arg$$ = Object::New(isolate);
 
         if (!status || status->need$) {
-            auto nodeFunc = [node, isolate, &context, &arg$](std::vector<SightNodePort> & list, bool isOutput = false) {
+            auto nodeFunc = [node, isolate, &context, &arg$, graphObject](std::vector<SightNodePort> & list, bool isOutput = false) {
 
                 for (const auto &item : list) {
                     if (item.portName.empty()) {
@@ -1612,7 +1609,7 @@ namespace sight {
                         return std::string();
                     };
 
-                    auto t = [&item,node,isolate]() -> std::string  {
+                    auto t = [&item, node, isolate, graphObject]() -> std::string {
                         // reverseActive this port.
                         //
                         if (!item.isConnect()) {
@@ -1632,7 +1629,7 @@ namespace sight {
                             auto targetNode = connection.target->node;
                             auto targetJsNode = findTemplateNode(targetNode);
                             if (targetJsNode) {
-                                return runGenerateFunction(targetJsNode->onReverseActive,isolate, targetNode);
+                                return runGenerateFunction(targetJsNode->onReverseActive,isolate, targetNode, graphObject);
                             }
                         } else {
 
@@ -1660,6 +1657,7 @@ namespace sight {
                 auto jsOptions = v8pp::class_<GenerateOptions>::reference_external(isolate, options);
                 arg$$->Set(context, v8pp::to_v8(isolate, "options"), jsOptions).ToChecked();
             }
+            arg$$->Set(context, v8pp::to_v8(isolate, "graph"), graphObject).ToChecked();
         }
 
         Local<Object> recv = Object::New(isolate);
@@ -1676,7 +1674,7 @@ namespace sight {
     }
 
 
-    std::string runGenerateFunction(PersistentFunction const& persistent, Isolate* isolate, SightNode* node) {
+    std::string runGenerateFunction(PersistentFunction const& persistent, Isolate* isolate, SightNode* node, Local<Object> graphObject) {
         if (persistent.IsEmpty()) {
             // no function ?
             dbg("no function");
@@ -1693,7 +1691,7 @@ namespace sight {
         if (status.shouldEval) {
             // The code need be eval first.
             if (!functionCode.empty()) {
-                resultMaybe = runGenerateCode(functionCode, isolate, context, node, &options, &status);
+                resultMaybe = runGenerateCode(functionCode, isolate, context, node, graphObject, &options, &status);
             }
 
             if (status.noReturn) {
@@ -1712,7 +1710,7 @@ namespace sight {
             }
         }
 
-        if (!functionCode.empty()) {
+        if (!functionCode.empty() && !options.noCode) {
             std::stringstream ss;
             bool dollar = false;
             ss << "return `";
@@ -1745,7 +1743,7 @@ namespace sight {
                     .need$ = true,
                     .need$$ = false,
             };
-            auto result = runGenerateCode(ss.str(), isolate, context, node, nullptr, &status);
+            auto result = runGenerateCode(ss.str(), isolate, context, node, graphObject, nullptr, &status);
             if (result.IsEmpty()) {
                 dbg("result is empty", ss.str());
             } else {
@@ -1757,14 +1755,14 @@ namespace sight {
         return "";
     }
 
-    void parseNode(std::vector<SightNode*> & list, Isolate* isolate, std::stringstream & finalSource){
+    void parseNode(std::vector<SightNode*> & list, Isolate* isolate, std::stringstream & finalSource, Local<Object> graphObject){
         auto node = list.front();
         auto jsNode = findTemplateNode(node);
         list.erase(list.begin());
 
 
         // generateCodeWork
-        std::string tmp = runGenerateFunction(jsNode->generateCodeWork, isolate, node);
+        std::string tmp = runGenerateFunction(jsNode->generateCodeWork, isolate, node, graphObject);
         if (!tmp.empty()) {
             finalSource << tmp;
         }
@@ -1804,15 +1802,17 @@ namespace sight {
         }
 
         // here it is.
+        auto &data = g_V8Runtime->parsingGraphData;
         auto isolate = g_V8Runtime->isolate;
         v8::HandleScope handle_scope(isolate);
+        data.graphObject = v8pp::class_<SightNodeGraphWrapper>::import_external(isolate, new SightNodeGraphWrapper(&graph));
 
-        std::vector<SightNode*> list;
+        std::vector<SightNode*> &list = data.list;
         list.push_back(node);
-        std::stringstream finalSourceStream;
+        std::stringstream & finalSourceStream = data.finalSourceStream;
 
         while (!list.empty()) {
-            parseNode(list, isolate, finalSourceStream);
+            parseNode(list, isolate, finalSourceStream, data.graphObject);
         }
 
         std::string finalSource = finalSourceStream.str();
@@ -1827,7 +1827,8 @@ namespace sight {
 //            printf("%d",item);
 //        }
 //        printf("\n");
-
+        
+        data.reset();
         return 0;
     }
 
@@ -2035,4 +2036,145 @@ namespace sight {
         // addUICommand(UICommandType::RegScriptGlobalFunctions, map);
         delete map;
     }
+
+    SightNodePortWrapper::SightNodePortWrapper(SightNodePortHandle portHandle)
+        : portHandle(std::move(portHandle)) {
+            updatePointer();
+    }
+
+    sight::SightNodePortWrapper::~SightNodePortWrapper()
+    {
+        dbg("~SightNodePortWrapper");
+    }
+
+    uint sight::SightNodePortWrapper::getId() const {
+        return pointer->getId();
+    }
+
+    const char* sight::SightNodePortWrapper::getErrorMsg() const {
+        return pointer->options.errorMsg.c_str();
+    }
+
+    void SightNodePortWrapper::setErrorMsg(const char* msg) {
+        pointer->options.errorMsg = msg;
+    }
+
+    void sight::SightNodePortWrapper::setType(uint v) {
+        pointer->type = v;
+    }
+
+    void sight::SightNodePortWrapper::resetType() {
+        pointer->type = pointer->templateNodePort->type;
+    }
+
+    uint sight::SightNodePortWrapper::getType() const {
+        return pointer->type;
+    }
+
+    void sight::SightNodePortWrapper::setReadonly(bool v) {
+        pointer->options.readonly = v;
+    }
+
+    bool sight::SightNodePortWrapper::isReadonly() const {
+        return pointer->options.readonly;
+    }
+
+    void sight::SightNodePortWrapper::setShow(bool v) {
+        pointer->options.show = v;
+    }
+
+    bool sight::SightNodePortWrapper::isShow() const {
+        return pointer->options.show;
+    }
+
+    void sight::SightNodePortWrapper::deleteLinks() {
+        pointer->clearLinks();
+    }
+
+    const char* sight::SightNodePortWrapper::getName() const {
+        return pointer->getPortName();
+    }
+
+    void sight::SightNodePortWrapper::updatePointer() {
+        pointer = nullptr;
+        if (portHandle) {
+            pointer = portHandle.get();
+        }
+    }
+
+    SightNodeGraphWrapper::SightNodeGraphWrapper(SightNodeGraph* graph) : graph(graph) {
+        buildNodeCache();
+    }
+
+    SightNode sight::SightNodeGraphWrapper::test() const {
+        if (cachedNodes.size() > 0) {
+            return cachedNodes[0];
+        }
+        return {};
+    }
+
+    std::vector<SightNode> SightNodeGraphWrapper::testArray() const {
+        std::vector<SightNode> list;
+        for( int i = 0; i < 5; i++){
+            if (i >= cachedNodes.size()) {
+                break;
+            }
+
+            list.push_back(cachedNodes[i]);
+        }
+        return list;
+    }
+
+    SightNode sight::SightNodeGraphWrapper::findNode(uint id) {
+        auto p = graph->findNode(id);
+        if (p) {
+            return *p;
+        }
+        return {};
+    }
+
+    SightNode sight::SightNodeGraphWrapper::findNode(std::string const& templateAddress, v8::Local<v8::Function> filter) {
+        SightNode n;
+        for( const auto& item: graph->getNodes()){
+            if (!templateAddress.empty() && templateAddress != item.templateAddress()) {
+                continue;
+            }
+
+            if (filter.IsEmpty()) {
+                n = item;
+                break;
+            }
+            
+            auto isolate = filter->GetIsolate();
+            auto v = v8pp::call_v8(isolate, filter, Object::New(isolate), item);
+            if (v->BooleanValue(isolate)) {
+                n = item;
+                break;
+            }
+        }
+
+        return n;
+    }
+
+    void sight::SightNodeGraphWrapper::buildNodeCache() {
+        cachedNodes.clear();
+        if (!graph) {
+            return;
+        }
+
+        for( auto& item: graph->getNodes()){
+            cachedNodes.push_back(item);
+        }
+    }
+
+    std::vector<SightNode> & sight::SightNodeGraphWrapper::getCachedNodes() {
+        return cachedNodes;
+    }
+
+    sight::SightNodeGraphWrapper::~SightNodeGraphWrapper()
+    {
+        dbg("~SightNodeGraphWrapper");
+    }
+
+
 }

@@ -276,6 +276,8 @@ namespace sight {
 
         absl::btree_map<uint, TypeInfo> const& getTypeInfoMap() const;
 
+        std::string getLastOpenGraph() const;
+
     private:
         std::string baseDir;
         bool createIfNotExist;

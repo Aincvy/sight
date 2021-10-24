@@ -211,6 +211,224 @@ addType('InOrOut', {
 
 });
 
+templateNodes = {};
+templateNodes.VarDeclare = {};
+templateNodes.VarDeclare.onInstantiate = function onInstantiate() {
+    let node = this;
+    // names: key: node.id, value: varName;  out: key: varName, value: node.id array
+    checkTinyData(node, { names: {}, out: {} });
+    let data = tinyData(node);
+    // fix var name first.
+    let realNames = Object.values(data.names);
+    let portVarName = node.portValue('name');
+    let oldName = portVarName.get();
+    print(oldName);
+    if (realNames.length > 0 && realNames.includes(oldName)) {
+        let i = 0;
+        while (true) {
+            let tmp = oldName + (++i);
+            if (!realNames.includes(tmp)) {
+                print(tmp);
+                portVarName.set(tmp);
+                oldName = tmp;
+
+                break;
+            }
+        }
+    }
+
+    // put in cache
+    data.names[node.id] = oldName;
+}
+
+templateNodes.VarDeclare.onReload = function onReload(){
+    checkTinyData(this, { names: {}, out: {} });
+    let data = tinyData(this);
+    let name = this.portValue('name').get();
+    let portIn = this.portValue('in');
+    let portOut = this.portValue('out');
+    if (this.portValue('type').get().index == 0) {
+        // in
+        data.names[this.id] = name;
+        portIn.show = true;
+        portOut.show = false;
+    } else {
+        // out
+        portIn.show = false;
+        portOut.show = true;
+        checkValue1(data.out, name, [], a => a.push(this.id));
+        // print(name, data.out[name]);
+    }
+};
+
+templateNodes.VarDeclare.onMsg = function onMsg(type, msg){
+    // print(this.id, type, msg);
+    if (type === 1) {
+        this.portValue('name').set(msg);
+    } else if (type === 2) {
+        this.portValue('out').type = msg;
+    } else if (type === 3) {
+        this.portValue('out')?.resetType();
+    }
+}
+
+templateNodes.VarDeclare.in = {};
+templateNodes.VarDeclare.in.onConnect = function onConnect(node, connection){
+    // print(connection.self.id, connection.target.id);
+    let type = connection.target.type;
+    this.type = type;
+
+    // effect out nodes.
+    let data = tinyData(node);
+    let name = node.portValue('name').get();
+    // print(name, data.out[name]);
+    loopIf(data.out[name], element => {
+        tell(element, 2, type);
+    });
+};
+
+
+templateNodes.VarDeclare.in.onDisconnect = function onDisconnect(node, connection){
+    this.resetType();
+
+    // effect out nodes.
+    let data = tinyData(node);
+    let name = node.portValue('name').get();
+    if (data.out[name]) {
+        data.out[name].forEach(element => {
+            tell(element, 3, 0);
+        });
+    }
+};
+
+templateNodes.VarDeclare.type = {};
+templateNodes.VarDeclare.type.onValueChange = function onValueChange(node){
+    let newValue = this.get();
+    let portVarName = node.portValue('name');
+    let data = tinyData(node);
+
+    if (newValue.index == 0) {
+        // in
+        let port = node.portValue('out');
+        if (port) {
+            port.show = false;
+            port.deleteLinks();
+        }
+        port = node.portValue('in');
+        if(port){
+            port.show = true;
+        }
+
+        // delete out
+        let name = portVarName.get();
+        if (data.out[name]) {
+            let array = data.out[name];
+            array.remove(node.id);
+        }
+    } else {
+        // out
+        let port = node.portValue('in');
+        if(port){
+            port.show = false;
+            port.deleteLinks();
+        }
+        port = node.portValue('out');
+        if(port){
+            port.show = true;
+        }
+
+        // delete name
+        delete data.names[node.id];
+
+        // change name
+        let realNames = Object.values(data.names);
+        if (realNames.length > 0) {
+            let name = realNames[0];
+            portVarName.set(name);
+
+            if (!data.out[name]) {
+                data.out[name] = [];
+            }
+            data.out[name].push(node.id);
+        } else {
+            portVarName.set('');
+        }
+    }
+
+    portVarName.errorMsg = '';
+}
+
+templateNodes.VarDeclare.name = {};
+templateNodes.VarDeclare.name.onValueChange = function onValueChange(node, oldName) {
+    // update var name.
+    let data = tinyData(node);
+    // fix var name first.
+    let realNames = Object.values(data.names);
+    let portVarName = node.portValue('name');
+    let portType = node.portValue('type');
+    let type = portType.get();
+    let nowName = portVarName.get();
+
+    let out = data.out;
+    if (type.index == 0) {
+        // in
+        if (realNames.includes(nowName) && data.names[node.id] != nowName) {
+            portVarName.errorMsg = 'repeat name';
+            // this.set(oldName);
+            return;
+        } else {
+            portVarName.errorMsg = '';
+        }
+
+        if (data.names[node.id] == nowName) {
+            return;
+        }
+
+        data.names[node.id] = nowName;
+        if (out) {
+            //  rename key
+            renameKey(out, nowName, oldName);
+            let array = out[nowName];
+            if (array && array.length > 0) {
+                array.forEach(element => {
+                    tell(element, 1, nowName);
+                });
+            }
+        }
+    } else {
+        // out
+        print(oldName);
+
+        // delete old name
+        if (out[oldName]) {
+            let array = out[oldName];
+            array.remove(node.id);
+        }
+
+        // check name valid
+        if (!realNames.includes(nowName)) {
+            portVarName.errorMsg = 'invalid var name';
+            return;
+        } else {
+            portVarName.errorMsg = '';
+        }
+
+        // add new name
+        checkValue1(out, nowName, [], a => a.push(node.id));
+    }
+}
+
+templateNodes.VarDeclare.name.onAutoComplete = function onAutoComplete(node){
+    let portType = node.portValue('type');
+    if (portType.get().index == 0) {
+        return undefined;
+    }
+
+    let data = tinyData(node);
+    let realNames = Object.values(data.names);
+    return realNames;
+};
+
 addTemplateNode({
     __meta_name: "VarDeclare",
     __meta_address: "built-in/sundry",
@@ -223,104 +441,16 @@ addTemplateNode({
         },
     },
     __meta_events: {
-        onInstantiate() {
-            let node = this;
-            // names: key: node.id, value: varName;  out: key: varName, value: node.id array
-            checkTinyData(node, { names: {}, out: {}});
-            let data = tinyData(node);
-            // fix var name first.
-            let realNames = Object.values(data.names);
-            let portVarName = node.portValue('varName');
-            let oldName = portVarName.get();
-            print(oldName);
-            if(realNames.length > 0 && realNames.includes(oldName)){
-                let i = 0;
-                while(true){
-                    let tmp = oldName + (++i);
-                    if(!realNames.includes(tmp)){
-                        print(tmp);
-                        portVarName.set(tmp);
-                        oldName = tmp;
-
-                        break;
-                    }
-                }
-            }
-
-            // put in cache
-            data.names[node.id] = oldName;
-        },
-
+        onInstantiate: templateNodes.VarDeclare.onInstantiate,
         // called after graph load
-        onReload(){
-            checkTinyData(this, { names: {}, out: {} });
-            let data = tinyData(this);
-            let name = this.portValue('varName').get();
-            let portIn = this.portValue('in');
-            let portOut = this.portValue('out');
-            if(this.portValue('type').get().index == 0){
-                // in
-                data.names[this.id] = name;
-                portIn.show(true);
-                portOut.show(false);
-            }  else {
-                // out
-                portIn.show(false);
-                portOut.show(true);
-                // if(!data.out[name]){
-                //     data.out[name] = [];
-                // }
-                // data.out[name].push(this.id);
-                checkValue1(data.out, name, [], a => a.push(this.id));
-                // print(name, data.out[name]);
-            }
-        },
-
-        onMsg(type, msg){
-            // print(this.id, type, msg);
-            if(type === 1){
-                this.portValue('varName').set(msg);
-            } else if(type === 2) {
-                this.portValue('out').type(msg);
-            } else if ( type === 3){
-                this.portValue('out').resetType();
-            }
-        },
+        onReload: templateNodes.VarDeclare.onReload,
+        onMsg: templateNodes.VarDeclare.onMsg,
     },
     __meta_inputs: {
         in: {
             type: 'Object',
-            onConnect(node, connection) {
-                print(connection.self.id, connection.target.id);
-                let type = connection.target.type(0);
-                this.type(type);
-
-                // effect out nodes.
-                let data = tinyData(node);
-                let name = node.portValue('varName').get();
-                print(name, data.out[name]);
-                // if(data.out[name]){
-                //     data.out[name].forEach(element => {
-                //         tell(element, 2, type);
-                //     });
-                // }
-                loopIf(data.out[name], element => {
-                    tell(element, 2, type);
-                });
-            },
-
-            onDisconnect(node, connection) {
-                this.resetType();
-
-                // effect out nodes.
-                let data = tinyData(node);
-                let name = node.portValue('varName').get();
-                if (data.out[name]) {
-                    data.out[name].forEach(element => {
-                        tell(element, 3, 0);
-                    });
-                }
-            },
+            onConnect: templateNodes.VarDeclare.in.onConnect,
+            onDisconnect: templateNodes.VarDeclare.in.onDisconnect,
         }
         
     },
@@ -333,126 +463,14 @@ addTemplateNode({
 
     type: {
         type: 'InOrOut',
-        onValueChange(node) {
-            let newValue = this.get();
-            let portVarName = node.portValue('varName');
-            let data = tinyData(node);
-
-            if (newValue.index == 0) {
-                // in
-                let port = node.portValue('out');
-                port.show(false);
-                port.deleteLinks();
-                node.portValue('in').show(true);
-
-                // delete out
-                let name = portVarName.get();
-                if (data.out[name]) {
-                    let array = data.out[name];
-                    let index = array.indexOf(node.id);
-                    if(index > -1){
-                        array.splice(index, 1);
-                    }
-                }
-            } else {
-                // out
-                let port = node.portValue('in');
-                port.show(false);
-                port.deleteLinks();
-                node.portValue('out').show(true);
-                
-                // delete name
-                delete data.names[node.id];
-
-                // change name
-                let realNames = Object.values(data.names);
-                if(realNames.length > 0){
-                    let name = realNames[0];
-                    portVarName.set(name);
-                    
-                    if(!data.out[name]){
-                        data.out[name] = [];
-                    }
-                    data.out[name].push(node.id);
-                } else {
-                    portVarName.set('');
-                }
-            }
-
-            portVarName.errorMsg('');
-        },
+        onValueChange: templateNodes.VarDeclare.type.onValueChange,
     },
 
-    varName: {
+    name: {
         type: 'String',
         defaultValue: 'varName',
-        onValueChange(node, oldName) {
-            // update var name.
-            let data = tinyData(node);
-            // fix var name first.
-            let realNames = Object.values(data.names);
-            let portVarName = node.portValue('varName');
-            let portType = node.portValue('type');
-            let type = portType.get();
-            let nowName = portVarName.get();
-
-            let out = data.out;
-            if(type.index == 0){
-                // in
-                
-                if (realNames.includes(nowName)) {
-                    portVarName.errorMsg('repeat name');
-                    return;
-                } else {
-                    portVarName.errorMsg('');
-                }
-
-                data.names[node.id] = nowName;
-                if(out){
-                    //  rename key
-                    // delete Object.assign(out, { [nowName]: out[oldName] })[oldName];
-                    renameKey(out, nowName, oldName);
-                    let array = out[nowName];
-                    if(array && array.length > 0){
-                        array.forEach(element => {
-                            tell(element, 1, nowName);
-                        });
-                    }
-                }
-            } else {
-                // out
-                print(1, oldName);
-
-                // delete old name
-                if(out[oldName]){
-                    let array = out[oldName];
-                    array.remove(node.id);
-                }
-                
-                // check name valid
-                if (!realNames.includes(nowName)) {
-                    portVarName.errorMsg('invalid var name');
-                    return;
-                } else {
-                    portVarName.errorMsg('');
-                }
-
-                // add new name
-                checkValue1(out, nowName, [], a => a.push(node.id));
-            }
-        },
-
-        onAutoComplete(node) {
-            let portType = node.portValue('type');
-            if(portType.get().index == 0){
-                return undefined;
-            }
-
-            let data = tinyData(node);
-            let realNames = Object.values(data.names);
-            return realNames;
-        }
-
+        onValueChange: templateNodes.VarDeclare.name.onValueChange,
+        onAutoComplete: templateNodes.VarDeclare.name.onAutoComplete,
     },
 
 });
@@ -461,19 +479,55 @@ addTemplateNode({
     __meta_name: "Portal",
     __meta_address: "built-in",
     __meta_func: {
-        generateCodeWork($) {
-            $.varName.value = $.number();
+        generateCodeWork($, $$) {
+            // call in portal.
+            // if this is input
+            // 1. active the output node.
+            // 2. this portal do nothing.
+            // 
+            $$.options.noCode = true;
+            print(typeof $$.graph.test, $$.graph.test, $$.graph.test.id, $$.graph.test.name);
+            // print(typeof $$.graph.nodes, $$.graph.nodes.length, $$.graph.nodes[0].id);
+            for (const item of $$.graph.nodes) {
+                print(item.id, item.name);
+                print('one node end.');
+            }
+        },
+
+        onReverseActive($, $$) {
+            // do nothing
         },
     },
+    __meta_events: {
+        onInstantiate: templateNodes.VarDeclare.onInstantiate,
+        // called after graph load
+        // onReload: templateNodes.VarDeclare.onReload,
+        onMsg: templateNodes.VarDeclare.onMsg,
+    },
     __meta_inputs: {
-        object: 'Object',
+        // in: {
+        //     type: 'Object',
+        //     onConnect: templateNodes.VarDeclare.in.onConnect,
+        //     onDisconnect: templateNodes.VarDeclare.in.onDisconnect,
+        // }
     },
     __meta_outputs: {
+        // out: {
+        //     type: 'Object',
+        //     show: false,
+        // },
     },
 
-    varName: {
+    type: {
+        type: 'InOrOut',
+        onValueChange: templateNodes.VarDeclare.type.onValueChange,
+    },
+
+    name: {
         type: 'String',
-        defaultValue: 'name',
+        defaultValue: 'portalName',
+        onValueChange: templateNodes.VarDeclare.name.onValueChange,
+        onAutoComplete: templateNodes.VarDeclare.name.onAutoComplete,
     },
 
 });

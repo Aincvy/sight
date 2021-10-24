@@ -94,10 +94,10 @@ namespace sight {
             auto right = connection->findRightPort();
             auto isolate = currentUIStatus()->isolate;
 
-            if (left->templateNodePort) {
+            if (left && left->templateNodePort) {
                 left->templateNodePort->onDisconnect(isolate, left, JsEventType::Connect, connection);
             }
-            if (right->templateNodePort) {
+            if (right && right->templateNodePort) {
                 right->templateNodePort->onDisconnect(isolate, right, JsEventType::Connect, connection);
             }
         }
@@ -501,8 +501,8 @@ namespace sight {
 
             ImGui::Text("FPS: %.2f (%.2gms)", io->Framerate, io->Framerate ? 1000.0f / io->Framerate : 0.0f);
             ImGui::SameLine();
-            if (ImGui::Button("test## 133")) {
-                dbg("test");
+            if (ImGui::Button("Reload## reload graph")) {
+                dbg("Not impl");
             }
             ImGui::Separator();
 
@@ -544,7 +544,6 @@ namespace sight {
                         // ed::AcceptNewItem() return true when user release mouse button.
                         if (ed::AcceptNewItem()) {
                             // Since we accepted new link, lets add one to our list of links.
-                            // g_Links.push_back({ed::LinkId(nextNodeOrPortId()), inputPinId, outputPinId});
                             auto id = CURRENT_GRAPH->createConnection(static_cast<int>(inputPinId.Get()), static_cast<int>(outputPinId.Get()));
                             if (id > 0) {
                                 // valid connection.
@@ -555,6 +554,22 @@ namespace sight {
                                 ed::Link(id, inputPinId, outputPinId);
                             } else {
                                 // may show something to user.
+                                switch (id) {
+                                case -1:
+                                    dbg("left or right is invalid");
+                                    break;
+                                case -2:
+                                    dbg("same port id");
+                                    break;
+                                case -3:
+                                    dbg("same kind");
+                                    break;
+                                case -4:
+                                    dbg("left only can accept one connection");
+                                    break;
+                                }
+
+                                ed::RejectNewItem();
                             }
                         }
 
@@ -569,14 +584,6 @@ namespace sight {
             // Handle deletion action
             if (ed::BeginDelete())
             {
-                ed::NodeId deletedNodeId;
-                while (ed::QueryDeletedNode(&deletedNodeId)) {
-                    // ask for node delete.
-                    if (ed::AcceptDeletedItem()) {
-                        CURRENT_GRAPH->delNode(static_cast<int>(deletedNodeId.Get()));
-                    }
-                }
-
                 // There may be many links marked for deletion, let's loop over them.
                 ed::LinkId deletedLinkId;
                 while (ed::QueryDeletedLink(&deletedLinkId))
@@ -593,6 +600,14 @@ namespace sight {
 
                     // You may reject link deletion by calling:
                     // ed::RejectDeletedItem();
+                }
+
+                ed::NodeId deletedNodeId;
+                while (ed::QueryDeletedNode(&deletedNodeId)) {
+                    // ask for node delete.
+                    if (ed::AcceptDeletedItem()) {
+                        CURRENT_GRAPH->delNode(static_cast<int>(deletedNodeId.Get()));
+                    }
                 }
             }
             ed::EndDelete(); // Wrap up deletion action
@@ -662,7 +677,6 @@ namespace sight {
         }
 
     }
-
 
     int initNodeEditor() {
         g_NodeEditorStatus = new NodeEditorStatus();
@@ -872,8 +886,11 @@ namespace sight {
         }
         case IntTypeButton:
         {
+            // todo power up, multiple buttons.
             if (ImGui::Button("button")) {
-                dbg("=1");
+                if (port->templateNodePort) {
+                    port->templateNodePort->onClick(currentUIStatus()->isolate, port);
+                }
             }
             break;
         }
@@ -897,16 +914,6 @@ namespace sight {
     }
 
     int showNodeEditorGraph(UIStatus const& uiStatus) {
-        // if (uiStatus.needInit) {
-        //     ImVec2 startPos = {
-        //             300, 20
-        //     };
-
-        //     auto windowSize = uiStatus.io->DisplaySize - startPos;
-        //     ImGui::SetNextWindowPos(startPos, ImGuiCond_Once);
-        //     ImGui::SetNextWindowSize(windowSize, ImGuiCond_Once);
-        // }
-
         ImVec2 startPos = {
             300, 20
         };
@@ -1234,6 +1241,13 @@ namespace sight {
 
     uint SightNode::getNodeId() const {
         return this->nodeId;
+    }
+
+    const char* SightNode::templateAddress() const {
+        if (templateNode) {
+            return templateNode->fullTemplateAddress.c_str();
+        }
+        return nullptr;
     }
 
     SightJsNode::SightJsNode() {
@@ -1860,7 +1874,7 @@ namespace sight {
         return findSightAnyThing(id).asConnection();
     }
 
-    uint SightNodeGraph::createConnection(uint leftPortId, uint rightPortId, uint connectionId) {
+    int SightNodeGraph::createConnection(uint leftPortId, uint rightPortId, uint connectionId) {
         if (leftPortId == rightPortId) {
             return -2;
         }
@@ -1872,6 +1886,10 @@ namespace sight {
         }
         if (left->kind == right->kind) {
             return -3;
+        }
+
+        if (left->getType() == IntTypeProcess && left->isConnect()) {
+            return -4;
         }
 
         auto id = connectionId > 0 ? connectionId : nextNodeOrPortId();
@@ -2256,7 +2274,7 @@ namespace sight {
                     list->push_back(SightNodeTemplateAddress(pointer->part, tmpPointer));
                 } else {
                     // find
-                    std::string tmpMsg = "replace template node.";
+                    std::string tmpMsg = "replace template node: ";
                     tmpMsg += pointer->part;
                     dbg(tmpMsg);
                     auto willCopy = *templateNode;
@@ -2681,6 +2699,7 @@ namespace sight {
         SightNodePort tmp = { this->kind, this->type, this};
         tmp.value = this->value;
         tmp.portName = this->portName;
+        tmp.options = this->options;
         return tmp;
     }
 }
