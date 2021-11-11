@@ -3,7 +3,6 @@ addTemplateNode({
     __meta_address: "built-in/literal/basic",
     __meta_func: {
         generateCodeWork($, $$) {
-            // $$.options.isPart = true;
             return $.number.value;       // When a output node is returned, it will be map to node's value.
         },
     },
@@ -20,7 +19,6 @@ addTemplateNode({
     __meta_address: "built-in/literal/basic",
     __meta_func: {
         generateCodeWork($, $$) {
-            // $$.options.isPart = true;
             return $.number.value;       // When a output node is returned, it will be map to node's value.
         },
     },
@@ -37,7 +35,6 @@ addTemplateNode({
     __meta_address: "built-in/literal/basic",
     __meta_func: {
         generateCodeWork($, $$) {
-            // $$.options.isPart = true;
             return $.number.value;       // When a output node is returned, it will be map to node's value.
         },
     },
@@ -54,7 +51,6 @@ addTemplateNode({
     __meta_address: "built-in/literal/basic",
     __meta_func: {
         generateCodeWork($, $$) {
-            // $$.options.isPart = true;
             return $.number.value;       // When a output node is returned, it will be map to node's value.
         },
     },
@@ -71,7 +67,6 @@ addTemplateNode({
     __meta_address: "built-in/literal/basic",
     __meta_func: {
         generateCodeWork($, $$) {
-            // $$.options.isPart = true;
             return $.char.value;       // When a output node is returned, it will be map to node's value.
         },
     },
@@ -88,7 +83,6 @@ addTemplateNode({
     __meta_address: "built-in/literal/basic",
     __meta_func: {
         generateCodeWork($, $$) {
-            // $$.options.isPart = true;
             return $.string.value;       // When a output node is returned, it will be map to node's value.
         },
     },
@@ -106,7 +100,6 @@ addTemplateNode({
     __meta_address: "built-in/literal/basic",
     __meta_func: {
         generateCodeWork($, $$) {
-            // $$.options.isPart = true;
             return $.bool.value;       // When a output node is returned, it will be map to node's value.
         },
     },
@@ -123,7 +116,6 @@ addTemplateNode({
     __meta_address: "built-in/literal/basic",
     __meta_func: {
         generateCodeWork($, $$) {
-            // $$.options.isPart = true;
             return $.long.value;       // When a output node is returned, it will be map to node's value.
         },
     },
@@ -140,7 +132,6 @@ addTemplateNode({
     __meta_address: "built-in/literal/math",
     __meta_func: {
         generateCodeWork($, $$) {
-            // $$.options.isPart = true;
             return $.color.value;       // When a output node is returned, it will be map to node's value.
         },
     },
@@ -157,7 +148,6 @@ addTemplateNode({
     __meta_address: "built-in/literal/math",
     __meta_func: {
         generateCodeWork($, $$) {
-            // $$.options.isPart = true;
             return $.vector3.value;       // When a output node is returned, it will be map to node's value.
         },
     },
@@ -175,7 +165,6 @@ addTemplateNode({
     __meta_address: "built-in/literal/math",
     __meta_func: {
         generateCodeWork($, $$) {
-            // $$.options.isPart = true;
             return $.vector4.value;       // When a output node is returned, it will be map to node's value.
         },
     },
@@ -192,7 +181,6 @@ addTemplateNode({
     __meta_address: "built-in/sundry",
     __meta_func: {
         generateCodeWork($, $$) {
-            // $$.options.isPart = true;
             return $.string.value;       // When a output node is returned, it will be map to node's value.
         },
     },
@@ -250,12 +238,20 @@ templateNodes.VarDeclare.onReload = function onReload(){
     if (this.portValue('type').get().index == 0) {
         // in
         data.names[this.id] = name;
-        portIn.show = true;
-        portOut.show = false;
+        if(portIn){
+            portIn.show = true;
+        }
+        if(portOut){
+            portOut.show = false;
+        }
     } else {
         // out
-        portIn.show = false;
-        portOut.show = true;
+        if(portIn){
+            portIn.show = false;
+        }
+        if(portOut){
+            portOut.show = true;
+        }
         checkValue1(data.out, name, [], a => a.push(this.id));
         // print(name, data.out[name]);
     }
@@ -433,11 +429,46 @@ addTemplateNode({
     __meta_name: "VarDeclare",
     __meta_address: "built-in/sundry",
     __meta_func: {
-        generateCodeWork($) {
-            $.varName.value = $.object();
+        generateCodeWork($, $$) {
+            $$.options.noCode = true;
+            if (this.portValue('type').get().index == 1) {
+                // print('this is a out portal, do nothing.');
+                return;
+            }
+            
+            $$.__let($.name.value, $.in());
         },
         onReverseActive($, $$){
-            return $.varName.value;
+            // only type=out 
+            // check does the input node has generated ?
+            // 1. find the varName with type=in.
+            // 2. call the node's generateCodeWork function.
+            // 
+            let varName = this.portValue('name').get();
+            let node = $$.graph.findNode(this, function (n) {
+                if (n.portValue('name')?.get() === varName) {
+                    // find type=in node
+                    return n.portValue('type')?.get().index == 0;
+                }
+                return false;
+            });
+            // print(this.id, node.id);
+            if(node) {
+                $$.options.isPart = true;
+                let info = $$.graph.getGenerateInfo(node);
+                if (info && info.hasGenerated){
+                    // has generated 
+                    return $.name.value;
+                } else {
+                    // request to generate code.
+                    generateCode(node);
+                    return $.name.value;
+                }
+            } else {
+                print(`cannot found the node type=in varName=${varName}`);
+                $$.options.noCode = true;
+            }
+            
         },
     },
     __meta_events: {
@@ -486,11 +517,24 @@ addTemplateNode({
             // 2. this portal do nothing.
             // 
             $$.options.noCode = true;
-            print(typeof $$.graph.test, $$.graph.test, $$.graph.test.id, $$.graph.test.name);
-            // print(typeof $$.graph.nodes, $$.graph.nodes.length, $$.graph.nodes[0].id);
-            for (const item of $$.graph.nodes) {
-                print(item.id, item.name);
-                print('one node end.');
+            if (this.portValue('type').get().index == 1){
+                // print('this is a out portal, do nothing.');
+                return;
+            }
+
+            let portalName = this.portValue('name').get();
+            let node = $$.graph.findNode(this, function(n) {
+                if (n.portValue('name')?.get() === portalName ){
+                    // find out portal
+                    return n.portValue('type')?.get().index == 1;
+                }
+                return false;
+            });
+            if(node){
+                // print(`active the next portal: ${node.id}, ${node.portValue('name')?.get()}`);
+                generateCode(node);
+            } else {
+                print(`Do not find the out portal: ${portalName}; [Jump]`);
             }
         },
 
@@ -501,7 +545,7 @@ addTemplateNode({
     __meta_events: {
         onInstantiate: templateNodes.VarDeclare.onInstantiate,
         // called after graph load
-        // onReload: templateNodes.VarDeclare.onReload,
+        onReload: templateNodes.VarDeclare.onReload,
         onMsg: templateNodes.VarDeclare.onMsg,
     },
     __meta_inputs: {
@@ -528,6 +572,39 @@ addTemplateNode({
         defaultValue: 'portalName',
         onValueChange: templateNodes.VarDeclare.name.onValueChange,
         onAutoComplete: templateNodes.VarDeclare.name.onAutoComplete,
+    },
+
+});
+
+addTemplateNode({
+    __meta_name: "CodeBlock",
+    __meta_address: "built-in/sundry",
+    __meta_func: {
+        generateCodeWork($, $$) {
+        },
+        onReverseActive($, $$) {
+        },
+    },
+    __meta_events: {
+        onInstantiate(){
+
+        },
+        // called after graph load
+        onReload(){
+
+        },
+        onMsg(){
+
+        },
+    },
+    __meta_inputs: {
+    },
+    __meta_outputs: {
+    },
+
+    code: {
+        type: 'LargeString',
+        defaultValue: '',
     },
 
 });

@@ -162,6 +162,7 @@ namespace sight {
                 if (lastOpenGraph.empty()) {
                     dbg("not open any graph");
                 } else {
+                    saveAnyThing();
                     addJsCommand(JsCommandType::ParseGraph, strdup((lastOpenGraph + ".yaml").c_str()), 0, true);
                 }
             }

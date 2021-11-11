@@ -101,6 +101,7 @@ namespace sight {
             int arrayIndex, elementIndex;
             for (int i = 0; i < arraySize; ++i) {
                 T *temp = this->pointer[i];
+                // fixme: here may cause a unspecified behavior.  see (c++ pro notes#121.6)
                 if (p >= temp && p <= temp + capacityPerArray - 1) {
                     // here it is.
                     elementIndex = p - temp;
@@ -272,6 +273,5 @@ namespace sight {
         }
 
     };
-
 
 }

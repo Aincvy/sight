@@ -158,8 +158,8 @@ addTemplateNode({
     __meta_address: "test/math/literal",
     __meta_func: {
         // this function will be to string(only function body.).
-        generateCodeWork($, $options) {
-            $options.isPart = true;
+        generateCodeWork($, $$) {
+            $$.options.isPart = true;
             return $.number;       // When a output node is returned, it will be map to node's value.
         },
 

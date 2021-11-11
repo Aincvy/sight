@@ -20,13 +20,13 @@
 
 namespace sight{
 
-    struct SightJsNode;
-    struct SightNode;
-    struct SightNodePort;
-    struct SightNodePortHandle;
-    struct SightNodeConnection;
-    union SightNodeValue;
-    class SightNodeGraph;
+    // struct SightJsNode;
+    // struct SightNode;
+    // struct SightNodePort;
+    // struct SightNodePortHandle;
+    // struct SightNodeConnection;
+    // union SightNodeValue;
+    // class SightNodeGraph;
 
     enum class JsCommandType {
         JsCommandHolder,
@@ -94,6 +94,26 @@ namespace sight{
     };
 
     /**
+     * @brief contains generate-related info
+     * 
+     */
+    struct SightNodeGenerateInfo  {
+        // the times of generate code function called .
+        u_char generateCodeCount = 0;
+
+        SightNodeGenerateInfo() = default;
+        ~SightNodeGenerateInfo() = default;
+
+        /**
+         * @brief 
+         * 
+         * @return true 
+         * @return false 
+         */
+        bool hasGenerated() const;
+    };
+
+    /**
      * @brief js wrapper | only for read data now.
      * 
      */
@@ -105,9 +125,9 @@ namespace sight{
 
         void buildNodeCache();
 
-        std::vector<SightNode> & getCachedNodes();
+        std::vector<SightNode>& getCachedNodes();
 
-        SightNode findNode(uint id);
+        SightNode findNodeWithId(uint id);
 
         /**
          * @brief find first 
@@ -116,11 +136,17 @@ namespace sight{
          * @param filter 
          * @return SightNode 
          */
-        SightNode findNode(std::string const& templateAddress, v8::Local<v8::Function> filter);
+        SightNode findNodeWithFilter(std::string const& templateAddress, v8::Local<v8::Function> filter);
 
-        SightNode test() const;
-        
-        std::vector<SightNode> testArray() const;
+        /**
+         * @brief 
+         * 
+         * @param nodeId 
+         * @param f    node data change function
+         * @return true function is executed.
+         * @return false function isn't executed.
+         */
+        bool updateNodeData(uint nodeId, v8::Local<v8::Function> f);
 
     private:
         SightNodeGraph* graph = nullptr;

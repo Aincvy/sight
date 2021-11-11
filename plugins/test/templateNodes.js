@@ -46,22 +46,20 @@ addTemplateNode({
     // used for context menu
     __meta_address: "test/debug",
     __meta_func: {
-      generateCodeWork() {
-        return function ($){
-            print($.msg);
-            let a = `print(${$.msg})`;
-        }
-      },
+        generateCodeWork($, $$) {
+            $$.options.isPart = true;
+            $$.options.appendLineEnd = true;
+
+            return print($.msg.value);
+        },
     },
     // other ideas
     __meta_inputs: {
-        chainIn: 'Process',
-        msg: 'String',
     },
     __meta_outputs: {
-
     },
 
+    msg: 'String',
 });
 
 addTemplateNode({
@@ -70,9 +68,13 @@ addTemplateNode({
     __meta_name: "Add",
     // used for context menu
     __meta_address: "test/math",
-    __meta_func($, $$){
-        print('Add generateCodeWork.');
-        return $.number1() + $.number2();
+    __meta_func: {
+        generateCodeWork($) {
+        },
+        onReverseActive($, $$){
+            $$.options.isPart = true;
+            return $.number1() + $.number2();
+        }
     },
     // other ideas
     __meta_inputs: {
@@ -92,7 +94,7 @@ addTemplateNode({
     // used for context menu
     __meta_address: "process",
     __meta_options: {
-        enter: true,
+        processFlag: 'enter',
     },
     __meta_func: {
         generateCodeWork($$) {
