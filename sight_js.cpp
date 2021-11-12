@@ -293,7 +293,6 @@ namespace sight {
     namespace {
 
         struct GenerateOptions {
-            bool isPart = false;
             bool noCode = false;
             bool appendLineEnd = false;
         };
@@ -363,10 +362,25 @@ namespace sight {
         struct GenerateFunctionStatus {
             int paramCount = 0;
             bool shouldEval = false;
-            std::string returnBody;
-            bool noReturn = false;
             bool need$ = false;
             bool need$$ = false;
+        };
+
+        /**
+         * @brief `generateCodeWork` and `onReverseActive` function's arg `$$`
+         * 
+         */
+        struct GenerateArg$$ {
+
+            void __let(const char* varName, const char* value) {
+                auto& ss = g_V8Runtime->parsingGraphData.currentUsedSourceStream();
+                ss << "let " << varName << " = " << value << ";" << std::endl;
+            }
+
+            void __constFunc(const char* varName, const char* value) {
+                auto& ss = g_V8Runtime->parsingGraphData.currentUsedSourceStream();
+                ss << "const " << varName << " = " << value << ";" << std::endl;
+            }
         };
 
         //
@@ -592,6 +606,15 @@ namespace sight {
             } else {
                 rValue.Set(tmp.ToLocalChecked());
             }
+        }
+
+        int v8InsertSource(const char* source){
+            if (g_V8Runtime->parsingGraphData.empty()) {
+                return CODE_FAIL;
+            }
+
+            g_V8Runtime->parsingGraphData.currentUsedSourceStream() << source;
+            return CODE_OK;
         }
 
         // print func
@@ -922,9 +945,6 @@ namespace sight {
                     eventHandleFunc(option, "onDisconnect", port.onDisconnect);
                     eventHandleFunc(option, "onClick", port.onClick);
 
-                    // if (!port.onValueChange.sourceCode.empty()) {
-                    //     dbg(port.onValueChange.sourceCode);
-                    // }
                 }
 
                 return port;
@@ -1329,7 +1349,7 @@ namespace sight {
     }
 
     /**
-     * init js binds
+     * init `generate` js bindings
      * cpp struct, functions to js engine.
      * @return
      */
@@ -1360,13 +1380,20 @@ namespace sight {
         v8pp::class_<GenerateOptions> generateOptionsClass(isolate);
         generateOptionsClass
             .ctor<>()
-            .set("isPart", &GenerateOptions::isPart)
             .set("noCode", &GenerateOptions::noCode)
             .set("appendLineEnd", &GenerateOptions::appendLineEnd);
 
         v8pp::class_<SightNodeGenerateInfo> generateNodeClass(isolate);
         generateNodeClass
             .set("hasGenerated", v8pp::property(&SightNodeGenerateInfo::hasGenerated));
+        module.set("SightNodeGenerateInfo", generateNodeClass);
+
+        v8pp::class_<GenerateArg$$> generateArg$$(isolate);
+        generateArg$$
+            .set("__let", &GenerateArg$$::__let)
+            .set("__const", &GenerateArg$$::__constFunc)
+            .set("insertSource", &v8InsertSource);
+        module.set("GenerateArg$$", generateArg$$);
 
         global->Set(context, v8pp::to_v8(isolate, "sight"), module.new_instance()).ToChecked();
         logDebug("init js bindings over!");
@@ -1688,56 +1715,17 @@ namespace sight {
                 status->shouldEval = true;
             }
 
-
-            auto pos = body.rfind(std::string("return"));
-            if (pos != std::string::npos && pos + 6 < body.size()) {
-                // has a return keyword
-
-                // check where the return is
-                // maybe use a parser is better.
-                int leftBracesCount = 0;
-                bool mayInFunction = false;
-                for( auto i = pos; i < body.size() ; i++){
-                    //  
-                    auto c = body[i];
-                    if (c == '{') {
-                        leftBracesCount++;
-                    } else if (c == '}') {
-                        if (leftBracesCount == 0) {
-                            // the return keyword may in a lambda expr or a function.
-                            mayInFunction = true;
-                            break;
-                        }
-
-                        leftBracesCount--;
+            // When only has 1 param and the body only has 1 line, and the line start with return, then omitted the `return` keyword.
+            if (!status->shouldEval && countLineInString(body) == 1) {
+                if (startsWith(body, "return")) {
+                    auto left = trimCopy(std::string(body, 6));
+                    auto commaPos = left.rfind(';');
+                    if (commaPos != std::string::npos) {
+                        // remove last ;
+                        left = std::string(left, 0, commaPos);
                     }
+                    return left;
                 }
-                
-                if (mayInFunction) {
-                    status->noReturn = true;
-                } else {
-                    auto left = trimCopy(std::string(body, pos + 6));
-                    if (startsWith(left, "function")) {
-                        status->shouldEval = true;
-                    } else {
-                        if (status->shouldEval) {
-                            // It returns a statement or expr
-                            auto commaPos = left.rfind(';');
-                            if (commaPos != std::string::npos) {
-                                // find last ;
-                                status->returnBody = std::string(left, 0, commaPos);
-                            } else {
-                                status->returnBody = left;
-                            }
-                            // remove return stmt from body.
-                            body.erase(pos);
-                            trim(body);
-                        }
-                    }
-                }
-                
-            } else {
-                status->noReturn = true;
             }
         }
 
@@ -1762,7 +1750,8 @@ namespace sight {
 
         // build args.
         auto arg$ = Object::New(isolate);
-        auto arg$$ = Object::New(isolate);
+        // auto arg$$ = Object::New(isolate);
+        auto arg$$ = v8pp::class_<GenerateArg$$>::import_external(isolate, new GenerateArg$$);
 
         if (!status || status->need$) {
             auto nodeFunc = [node, isolate, &context, &arg$, graphObject](std::vector<SightNodePort> & list, bool isOutput = false) {
@@ -1806,9 +1795,11 @@ namespace sight {
                     };
 
                     auto functionObject = isOutput ? v8pp::wrap_function(isolate, name, emptyFunc) : v8pp::wrap_function(isolate, name, t);
-                    functionObject->Set(context, v8pp::to_v8(isolate, "value"), getPortValue(isolate, item.getType(), item.value)).ToChecked();
                     functionObject->Set(context, v8pp::to_v8(isolate, "isConnect"), v8pp::to_v8(isolate, item.isConnect())).ToChecked();
+                    functionObject->Set(context, v8pp::to_v8(isolate, "value"), getPortValue(isolate, item.getType(), item.value)).ToChecked();
 
+                    // Maybe need an optimization.
+                    // AccessorNameGetterCallback a;
                     arg$->Set(context, v8pp::to_v8(isolate, name), functionObject).ToChecked();
                 }
 
@@ -1826,18 +1817,6 @@ namespace sight {
                 arg$$->Set(context, v8pp::to_v8(isolate, "options"), jsOptions).ToChecked();
             }
             arg$$->Set(context, v8pp::to_v8(isolate, "graph"), graphObject).ToChecked();
-            
-            // let, const
-            auto __let = [](const char* varName, const char* value) {
-                auto & ss = g_V8Runtime->parsingGraphData.currentUsedSourceStream();
-                ss << "let " << varName << " = " << value << ";" << std::endl;
-            };
-            auto __constFunc = [](const char* varName, const char* value) {
-                auto& ss = g_V8Runtime->parsingGraphData.currentUsedSourceStream();
-                ss << "const " << varName << " = " << value << ";" << std::endl;
-            };
-            arg$$->Set(context, v8pp::to_v8(isolate, "__const"), v8pp::wrap_function(isolate, "__const", __constFunc)).ToChecked();
-            arg$$->Set(context, v8pp::to_v8(isolate, "__let"), v8pp::wrap_function(isolate, "__let", __let)).ToChecked();
         }
 
         Local<Object> recv = v8pp::class_<SightNode>::reference_external(isolate, node);
@@ -1891,14 +1870,6 @@ namespace sight {
                         return jsObjectToString(firstRunResult, isolate);
                     }
                 }
-            }
-
-            // 
-            if (status.noReturn) {
-                functionCode = "";
-            } else {
-                // then, parse return body.
-                functionCode = status.returnBody;
             }
         }
 
@@ -2041,7 +2012,9 @@ namespace sight {
             parseNode(isolate, data.graphObject);
 
             if (data.lastUsedIndex == outerList.size() -1 && list.link.empty()) {
+#if GENERATE_CODE_DETAILS == 1
                 dbg("append source, delete last list..", list.sourceStream.str());
+#endif
                 finalSourceStream << list.sourceStream.str();
                 outerList.erase(outerList.end() - 1);
             }

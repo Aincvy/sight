@@ -108,4 +108,3 @@ sight.SightNodeGraphWrapper.prototype.getGenerateInfo = function(obj = undefined
 
     return undefined;
 }
-

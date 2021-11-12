@@ -11,8 +11,6 @@ globals.test_ui = function(){
 
 Array.prototype.remove = function (element) {
     let index = this.indexOf(element);
-    // print(element, index);
-    // print(this);
     if (index >= 0) {
         this.splice(index, 1);
     }

@@ -46,11 +46,8 @@ addTemplateNode({
     // used for context menu
     __meta_address: "test/debug",
     __meta_func: {
-        generateCodeWork($, $$) {
-            $$.options.isPart = true;
-            $$.options.appendLineEnd = true;
-
-            return print($.msg.value);
+        generateCodeWork($) {
+            print($.msg.value);
         },
     },
     // other ideas
@@ -71,8 +68,7 @@ addTemplateNode({
     __meta_func: {
         generateCodeWork($) {
         },
-        onReverseActive($, $$){
-            $$.options.isPart = true;
+        onReverseActive($){
             return $.number1() + $.number2();
         }
     },
@@ -98,7 +94,6 @@ addTemplateNode({
     },
     __meta_func: {
         generateCodeWork($$) {
-            $$.options.isPart = true;
             print('EnterNode generateCodeWork.');
         },
 
@@ -120,12 +115,8 @@ addTemplateNode({
     __meta_name: "TestTypes",
     // used for context menu
     __meta_address: "process",
-    __meta_options: {
-        enter: true,
-    },
     __meta_func: {
         generateCodeWork($$) {
-            $$.options.isPart = true;
             print('TestTypes generateCodeWork.');
         },
 
@@ -148,5 +139,28 @@ addTemplateNode({
 
 });
 
+addTemplateNode({
+    // meta info, start with __meta
+
+    __meta_name: "TestAppendSource",
+    // used for context menu
+    __meta_address: "process",
+    __meta_func: {
+        generateCodeWork($, $$) {
+            $$.insertSource(`return ${$.n.value}`);
+        },
+    },
+
+    // other ideas
+    __meta_inputs: {
+
+    },
+    __meta_outputs: {
+        
+    },
+
+    n: 'Number',
+
+});
 
 print('template node file end ');

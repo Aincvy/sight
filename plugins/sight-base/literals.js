@@ -454,7 +454,6 @@ addTemplateNode({
             });
             // print(this.id, node.id);
             if(node) {
-                $$.options.isPart = true;
                 let info = $$.graph.getGenerateInfo(node);
                 if (info && info.hasGenerated){
                     // has generated 

@@ -5,6 +5,7 @@
 #pragma once
 
 #include "string"
+#include <algorithm>
 
 namespace sight {
 
@@ -118,4 +119,13 @@ namespace sight {
         return std::string(str, 0, str.rfind('.'));
     }
 
+    inline std::size_t countLineInString(std::string const& str){
+        auto pos = str.find_last_of('\n');
+        if (pos == std::string::npos) {
+            return str.empty() ? 0 : 1;   
+        }
+        auto size = std::count_if(str.begin(), str.end(), [](char c) { return c == '\n'; });
+        return size + (pos == str.size() - 1 ? 0 : 1);
+    }
+    
 }

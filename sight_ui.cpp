@@ -64,6 +64,9 @@ namespace sight {
             if ((i = getCurrentGraph()->save()) != CODE_OK) {
                 dbg(i);
             }
+            if ((i = currentProject()->save()) != CODE_OK) {
+                dbg(i);
+            }
         }
 
         void showMainFileMenu(UIStatus& uiStatus){

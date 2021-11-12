@@ -45,12 +45,15 @@ If there only 1 param, and it called `$`,  then the whole function body will be 
 
 And the source will be append to the final source.
 
+- Here is an exception, the return statement.  
+  - If the function body only has 1 line, and the line start with `return` keyword, then the `return` keyword will be omitted.
+
 
 
 If there has 2 params,  the function will be eval once, then check the result.
 
 - If result is null or undefined or do not have a result, then do nothing. (It means this node do not generate any code.)
-- If result is a function, then the function will be eval. (It will not be recursion. )
+- If result is a function, then the function will be convert to string.(Full converted, no any omit.)
 - Otherwise, the result will be the generated-code. It will be append to the final source.
 
 - The params's order cannot be changed. `($, $$)`
