@@ -711,10 +711,10 @@ namespace sight {
         auto templateNodePort = port->templateNodePort;
 
         templateNodePort->onValueChange(isolate, port, JsEventType::ValueChange, (void*) & port->oldValue);
-        if (port->getType() == IntTypeLargeString) {
-            port->oldValue.stringFree();
-        }
-        port->oldValue = port->value.copy(port->getType());
+        // if (port->getType() == IntTypeLargeString) {
+        //     port->oldValue.stringFree();
+        // }
+        port->oldValue = port->value;
     }
 
     void onNodePortAutoComplete(SightNodePort* port){
@@ -746,7 +746,7 @@ namespace sight {
         case IntTypeFloat:
         {
             int flags = options.readonly ? ImGuiSliderFlags_ReadOnly : 0;
-            if (ImGui::DragFloat(labelBuf, &port->value.f, 0.5f, 0, 0, "%.3f", flags)) {
+            if (ImGui::DragFloat(labelBuf, &port->value.u.f, 0.5f, 0, 0, "%.3f", flags)) {
             }
             if (ImGui::IsItemDeactivatedAfterEdit()) {
                 onNodePortValueChange(port);
@@ -756,7 +756,7 @@ namespace sight {
         case IntTypeDouble:
         {
             int flags = options.readonly ? ImGuiInputTextFlags_ReadOnly : 0;
-            if (ImGui::InputDouble(labelBuf, &port->value.d, 0,0,"%.6f", flags)) {
+            if (ImGui::InputDouble(labelBuf, &port->value.u.d, 0, 0, "%.6f", flags)) {
             }
             if (ImGui::IsItemDeactivatedAfterEdit()) {
                 onNodePortValueChange(port);
@@ -767,7 +767,7 @@ namespace sight {
         case IntTypeInt:
         {
             int flags = options.readonly ? ImGuiSliderFlags_ReadOnly : 0;
-            if (ImGui::DragInt(labelBuf, &port->value.i, 1,0,0,"%d",flags)) {
+            if (ImGui::DragInt(labelBuf, &port->value.u.i, 1, 0, 0, "%d", flags)) {
                 // onNodePortValueChange(port, oldValue);
             }
             if (ImGui::IsItemDeactivatedAfterEdit()) {
@@ -790,7 +790,7 @@ namespace sight {
                     ImGui::SetNextItemWidth(width);
                     std::string comboLabel = labelBuf;
                     comboLabel += ".combo";
-                    if (ImGui::BeginCombo(comboLabel.c_str(), port->value.string, ImGuiComboFlags_NoArrowButton)) {
+                    if (ImGui::BeginCombo(comboLabel.c_str(), port->value.u.string, ImGuiComboFlags_NoArrowButton)) {
                         std::string filterLabel = comboLabel + ".filter";
                         static char filterText[NAME_BUF_SIZE] = {0};
                         ImGui::InputText(filterLabel.c_str(), filterText, std::size(filterText));
@@ -798,8 +798,8 @@ namespace sight {
                             if (strlen(filterText) > 0 && !startsWith(item, filterText)) {
                                 continue;
                             }
-                            if (ImGui::Selectable(item.c_str(), item == port->value.string)) {
-                                snprintf(port->value.string, std::size(port->value.string), "%s", item.c_str());
+                            if (ImGui::Selectable(item.c_str(), item == port->value.u.string)) {
+                                snprintf(port->value.u.string, std::size(port->value.u.string), "%s", item.c_str());
                                 onNodePortValueChange(port);
                             }
                         }
@@ -812,7 +812,7 @@ namespace sight {
 
             if (!showed) {
                 ImGui::SetNextItemWidth(width);
-                if (ImGui::InputText(labelBuf, port->value.string, std::size(port->value.string), flags)) {
+                if (ImGui::InputText(labelBuf, port->value.u.string, std::size(port->value.u.string), flags)) {
                 }
                 if (ImGui::IsItemActivated()) {
                     onNodePortAutoComplete(port);
@@ -826,7 +826,7 @@ namespace sight {
         }
         case IntTypeBool:
         {
-            if (checkBox(labelBuf, &port->value.b, options.readonly)) {
+            if (checkBox(labelBuf, &port->value.u.b, options.readonly)) {
                 onNodePortValueChange(port);
             }
             break;
@@ -834,7 +834,7 @@ namespace sight {
         case IntTypeColor:
         {
             int flags = options.readonly ? ImGuiColorEditFlags_DefaultOptions_ | ImGuiColorEditFlags_NoInputs : 0;
-            if (ImGui::ColorEdit3(labelBuf, port->value.vector4, flags)) {
+            if (ImGui::ColorEdit3(labelBuf, port->value.u.vector4, flags)) {
                 onNodePortValueChange(port);
             }
             break;
@@ -843,7 +843,7 @@ namespace sight {
         {
             int flags = options.readonly ? ImGuiSliderFlags_ReadOnly : 0;
             ImGui::SetNextItemWidth(width * 2);
-            if (ImGui::DragFloat3(labelBuf, port->value.vector3,1,0,0,"%.3f", flags)) {
+            if (ImGui::DragFloat3(labelBuf, port->value.u.vector3, 1, 0, 0, "%.3f", flags)) {
                 onNodePortValueChange(port);
             }
             break;
@@ -852,7 +852,7 @@ namespace sight {
         {
             int flags = options.readonly ? ImGuiSliderFlags_ReadOnly : 0;
             ImGui::SetNextItemWidth(width * 2);
-            if (ImGui::DragFloat4(labelBuf, port->value.vector4, 1,0,0,"%.3f",flags)) {
+            if (ImGui::DragFloat4(labelBuf, port->value.u.vector4, 1, 0, 0, "%.3f", flags)) {
                 onNodePortValueChange(port);
             }
             break;
@@ -861,7 +861,7 @@ namespace sight {
         {
             int flags = options.readonly ? ImGuiInputTextFlags_ReadOnly : 0;
             ImGui::SetNextItemWidth(width / 3.0f);
-            if (ImGui::InputText(labelBuf, port->value.string, 2,0)) {
+            if (ImGui::InputText(labelBuf, port->value.u.string, 2, 0)) {
                 onNodePortValueChange(port);
             }
             break;
@@ -869,13 +869,30 @@ namespace sight {
         case IntTypeLargeString:
         {
             if (fromGraph) {
-                ImGui::Text("%s", port->value.largeString.pointer);
+                ImGui::Text("%s", port->value.u.largeString.pointer);
                 helpMarker("Please edit it in external editor or Inspector window.");
             } else {
                 int flags = options.readonly ? ImGuiInputTextFlags_ReadOnly : 0;
+                flags |= ImGuiInputTextFlags_CallbackResize;
                 auto nWidth = width + width / 2.0f;
-                if (ImGui::InputTextMultiline(labelBuf, port->value.largeString.pointer, port->value.largeString.bufferSize,
-                                              ImVec2(nWidth, 150), flags)) {
+                static auto callback = [](ImGuiInputTextCallbackData* data) {
+                    if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
+                        auto value = (SightNodeValue*)data->UserData;
+                        auto & largeString = value->u.largeString;
+                        // request resize
+                        // dbg("request resize", largeString.bufferSize, data->BufSize, data->BufTextLen);
+                        if (data->BufSize != largeString.bufferSize) {
+                            value->stringCheck(data->BufSize);
+                        }
+                        // if (value->stringCheck(data->BufTextLen)) {
+                        //     data->Buf = value->u.largeString.pointer;    
+                        // }
+                    }
+                    return 0;
+                };
+                if (ImGui::InputTextMultiline(labelBuf, port->value.u.largeString.pointer, port->value.u.largeString.bufferSize,
+                                              ImVec2(nWidth, 150), flags, callback, &port->value)) {
+                    
                 }
                 if (ImGui::IsItemDeactivatedAfterEdit()) {
                     dbg(1);
@@ -996,9 +1013,10 @@ namespace sight {
     }
 
     SightNodePort::SightNodePort(NodePortType kind, uint type, const SightJsNodePort* templateNodePort)
-        : templateNodePort(templateNodePort) {
+        : templateNodePort(templateNodePort), oldValue(type){
         this->kind = kind;
         this->type = type;
+        // this->value = {type};
     }
 
     bool SightNodePort::isConnect() const {
@@ -1035,7 +1053,7 @@ namespace sight {
     }
 
     const char *SightNodePort::getDefaultValue() const {
-        return this->value.string;
+        return this->value.u.string;
     }
 
     uint SightNodePort::getType() const {
@@ -1080,10 +1098,10 @@ namespace sight {
 
                 if (copyFromType == CopyFromType::Instantiate) {
                     // init something
-                    auto& back = dst.back();
-                    if (back.getType() == IntTypeLargeString) {
-                        back.value.stringInit();
-                    }
+                    // auto& back = dst.back();
+                    // if (back.getType() == IntTypeLargeString) {
+                    //     back.value.stringInit();
+                    // }
                 }
             }
         };
@@ -1176,15 +1194,15 @@ namespace sight {
             }
         }
 
-        auto nodeFunc = [] (std::vector<SightNodePort> & list){
-            for(auto& item: list){
-                if (item.getType() == IntTypeLargeString) {
-                    item.value.stringFree();
-                }
-            }
-        };
+        // auto nodeFunc = [] (std::vector<SightNodePort> & list){
+        //     for(auto& item: list){
+        //         if (item.getType() == IntTypeLargeString) {
+        //             item.value.stringFree();
+        //         }
+        //     }
+        // };
 
-        CALL_NODE_FUNC(this);
+        // CALL_NODE_FUNC(this);
     }
 
     SightNodePortHandle SightNode::findPort(const char* name, int orderSize, int order[]) {
@@ -1490,33 +1508,33 @@ namespace sight {
                 out << YAML::Key << "value" << YAML::Value;
                 switch (type) {
                 case IntTypeFloat:
-                    out << item.value.f;
+                    out << item.value.u.f;
                     break;
                 case IntTypeDouble:
-                    out << item.value.d;
+                    out << item.value.u.d;
                     break;
                 case IntTypeInt:
                 case IntTypeLong:
-                    out << item.value.i;
+                    out << item.value.u.i;
                     break;
                 case IntTypeString:
-                    out << item.value.string;
+                    out << item.value.u.string;
                     break;
                 case IntTypeLargeString:
-                    out << item.value.largeString.pointer;
+                    out << item.value.u.largeString.pointer;
                     break;
                 case IntTypeBool:
-                    out << item.value.b;
+                    out << item.value.u.b;
                     break;
                 case IntTypeVector3:
-                    writeFloatArray((float*)item.value.vector3, 3);
+                    writeFloatArray((float*)item.value.u.vector3, 3);
                     break;
                 case IntTypeChar:
-                    out << item.value.string[0];
+                    out << item.value.u.string[0];
                     break;
                 case IntTypeVector4:
                 case IntTypeColor:
-                    writeFloatArray((float*)item.value.vector4, 4);
+                    writeFloatArray((float*)item.value.u.vector4, 4);
                     break;
                 default:
                 {
@@ -1527,7 +1545,7 @@ namespace sight {
                         if (find) {
                             switch (typeInfo.render.kind) {
                             case TypeInfoRenderKind::ComboBox:
-                                out << item.value.i;
+                                out << item.value.u.i;
                                 serializeGood = true;
                                 break;
                             case TypeInfoRenderKind::Default:
@@ -1657,27 +1675,27 @@ namespace sight {
                 if (valueNode.IsDefined()) {
                     switch (type) {
                     case IntTypeFloat:
-                        port.value.f = valueNode.as<float>();
+                        port.value.u.f = valueNode.as<float>();
                         break;
                     case IntTypeDouble:
-                        port.value.d = valueNode.as<double>();
+                        port.value.u.d = valueNode.as<double>();
                         break;
                     case IntTypeInt:
                     case IntTypeLong:
-                        port.value.i = valueNode.as<int>();
+                        port.value.u.i = valueNode.as<int>();
                         break;
                     case IntTypeString:
-                        sprintf(port.value.string, "%s", valueNode.as<std::string>().c_str());
+                        sprintf(port.value.u.string, "%s", valueNode.as<std::string>().c_str());
                         break;
                     case IntTypeLargeString:
                     {
                         std::string tmpString = valueNode.as<std::string>();
                         port.value.stringCheck(tmpString.size());
-                        sprintf(port.value.largeString.pointer, "%s", tmpString.c_str());
+                        sprintf(port.value.u.largeString.pointer, "%s", tmpString.c_str());
                         break;
                     }
                     case IntTypeBool:
-                        port.value.b = valueNode.as<bool>();
+                        port.value.u.b = valueNode.as<bool>();
                         break;
                     case IntTypeProcess:
                     case IntTypeButton:
@@ -1686,15 +1704,15 @@ namespace sight {
                         break;
                     case IntTypeChar:
                         if (valueNode.IsDefined() && !valueNode.IsNull()) {
-                            port.value.string[0] = valueNode.as<char>();
+                            port.value.u.string[0] = valueNode.as<char>();
                         }
                         break;
                     case IntTypeVector3:
-                        readFloatArray(port.value.vector3, 3, valueNode);
+                        readFloatArray(port.value.u.vector3, 3, valueNode);
                         break;
                     case IntTypeVector4:
                     case IntTypeColor:
-                        readFloatArray(port.value.vector4, 4, valueNode);
+                        readFloatArray(port.value.u.vector4, 4, valueNode);
                         break;
                     default:
                     {
@@ -1704,7 +1722,7 @@ namespace sight {
                             if (find) {
                                 switch (typeInfo.render.kind) {
                                 case TypeInfoRenderKind::ComboBox:
-                                    port.value.i = valueNode.as<int>();
+                                    port.value.u.i = valueNode.as<int>();
                                     break;
                                 case TypeInfoRenderKind::Default:
                                 default:
@@ -2467,24 +2485,48 @@ namespace sight {
                                                      SightNodeConnection *connection) : self(self), target(target),
                                                                                         connection(connection) {}
 
+    void SightNodeValue::setType(uint type) {
+        if (this->type == type) {
+            return;
+        }
+
+        if (this->type == IntTypeLargeString) {
+            stringFree();
+        }
+
+        this->type = type;
+        if (this->type == IntTypeLargeString) {
+            stringInit();
+        }
+    }
+
     void SightNodeValue::stringInit() {
-        largeString.bufferSize = NAME_BUF_SIZE * 2;
+        auto & largeString = u.largeString;
+        // largeString.bufferSize = NAME_BUF_SIZE * 2;
+        largeString.bufferSize = 10;
         largeString.size = 0;
         largeString.pointer = (char*)calloc(1, largeString.bufferSize);
 
         // dbg(largeString.bufferSize, largeString.pointer, largeString.size);
     }
 
-    void SightNodeValue::stringCheck(size_t needSize) {
+    bool SightNodeValue::stringCheck(size_t needSize) {
+        auto& largeString = u.largeString;
+        if (largeString.bufferSize > needSize) {
+            return false;
+        }
         stringFree();
-        static constexpr size_t tmpSize = NAME_BUF_SIZE * 2;
-        
+        // static constexpr size_t tmpSize = NAME_BUF_SIZE * 2;
+        static constexpr size_t tmpSize = 10;
+
         largeString.bufferSize = needSize < tmpSize ? tmpSize : static_cast<size_t>(needSize * 1.5f);
         largeString.size = 0;
         largeString.pointer = (char*)calloc(1, largeString.bufferSize);
+        return true;
     }
 
     void SightNodeValue::stringFree() {
+        auto& largeString = u.largeString;
         if (largeString.pointer) {
             free(largeString.pointer);
             largeString.pointer = nullptr;
@@ -2495,19 +2537,56 @@ namespace sight {
     void SightNodeValue::stringCopy(std::string const& str) {
         stringCheck(str.size());
 
+        auto& largeString = u.largeString;
         sprintf(largeString.pointer, "%s", str.c_str());
         largeString.size = str.size();
     }
 
-    SightNodeValue SightNodeValue::copy(int type) const {
-        SightNodeValue tmp;
+    SightNodeValue::SightNodeValue(uint type)
+    {
+        setType(type);
+    }
+
+    // SightNodeValue SightNodeValue::copy(int type) const {
+    //     SightNodeValue tmp;
+        
+    //     if (type == IntTypeLargeString) {
+    //         // large string
+    //         tmp.stringCopy(this->u.largeString.pointer);
+    //     } else {
+    //         memcpy(tmp.u.string, this->u.string, std::size(this->u.string));
+    //     }
+    //     return tmp;
+    // }
+
+    SightNodeValue::SightNodeValue(SightNodeValue const& rhs)
+    {
+        this->type = rhs.type;
         if (type == IntTypeLargeString) {
-            // large string
-            tmp.stringCopy(this->largeString.pointer);
+            this->stringCopy(rhs.u.largeString.pointer);
         } else {
-            memcpy(tmp.string, this->string, std::size(this->string));
+            this->u = rhs.u;
         }
-        return tmp;
+    }
+
+    SightNodeValue& SightNodeValue::operator=(SightNodeValue const& rhs) {
+        if (this != &rhs) {
+            this->type = rhs.type;
+            if (this->type == IntTypeLargeString) {
+                // stringFree();
+                stringCopy(rhs.u.largeString.pointer);
+            } else {
+                this->u = rhs.u;
+            }
+        }
+        return *this;
+    }
+
+    SightNodeValue::~SightNodeValue()
+    {
+        if (this->type == IntTypeLargeString) {
+            stringFree();
+        }
     }
 
     ScriptFunctionWrapper::ScriptFunctionWrapper(Function const& f)
@@ -2524,32 +2603,6 @@ namespace sight {
         if (!function.IsEmpty() || sourceCode.empty()) {
             return;
         }
-        using namespace v8;
-
-        // trim(sourceCode);
-        // if (!startsWith(sourceCode, "function")) {
-        //     sourceCode = "function " + sourceCode;
-        // }
-        // sourceCode = "return " + sourceCode;
-        // dbg(sourceCode);
-
-        // auto context = isolate->GetCurrentContext();
-        // HandleScope handleScope(isolate);
-        // v8::ScriptCompiler::Source source(v8pp::to_v8(isolate, sourceCode.c_str()));
-        // auto mayFunction = v8::ScriptCompiler::CompileFunctionInContext(context, &source, 0, nullptr, 0, nullptr);
-        // if (mayFunction.IsEmpty()) {
-        //     dbg("compile failed");
-        // } else {
-        //     auto recv = Object::New(isolate);
-        //     auto t1 = mayFunction.ToLocalChecked()->Call(context, recv, 0, nullptr);
-        //     if (!t1.IsEmpty()) {
-        //         auto t2 = t1.ToLocalChecked();
-        //         if (t2->IsFunction()) {
-        //             function = Function(isolate, t2.As<v8::Function>());
-        //             sourceCode.clear();
-        //         }
-        //     }
-        // }
 
         auto f = recompileFunction(isolate, sourceCode);
         if (!f.IsEmpty()) {
@@ -2664,6 +2717,11 @@ namespace sight {
         }
 
         return true;
+    }
+
+    SightBaseNodePort::SightBaseNodePort(uint type) : type(type), value(type)
+    {
+        
     }
 
     void SightBaseNodePort::setKind(int intKind) {

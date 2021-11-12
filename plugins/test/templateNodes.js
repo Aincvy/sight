@@ -47,7 +47,7 @@ addTemplateNode({
     __meta_address: "test/debug",
     __meta_func: {
         generateCodeWork($) {
-            print($.msg.value);
+            print("$.msg.value");
         },
     },
     // other ideas

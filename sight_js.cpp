@@ -101,18 +101,18 @@ namespace sight {
         case IntTypeProcess:
             break;
         case IntTypeFloat:
-            return v8pp::to_v8(isolate, value.f);
+            return v8pp::to_v8(isolate, value.u.f);
         case IntTypeDouble:
-            return v8pp::to_v8(isolate, value.d);
+            return v8pp::to_v8(isolate, value.u.d);
         case IntTypeString:
-            return v8pp::to_v8(isolate, (const char*)value.string);
+            return v8pp::to_v8(isolate, (const char*)value.u.string);
         case IntTypeInt:
         case IntTypeLong:
-            return v8pp::to_v8(isolate, value.i);
+            return v8pp::to_v8(isolate, value.u.i);
         case IntTypeBool:
-            return v8pp::to_v8(isolate, value.b);
+            return v8pp::to_v8(isolate, value.u.b);
         case IntTypeLargeString:
-            return v8pp::to_v8(isolate, (const char*)value.largeString.pointer);
+            return v8pp::to_v8(isolate, (const char*)value.u.largeString.pointer);
         default:
         {
             if (!isBuiltInType(type)) {
@@ -125,8 +125,8 @@ namespace sight {
                     case TypeInfoRenderKind::ComboBox:
                     {
                         auto object = Object::New(isolate);
-                        v8pp::set_const(isolate, object, "index", value.i);
-                        v8pp::set_const(isolate, object, "name", render.data.comboBox.list->at(value.i));
+                        v8pp::set_const(isolate, object, "index", value.u.i);
+                        v8pp::set_const(isolate, object, "name", render.data.comboBox.list->at(value.u.i));
                         return object;
                     }
                     }
@@ -150,28 +150,28 @@ namespace sight {
         case IntTypeProcess:
             break;
         case IntTypeFloat:
-            port->value.f = v8pp::from_v8<float>(isolate, value);
+            port->value.u.f = v8pp::from_v8<float>(isolate, value);
             break;
         case IntTypeDouble:
-            port->value.d = v8pp::from_v8<double>(isolate, value);
+            port->value.u.d = v8pp::from_v8<double>(isolate, value);
             break;
         case IntTypeString:
         {
             // dbg(port->value.string);
             std::string tmp = v8pp::from_v8<std::string>(isolate, value);
-            auto size = std::size(port->value.string);
+            auto size = std::size(port->value.u.string);
             if (tmp.size() >= size) {
                 dbg("Warning!!  string is too large. It will be truncated.");
             }
-            snprintf(port->value.string, size, "%s", tmp.c_str());
+            snprintf(port->value.u.string, size, "%s", tmp.c_str());
             break;
         }
         case IntTypeInt:
         case IntTypeLong:
-            port->value.i = v8pp::from_v8<int>(isolate, value);
+            port->value.u.i = v8pp::from_v8<int>(isolate, value);
             break;
         case IntTypeBool:
-            port->value.b = v8pp::from_v8<bool>(isolate, value);
+            port->value.u.b = v8pp::from_v8<bool>(isolate, value);
             break;
         case IntTypeLargeString:
         {
@@ -194,7 +194,7 @@ namespace sight {
                             auto find = std::find(data.list->begin(), data.list->end(), v);
                             if (find != data.list->end()) {
                                 // has one
-                                port->value.i = static_cast<int>(std::distance(data.list->begin(), find));
+                                port->value.u.i = static_cast<int>(std::distance(data.list->begin(), find));
                             } else {
                                 flag = false;
                             }
@@ -203,7 +203,7 @@ namespace sight {
                             if (selected < 0 || selected >= data.list->size()) {
                                 flag = false;
                             } else {
-                                port->value.i = selected;
+                                port->value.u.i = selected;
                             }
                         }
                         break;
@@ -294,7 +294,7 @@ namespace sight {
 
         struct GenerateOptions {
             bool noCode = false;
-            bool appendLineEnd = false;
+            bool appendLineEnd = true;
         };
 
         /**
@@ -947,6 +947,7 @@ namespace sight {
 
                 }
 
+                port.value.setType(port.type);
                 return port;
             };
             
@@ -1648,7 +1649,7 @@ namespace sight {
         return CODE_OK;
     }
 
-    std::string analysisGenerateFunction(Isolate* isolate, Local<Function> function, Local<Context> context, GenerateFunctionStatus* status = nullptr){
+    std::string analysisGenerateFunction(Isolate* isolate, Local<Function> function, Local<Context> context, GenerateOptions &options, GenerateFunctionStatus* status = nullptr){
         auto toString = function->Get(context, v8pp::to_v8(isolate, "toString")).ToLocalChecked();
         auto toStringFunc = toString.As<Function>();
         auto str = toStringFunc->Call(context, function, 0 , nullptr).ToLocalChecked();
@@ -1724,6 +1725,7 @@ namespace sight {
                         // remove last ;
                         left = std::string(left, 0, commaPos);
                     }
+                    options.appendLineEnd = false;
                     return left;
                 }
             }
@@ -1845,9 +1847,9 @@ namespace sight {
         auto context = isolate->GetCurrentContext();
 
         GenerateFunctionStatus status;
-        std::string functionCode = analysisGenerateFunction(isolate, function, context, &status);
-        MaybeLocal<Value> resultMaybe;
         GenerateOptions options;
+        std::string functionCode = analysisGenerateFunction(isolate, function, context, options, &status);
+        MaybeLocal<Value> resultMaybe;
         if (status.shouldEval) {
             // The code need be eval first.
 #if GENERATE_CODE_DETAILS == 1
@@ -1861,7 +1863,7 @@ namespace sight {
                     // not empty.
                     auto firstRunResult = resultMaybe.ToLocalChecked();
                     if (firstRunResult->IsFunction()) {
-                        functionCode = analysisGenerateFunction(isolate, firstRunResult.As<Function>(), context);
+                        functionCode = analysisGenerateFunction(isolate, firstRunResult.As<Function>(), context, options);
                     } else if (firstRunResult->IsNullOrUndefined()) {
                         // do nothing when null or undefined.
 
@@ -1920,7 +1922,8 @@ namespace sight {
                 ss << '}';
             }
             if (options.appendLineEnd) {
-                ss << ';' << std::endl;
+                // ss << ';' << std::endl;
+                ss << std::endl;
             }
             ss << '`';
 

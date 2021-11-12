@@ -691,12 +691,12 @@ namespace sight {
             // this will not working on graph, but works on inspector.
             // maybe i will fix it on someday.
             // fixme: https://github.com/thedmd/imgui-node-editor/issues/101
-            if (ImGui::BeginCombo(labelBuf, data.list->at(value.i).c_str())) {
+            if (ImGui::BeginCombo(labelBuf, data.list->at(value.u.i).c_str())) {
                 auto & list = *data.list;
                 for( int i = 0; i < list.size(); i++){
-                    if (ImGui::Selectable(list[i].c_str(), value.i == i)) {
-                        if (value.i != i) {
-                            value.i = i;
+                    if (ImGui::Selectable(list[i].c_str(), value.u.i == i)) {
+                        if (value.u.i != i) {
+                            value.u.i = i;
                             onNodePortValueChange(port);
                         }
                     }
@@ -742,7 +742,7 @@ namespace sight {
         case TypeInfoRenderKind::Default:
             break;
         case TypeInfoRenderKind::ComboBox:
-            value.i = render.data.comboBox.selected;
+            value.u.i = render.data.comboBox.selected;
             break;
         }
     }

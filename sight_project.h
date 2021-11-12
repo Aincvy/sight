@@ -15,7 +15,7 @@
 
 namespace sight {
 
-    union SightNodeValue;
+    struct SightNodeValue;
     class SightNodeGraph;
     struct SightNodePort;
 

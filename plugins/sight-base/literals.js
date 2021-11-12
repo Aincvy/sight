@@ -580,8 +580,10 @@ addTemplateNode({
     __meta_address: "built-in/sundry",
     __meta_func: {
         generateCodeWork($, $$) {
+            return $.code.value;
         },
-        onReverseActive($, $$) {
+        // do nothing.
+        onReverseActive($) {
         },
     },
     __meta_events: {

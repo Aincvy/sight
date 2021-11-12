@@ -41,45 +41,62 @@ namespace sight {
     struct SightJsNode;
     struct SightJsNodePort;
 
-    union SightNodeValue{
-        int i;
-        float f;
-        double d;
-        bool b;
-        char string[NAME_BUF_SIZE] = {0};
-        struct {
-            char * pointer;
-            size_t size;
-            size_t bufferSize;
-        } largeString;     // largeString
-        float vector2[2];
-        float vector3[3];
-        float vector4[4];
+    struct SightNodeValue{
+        union {
+            int i;
+            float f;
+            double d;
+            bool b;
+            char string[NAME_BUF_SIZE] = { 0 };
+            float vector2[2];
+            float vector3[3];
+            float vector4[4];
+
+            struct {
+                char* pointer;
+                size_t size;
+                size_t bufferSize;
+            } largeString;     // largeString
+        } u;
+        
+        void setType(uint type);
 
         // if this union is largeString, then you can call below functions.
         // if not, DO NOT call those functions.
-        void stringInit();
-        void stringCheck(size_t needSize);
-        void stringFree();
+
+        /**
+         * @brief 
+         * 
+         * @param needSize 
+         * @return true  has modified buffer 
+         * @return false has not has modified buffer
+         */
+        bool stringCheck(size_t needSize);
         void stringCopy(std::string const& str);
 
-        SightNodeValue copy(int type) const;
-
+        SightNodeValue(uint type);
         SightNodeValue() = default;
         /**
          * @brief Construct a new Sight Node Value object
          * Use `copy` function.
          * @param rhs 
          */
-        SightNodeValue(SightNodeValue const& rhs) = default;
+        SightNodeValue(SightNodeValue const& rhs);
         /**
          * @brief 
          * Use `copy` function.
          * @param rhs 
          * @return SightNodeValue& 
          */
-        SightNodeValue& operator=(SightNodeValue const& rhs) = default;
+        SightNodeValue& operator=(SightNodeValue const& rhs);
 
+        ~SightNodeValue();
+
+    private:
+        uint type;
+
+        void stringInit();
+        void stringFree();
     };
 
     struct SightNodePortOptions {
@@ -102,6 +119,9 @@ namespace sight {
         uint type;
 
         SightNodeValue value;
+
+        SightBaseNodePort() = default;
+        SightBaseNodePort(uint type);
 
         /**
          * Set kind from int.
