@@ -20,14 +20,6 @@
 
 namespace sight{
 
-    // struct SightJsNode;
-    // struct SightNode;
-    // struct SightNodePort;
-    // struct SightNodePortHandle;
-    // struct SightNodeConnection;
-    // union SightNodeValue;
-    // class SightNodeGraph;
-
     enum class JsCommandType {
         JsCommandHolder,
         // run a file and flush node cache
@@ -87,6 +79,8 @@ namespace sight{
         void resetType();
 
         void updatePointer();
+
+        int getKind() const;
 
     private:
         SightNodePort* pointer = nullptr;
@@ -189,8 +183,9 @@ namespace sight{
      * @param filepath
      * @return
      */
-    int runJsFile(v8::Isolate* isolate, const char* filepath, std::promise<int>* promise = nullptr, v8::Local<v8::Object> module = {});
+    int runJsFile(v8::Isolate* isolate, const char* filepath, std::promise<int>* promise = nullptr, v8::Local<v8::Object> module = {}, v8::Local<v8::Value>* resultOuter = nullptr);
 
+    int runJsFile(v8::Isolate* isolate, const char* filepath, std::promise<int>* promise = nullptr, v8::Local<v8::Value>* resultOuter = nullptr);
 
     /**
      * only call this function from js thread.
@@ -243,6 +238,8 @@ namespace sight{
     void registerToGlobal(v8::Isolate* isolate, v8::Local<v8::Object> object, std::map<std::string, std::string>* outFunctionCode = nullptr);
 
     void registerGlobals(v8::Local<v8::Value> value);
+    
+    SightJsNode& registerEntityFunctions(SightJsNode& node);
 
     inline bool isValid(v8::Local<v8::Value> value){
         return !value.IsEmpty() && !value->IsNullOrUndefined();

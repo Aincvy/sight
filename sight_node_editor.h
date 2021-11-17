@@ -12,11 +12,13 @@
 #include "imgui_node_editor.h"
 
 #include "sight_defines.h"
+#include "sight_project.h"
 #include "sight_ui.h"
 #include "sight_memory.h"
 
 #include "v8.h"
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 
 namespace ed = ax::NodeEditor;
 using Isolate = v8::Isolate;
@@ -40,6 +42,7 @@ namespace sight {
     struct SightNode;
     struct SightJsNode;
     struct SightJsNodePort;
+    struct SightNodePortHandle;
 
     struct SightNodeValue{
         union {
@@ -191,6 +194,8 @@ namespace sight {
 
         SightNodeGraph* getGraph();
         const SightNodeGraph* getGraph() const;
+
+        operator SightNodePortHandle() const;
     };
 
     /**
@@ -257,7 +262,7 @@ namespace sight {
 
     struct SightJsNodeOptions{
         SightNodeProcessType processFlag = SightNodeProcessType::Normal;
-
+        uint titleBarPortType = IntTypeProcess;
     };
 
     struct SightBaseNode {
@@ -315,7 +320,7 @@ namespace sight {
         /**
          * add chain ports, if not exist.
          */
-        void tryAddChainPorts();
+        void tryAddChainPorts(uint type = IntTypeProcess);
 
         /**
          * @brief Reset node for next time used.
@@ -428,6 +433,8 @@ namespace sight {
         // no input/output ports.
         std::vector<SightJsNodePort> originalFields;
 
+        absl::flat_hash_set<std::string> bothPortList;
+
         SightJsNodeOptions options;
 
         // called by js thread
@@ -529,6 +536,11 @@ namespace sight {
          * Please call this function only if you know what you are doing.
          */
         void dispose();
+
+        void setNodeMemoryFromArray();
+
+        private:
+            bool nodeMemoryFromArray = false;
     };
 
     struct SightNodeGraphExternalData{
@@ -792,14 +804,6 @@ namespace sight {
      * @param loadEntityGraph  is pathWithoutExt a entity graph?  may deprecated.
      */
     void changeGraph(const char* pathWithoutExt, bool loadEntityGraph = false);
-
-
-    /**
-     * Generate node from entity.
-     * @param createEntityData
-     * @return
-     */
-    SightNode* generateNode(const UICreateEntity & createEntityData, SightNode *node = nullptr);
 
     /**
      *

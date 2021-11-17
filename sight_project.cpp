@@ -5,6 +5,7 @@
 #include "sight_project.h"
 #include "dbg.h"
 #include "imgui.h"
+#include "sight_js.h"
 #include "sight_js_parser.h"
 #include "sight_ui.h"
 #include "sight_util.h"
@@ -22,6 +23,7 @@
 #include <string>
 #include <sys/types.h>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 namespace sight {
@@ -134,6 +136,37 @@ namespace sight {
             
         }
 
+        YAML::Emitter& operator << (YAML::Emitter& out, SightEntity const& entity){
+            out << YAML::Key << entity.templateAddress << YAML::BeginMap;            
+            out << YAML::Key << "name" << YAML::Value << entity.name;
+
+            out << YAML::Key << "fields" << YAML::BeginMap;
+            for( const auto& item: entity.fields){
+                out << YAML::Key << item.name << YAML::BeginMap;
+                out << YAML::Key << "type" << YAML::Value << item.type;
+                out << YAML::Key << "defaultValue" << YAML::Value << item.defaultValue;
+                out << YAML::EndMap;
+            }
+            out << YAML::EndMap;
+
+            out << YAML::EndMap;
+            return out;
+        }
+
+        SightEntity loadEntity(std::string const& templateAddress, YAML::Node const& node){
+            SightEntity entity;
+            entity.templateAddress = templateAddress;
+            entity.name = node["name"].as<std::string>();
+
+            auto fieldsNode = node["fields"];
+            for( const auto& item: fieldsNode){
+                std::string name = item.first.as<std::string>();
+                auto &dataNode = item.second;
+                entity.fields.emplace_back(name, dataNode["type"].as<std::string>(), dataNode["defaultValue"].as<std::string>());
+            }
+
+            return entity;
+        }
     }
 
     int Project::build() {
@@ -184,10 +217,15 @@ namespace sight {
         return baseDir + "styles.yaml";
     }
 
+    std::string Project::pathEntitiesConfigFile() const {
+        return baseDir + "entities.yaml";
+    }
+
     int Project::load() {
         int i;
         CHECK_CODE(loadConfigFile(), i);
         CHECK_CODE(loadStyleInfo(), i);
+        CHECK_CODE(loadEntities(), i);
 
         return 0;
     }
@@ -196,6 +234,7 @@ namespace sight {
         int i;
         CHECK_CODE(saveConfigFile(), i);
         CHECK_CODE(saveStyleInfo(), i);
+        CHECK_CODE(saveEntities(), i);
 
         return CODE_OK;
     }
@@ -257,6 +296,21 @@ namespace sight {
 
         // save file
         std::ofstream outToFile(path, std::ios::out | std::ios::trunc);
+        outToFile << out.c_str() << std::endl;
+        outToFile.close();
+        return CODE_OK;
+    }
+
+    int Project::saveEntities() {
+        YAML::Emitter out;
+        out << YAML::BeginMap;
+        out << YAML::Key << whoAmI << YAML::Value << "sight-entities";
+        for( const auto& item: this->entitiesMap){
+            out << item.second;
+        }
+        out << YAML::EndMap;
+
+        std::ofstream outToFile(pathEntitiesConfigFile(), std::ios::out | std::ios::trunc);
         outToFile << out.c_str() << std::endl;
         outToFile.close();
         return CODE_OK;
@@ -344,6 +398,44 @@ namespace sight {
             dbg("load project config error.", path.c_str(), e.what());
             return CODE_FILE_FORMAT_ERROR;
         }
+        return CODE_OK;
+    }
+
+    int Project::loadEntities() {
+        auto path = pathEntitiesConfigFile();
+        std::ifstream fin(path);
+        if (!fin.is_open()) {
+            return CODE_FILE_ERROR;
+        }
+
+        try {
+            auto root = YAML::Load(fin);
+            auto temp = root[whoAmI];
+            if (temp.IsDefined()) {
+                if (temp.as<std::string>() != "sight-entities") {
+                    dbg("entity file who-am-i error", path);
+                    return CODE_FILE_ERROR;
+                }
+            }
+
+            for( const auto& item: root){
+                auto key = item.first.as<std::string>();
+                if (key == whoAmI) {
+                    continue;
+                }
+
+                auto entity = loadEntity(key, item.second);
+                entity.fixSimpleName();
+                this->entitiesMap[key] = entity;
+
+                getIntType(entity.name, true);
+            }
+            
+        } catch (const YAML::BadConversion& e) {
+            dbg("load project config error.", path.c_str(), e.what());
+            return CODE_FILE_FORMAT_ERROR;
+        }
+
         return CODE_OK;
     }
 
@@ -477,6 +569,28 @@ namespace sight {
         return lastOpenGraph;
     }
 
+    bool Project::addEntity(SightEntity const& entity) {
+        if (this->entitiesMap.contains(entity.templateAddress)) {
+            return false;
+        }
+
+        for( const auto& item: entity.fields){
+            if (getIntType(item.type) <= 0) {
+                dbg("type not found", item.type);
+                return false;
+            }
+        }
+
+        // update to template
+        return (this->entitiesMap[entity.templateAddress] = entity).effect();
+    }
+
+    void Project::updateEntitiesToTemplateNode() const {
+        for( const auto& item: this->entitiesMap){
+            addTemplateNode(item.second);
+        }
+    }
+
     std::string Project::pathEntityFolder() const {
         return pathSrcFolder() + "entity/";
     }
@@ -584,6 +698,7 @@ namespace sight {
         status->selection.projectPath = project->getBaseDir();
         
         project->buildFilesCache();
+        project->updateEntitiesToTemplateNode();
         project->checkOpenLastGraph();
     }
 
@@ -760,5 +875,58 @@ namespace sight {
         this->iconType = IconType::Circle;
         this->color = IM_COL32_WHITE;
     }
+
+    SightEntityField::SightEntityField(std::string name, std::string type, std::string defaultValue)
+        : name(std::move(name))
+        , type(std::move(type))
+        , defaultValue(std::move(defaultValue)) {
+    }
+
+    void SightEntity::fixTemplateAddress() {
+        if (!endsWith(templateAddress, name)) {
+            if (!endsWith(templateAddress, "/")) {
+                templateAddress += "/";
+            }
+            templateAddress += name;
+        }
+        fixSimpleName();
+    }
+
+    void SightEntity::fixSimpleName() {
+        if (simpleName.empty()) {
+            simpleName = name;
+        }
+    }
+
+    int SightEntity::effect() const {
+        auto &entity = *this;
+        sight::getIntType(entity.name, true);
     
+        // update to template
+        return addTemplateNode(entity);
+    }
+
+    SightEntity::operator SightNodeTemplateAddress() const {
+        SightNodeTemplateAddress address;
+        address.name = this->templateAddress;
+        address.templateNode = new SightJsNode();
+        
+        auto & node = *address.templateNode;
+        node.nodeName = this->simpleName;
+        node.fullTemplateAddress = this->templateAddress;
+
+        for( const auto& item: this->fields){
+            SightJsNodePort port{
+                item.name,
+                NodePortType::Both
+            };
+            port.type = getIntType(item.type);
+            port.value.setType(port.type);
+
+            node.addPort(port);
+        }
+        node.options.titleBarPortType = sight::getIntType(this->name, true);
+        registerEntityFunctions(node);
+        return address;
+    }
 }

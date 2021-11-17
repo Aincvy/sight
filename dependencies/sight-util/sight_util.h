@@ -6,6 +6,8 @@
 
 #include "string"
 #include <algorithm>
+#include <string>
+#include <string_view>
 
 namespace sight {
 
@@ -33,6 +35,13 @@ namespace sight {
      */
     inline bool startsWith(std::string const&fullString, std::string const& substring){
         return fullString.size() >= substring.size() && fullString.find(substring) == 0;
+    }
+
+    inline std::string& appendIfNotExists(std::string& str, std::string const& end) {
+        if (!endsWith(str, end)) {
+            str += end;
+        }
+        return str;
     }
 
     /**
@@ -127,5 +136,5 @@ namespace sight {
         auto size = std::count_if(str.begin(), str.end(), [](char c) { return c == '\n'; });
         return size + (pos == str.size() - 1 ? 0 : 1);
     }
-    
+
 }

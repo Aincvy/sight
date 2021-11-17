@@ -66,9 +66,6 @@ addTemplateNode({
     __meta_name: "EventTest",
     // used for context menu
     __meta_address: "entity",
-    __meta_options: {
-        enter: true,
-    },
     __meta_func: {
         generateCodeWork($) {
         },
@@ -78,13 +75,14 @@ addTemplateNode({
         // node is the node data, not the template node.
         onInstantiate() {
             print("this is run by ui thread. onInstantiate");
-
+            let inputs = this.inputPorts;
+            print(typeof inputs, inputs.length);
+            print('output: ' + this.outputPorts.length);
+            print('fields: ' +this.fields.length);
+            print('both: ' +this.bothPorts.length);
+            print('all: ' +this.ports.length);
         },
-
-        // node isn't the template node.
-        // onDestroyed(node) {
-        //     print("onDestroyed");
-        // }
+        
         onDestroyed: externalOnDestroyed,
     },
 
@@ -135,7 +133,7 @@ addTemplateNode({
         type: 'Object',
         kind: 'output',
         showValue: false,
-        show: false,
+        show: true,
     },
 
     button: {
@@ -157,33 +155,4 @@ function name() {
 
     };
 }
-
-
-// addTemplateNode({
-//     // meta info, start with __meta
-
-//     __meta_name: "DynLoad",
-//     // used for context menu
-//     __meta_address: "entity",
-//     __meta_options: {
-//         enter: true,
-//     },
-//     __meta_func: {
-//         generateCodeWork($$) {
-//             $$.options.isPart = true;
-//             print('TestTypes generateCodeWork.');
-//         },
-
-//     },
-
-//     __meta_events: {
-//         // call after instantiate, called by ui thread.([ui thread] in below.)
-//         // node is the node data, not the template node.
-//         onInstantiate() {
-//             print('1');
-//             print('2');
-//         }
-//     },
-
-// });
 

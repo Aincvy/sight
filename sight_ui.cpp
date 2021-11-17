@@ -71,8 +71,6 @@ namespace sight {
 
         void showMainFileMenu(UIStatus& uiStatus){
             if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS._new)) {
-                if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.entity)) {
-                }
                 if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.graph)) {
                     g_UIStatus->windowStatus.popupGraphName = true;
                 }

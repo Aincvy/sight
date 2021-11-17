@@ -18,6 +18,7 @@ namespace sight {
     struct SightNodeValue;
     class SightNodeGraph;
     struct SightNodePort;
+    struct SightNodeTemplateAddress;
 
     enum TypeIntValues {
         IntTypeProcess = 1,
@@ -109,7 +110,7 @@ namespace sight {
     };
 
     struct TypeInfo {
-        // typename
+        // typename, full name
         std::string name;
         // id
         uint intValue = 0;
@@ -118,6 +119,8 @@ namespace sight {
 
         TypeStyle* style = nullptr;
         TypeInfoRender render;
+        // 
+        std::string simpleName;
 
         void initValue(SightNodeValue & value) const;
 
@@ -134,6 +137,33 @@ namespace sight {
         std::atomic<uint> nodeOrPortId = 3000;
     };
 
+    struct SightEntityField{
+        std::string name;
+        std::string type;
+        std::string defaultValue;
+
+        SightEntityField() = default;
+        SightEntityField(std::string name, std::string type, std::string defaultValue);
+    };
+
+    /**
+     * @brief An entity.
+     * 
+     */
+    struct SightEntity {
+        std::string name;
+        std::string templateAddress;
+
+        std::vector<SightEntityField> fields;
+        std::string simpleName;
+
+        void fixTemplateAddress();
+        void fixSimpleName();
+
+        int effect() const;
+
+        operator SightNodeTemplateAddress() const;
+    };
 
     /**
      * @brief build target 
@@ -166,7 +196,7 @@ namespace sight {
 
     /**
      * project class.
-     *
+     * todo add thread safe guard
      */
     class Project {
     public:
@@ -189,6 +219,7 @@ namespace sight {
          * @return int 
          */
         int loadStyleInfo();
+        int loadEntities();
 
         /**
          * load all need plugins
@@ -206,12 +237,12 @@ namespace sight {
         int save();
         int saveConfigFile();
         int saveStyleInfo();
-
+        int saveEntities();
 
         /**
          *
          * @param str
-         * @return -1 if not found.
+         * @return 0 if not found.
          */
         uint getIntType(std::string const& str, bool addIfNotFound = false);
 
@@ -278,6 +309,10 @@ namespace sight {
 
         std::string getLastOpenGraph() const;
 
+        bool addEntity(SightEntity const& entity);
+
+        void updateEntitiesToTemplateNode() const;
+
     private:
         std::string baseDir;
         bool createIfNotExist;
@@ -292,10 +327,13 @@ namespace sight {
 
         // key: name, 
         absl::btree_map<std::string, BuildTarget> buildTargetMap;
+        // key: template address
+        absl::btree_map<std::string, SightEntity> entitiesMap;
 
         // file locations
         std::string pathConfigFile() const;
         std::string pathStyleConfigFile() const;
+        std::string pathEntitiesConfigFile() const;
 
         std::string pathSrcFolder() const;
         std::string pathTargetFolder() const;
@@ -312,7 +350,7 @@ namespace sight {
      * @brief Called if project is load success.
      * If ui status is not ready, then this function will be do nothing.
      *  And when ui status is ready, this function will be called.
-     * 
+     * This function is called by ui thread.
      * @param project 
      */
     void onProjectAndUILoadSuccess(Project* project);
@@ -360,7 +398,5 @@ namespace sight {
     bool inline isBuiltInType(uint type){
         return type < IntTypeNext;
     }
-
-
 
 }

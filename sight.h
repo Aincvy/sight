@@ -41,13 +41,17 @@ namespace sight {
         CODE_NOT_IMPLEMENTED,
 
         CODE_FILE_ERROR = 100,
+        CODE_FILE_NOT_EXISTS,
         CODE_FILE_FORMAT_ERROR,
+
 
         CODE_PLUGIN_NO_PKG_FILE = 200,
         CODE_PLUGIN_COMPILE_FAIL,
         CODE_PLUGIN_NO_DESCRIPTION,
         CODE_PLUGIN_FILE_ERROR,
         CODE_PLUGIN_DISABLED,
+
+        CODE_SCRIPT_NO_RESULT = 250,
     };
 
     /**

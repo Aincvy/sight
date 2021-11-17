@@ -432,7 +432,22 @@ addTemplateNode({
         generateCodeWork($, $$) {
             $$.options.noCode = true;
             if (this.portValue('type').get().index == 1) {
-                // print('this is a out portal, do nothing.');
+                // output node, make sure the input has generated.
+                let varName = this.portValue('name').get();
+                let node = $$.graph.findNode(this, function (n) {
+                    if (n.portValue('name')?.get() === varName) {
+                        // find type=in node
+                        return n.portValue('type')?.get().index == 0;
+                    }
+                    return false;
+                });
+
+                if (node) {
+                    $$.ensureNodeGenerated(node.id);
+                } else {
+                    $$.error(`cannot found the node type=in varName=${varName}`, this);
+                }
+
                 return;
             }
             
@@ -452,7 +467,7 @@ addTemplateNode({
                 }
                 return false;
             });
-            // print(this.id, node.id);
+
             if(node) {
                 let info = $$.graph.getGenerateInfo(node);
                 if (info && info.hasGenerated){
@@ -464,10 +479,8 @@ addTemplateNode({
                     return $.name.value;
                 }
             } else {
-                print(`cannot found the node type=in varName=${varName}`);
-                $$.options.noCode = true;
+                $$.error(`cannot found the node type=in varName=${varName}`, this);
             }
-            
         },
     },
     __meta_events: {
@@ -533,7 +546,8 @@ addTemplateNode({
                 // print(`active the next portal: ${node.id}, ${node.portValue('name')?.get()}`);
                 generateCode(node);
             } else {
-                print(`Do not find the out portal: ${portalName}; [Jump]`);
+                // print(`Do not find the out portal: ${portalName}; [Jump]`);
+                $$.error(`Do not find the out portal: ${portalName}`, this);
             }
         },
 

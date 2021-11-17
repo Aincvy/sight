@@ -12,8 +12,8 @@
 #endif
 
 // used for name string
-#define NAME_BUF_SIZE 65
-#define LITTLE_NAME_BUF_SIZE 33
+#define NAME_BUF_SIZE 64
+#define LITTLE_NAME_BUF_SIZE 32
 
 #define LITTLE_ARRAY_SIZE 128
 #define MEDIUM_ARRAY_SIZE 486

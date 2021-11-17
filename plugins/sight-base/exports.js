@@ -5,12 +5,6 @@
 
 let globals = module.globals;
 
-if (typeof test !== 'undefined') {
-    // the variable is defined
-    print('ready to call test');
-    test();
-}
-
 // Not supported.
 // import mjs from './test.mjs'
 // print(mjs.number);
@@ -25,14 +19,12 @@ module.onInit = function(type){
 
 }
 
-
 Array.prototype.remove = function (element) {
     let index = this.indexOf(element);
     if (index > 0) {
         this.splice(index, 1);
     }
 }
-
 
 //  built-in functions power-up
 globals.detectId = function(obj) {
@@ -108,3 +100,54 @@ sight.SightNodeGraphWrapper.prototype.getGenerateInfo = function(obj = undefined
 
     return undefined;
 }
+
+sight.GenerateArg$$.prototype.error = function(msg = '', node = undefined, port = undefined){
+    let nodeId = detectId(node) ?? 0;
+    let portId = detectId(port) ?? 0;
+
+    this.errorReport(msg, nodeId, portId);
+}
+
+sight.entity.generateCodeWork = function($, $$) {
+    
+    let selfName = this.getOtherSideValue('', 'VarDeclare', 'name');
+    if(!selfName){
+        $$.error('Entity need a varName!', this);
+        return undefined;
+    }
+    for (const item of this.inputPorts) {
+        // 
+        let port = $[item.id];
+        if (!port.isConnect) {
+            continue;
+        }
+        
+        // 
+        let line = `${selfName}.${item.name} = ${port()};\n`;
+        // print(line);
+        $$.insertSource(line);
+    }
+};
+
+sight.entity.onReverseActive = function ($, $$) {
+
+    let selfName = this.getOtherSideValue('', 'VarDeclare', 'name');
+    if (!selfName) {
+        $$.error('Entity need a varName!', this);
+        return undefined;
+    }
+    
+    // print($$.reverseActivePort);
+    // print(Object.keys($));
+    let port = $[$$.reverseActivePort];
+    if(!port){
+        $$.error('Entity cannot find the reverseActivePort!', this);
+        return undefined;
+    }
+    let name = port.name;
+    if(name === ''){
+        return selfName;
+    }
+    return `${selfName}.${port.name}`;
+};
+print('entity function set over!');

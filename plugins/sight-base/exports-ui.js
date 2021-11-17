@@ -2,6 +2,7 @@
 // In this file, the module is independent. Do not share with other files inside this plugin.
 
 print('to ui thread.');
+include('exports-common.js');
 
 let globals = module.globals ;
 
