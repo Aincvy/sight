@@ -1,14 +1,10 @@
 // this file will be ran by ui thread.
 // In this file, the module is independent. Do not share with other files inside this plugin.
 
-print('to ui thread.');
+print('ui thread.');
 include('exports-common.js');
 
 let globals = module.globals ;
-
-globals.test_ui = function(){
-    print('test_ui');
-}
 
 Array.prototype.remove = function (element) {
     let index = this.indexOf(element);

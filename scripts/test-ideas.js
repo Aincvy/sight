@@ -429,29 +429,6 @@ function require(path){
 require("plugin:sight-base");
 require("./abc.js");
 
-// 
-sight.set('entity.generateCodeWork', function($, $$){
-    // loop input nodes, if something is connected, then set it's value.
-    for (const item of $$.port.inputs) {
-        // 
-        if (!item.isConnect){
-            continue;
-        }
-
-        // here is a question, object's varName ?
-        // 
-        let selfName = "this";
-        let line = `${selfName}.${item.name} = ${item()};`;
-        $$.insertSource(line);
-    }
-});
-sight.entity.generateCodeWork = function($, $$) {
-    
-};
-
-sight.set('entity.onReverseActive', function ($, $$) {
-
-});
 
 sight.buildTarget('default', function(project){
     print('start building');

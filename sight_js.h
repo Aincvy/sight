@@ -7,6 +7,7 @@
 #include <future>
 #include <map>
 #include <vector>
+#include <string>
 
 #include "sight.h"
 #include "shared_queue.h"
@@ -40,6 +41,10 @@ namespace sight{
         Test,
         // try to reload a plugin
         PluginReload,
+
+        ProjectBuild,
+        ProjectClean,
+        ProjectRebuild,
 
     };
 
@@ -206,6 +211,8 @@ namespace sight{
      * @return std::string 
      */
     std::string serializeJsNode(SightJsNode const& node);
+
+    int parseGraph(const char* filename, std::string& source);
 
     /**
      * @brief checkTinyData(), tinyData()

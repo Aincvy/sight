@@ -454,6 +454,20 @@ namespace sight {
 
         };
 
+        struct ProjectWrapper {
+            Project* project = nullptr;
+
+            ProjectWrapper() = delete;
+            ProjectWrapper(Project* p) : project(p) {
+
+            }
+
+            void parseAllGraphs() const {
+                project->parseAllGraphs();
+            }
+
+        };
+
         //
         //    some util functions.
         //
@@ -1407,6 +1421,19 @@ namespace sight {
                 rValue.SetUndefined();
             }
         }
+
+        bool v8AddBuildTarget(const char* name, Local<Function> buildFunc, bool override){
+            auto p = currentProject();
+            auto & map = p->getBuildTargetMap();
+            if (!override && map.contains(name)) {
+                return false;
+            }
+
+            auto isolate = buildFunc->GetIsolate();
+            map[name] = { name, ScriptFunctionWrapper::Function(isolate, buildFunc) };
+
+            return true;
+        }
     }
 
 
@@ -1594,7 +1621,8 @@ namespace sight {
 
         // functions ...
         module.set("addNode", &v8AddNode);
-        
+        module.set("addBuildTarget", &v8AddBuildTarget);
+
         auto global = context->Global();
         auto addTemplateNodeFunc = v8pp::wrap_function(isolate, "addTemplateNode", v8AddTemplateNode);
         global->Set(context, v8pp::to_v8(isolate, "addTemplateNode"), addTemplateNodeFunc).ToChecked();
@@ -1632,7 +1660,12 @@ namespace sight {
         entityFunctionsClass
             .set("generateCodeWork", v8pp::property(&SightEntityFunctions::getGenerateCodeWork, &SightEntityFunctions::setGenerateCodeWork))
             .set("onReverseActive", v8pp::property(&SightEntityFunctions::getOnReverseActive, &SightEntityFunctions::setOnReverseActive));
-        // module.set("SightEntityFunctions", entityFunctionsClass);
+        module.set("SightEntityFunctions", entityFunctionsClass);
+
+        v8pp::class_<ProjectWrapper> projectWrapperClass(isolate);
+        projectWrapperClass
+            .set("parseAllGraphs", &ProjectWrapper::parseAllGraphs);
+        module.set("Project", projectWrapperClass);
 
         auto sightObject = module.new_instance();
         sightObject->Set(context, v8pp::to_v8(isolate, "entity"), 
@@ -2247,7 +2280,7 @@ namespace sight {
      * @param filename
      * @return
      */
-    int parseGraph(const char* filename){
+    int parseGraph(const char* filename, std::string& source) {
         dbg(filename);
         SightNodeGraph graph;
         int i = graph.load(filename, false);
@@ -2345,14 +2378,17 @@ namespace sight {
             // maybe need append more info ?
 
             dbg(tmpErrorMsg.str());
+            dbg(filename);
         } else {
             std::string finalSource = finalSourceStream.str();
             trim(finalSource);
             dbg(finalSource);
+            source = finalSource;
+            return CODE_OK;
         }
         
         data.reset();
-        return 0;
+        return CODE_FAIL;
     }
 
     void runJsCommands() {
@@ -2376,9 +2412,11 @@ namespace sight {
             case JsCommandType::JsCommandHolder:
                 // do nothing.
                 break;
-            case JsCommandType::ParseGraph:
-                parseGraph(command.args.argString);
+            case JsCommandType::ParseGraph:{
+                std::string source;
+                parseGraph(command.args.argString, source);
                 break;
+            }
             case JsCommandType::InitPluginManager:
             {
                 pluginManager()->init(g_V8Runtime->isolate);
@@ -2410,6 +2448,15 @@ namespace sight {
                 }
                 break;
             }
+            case JsCommandType::ProjectBuild:
+                currentProject()->build(command.args.argString);
+                break;
+            case JsCommandType::ProjectClean:
+                currentProject()->clean();
+                break;
+            case JsCommandType::ProjectRebuild:
+                currentProject()->rebuild();
+                break;
             }
 
             command.args.dispose();
@@ -2710,5 +2757,15 @@ namespace sight {
         return this->generateCodeCount > 0;
     }
 
+    int BuildTarget::build() const {
+        auto isolate = Isolate::GetCurrent();
+        auto func = this->buildFunction.Get(isolate);
+
+        auto result = v8pp::call_v8(isolate, func, Object::New(isolate), v8pp::class_<ProjectWrapper>::import_external(isolate, new ProjectWrapper(currentProject())));
+        if (!result.IsEmpty()) {
+            dbg("has result");
+        }
+        return CODE_OK;
+    }
 
 }

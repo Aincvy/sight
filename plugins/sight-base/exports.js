@@ -151,3 +151,17 @@ sight.entity.onReverseActive = function ($, $$) {
     return `${selfName}.${port.name}`;
 };
 print('entity function set over!');
+
+sight.buildTarget = function(name, func = Function(), override = true){
+    if(typeof func !== 'function'){
+        throw 'Func must be a function.';
+    }
+
+    sight.addBuildTarget(name, func, override);
+}
+
+sight.buildTarget('Default', function (project) {
+    print('start building');
+    project.parseAllGraphs();
+    print('building over!');
+});

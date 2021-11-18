@@ -19,6 +19,7 @@
 #include "filesystem"
 #include "fstream"
 #include <algorithm>
+#include <fstream>
 #include <iterator>
 #include <string>
 #include <sys/types.h>
@@ -169,19 +170,30 @@ namespace sight {
         }
     }
 
-    int Project::build() {
+    int Project::build(const char* target) {
+        auto iter = buildTargetMap.find(target);
+        if (iter == buildTargetMap.end()) {
+            return CODE_FAIL;
+        }
 
-        return 0;
+        auto & buildTarget = iter->second;
+        buildTarget.build();
+
+        if (lastBuildTarget != target) {
+            lastBuildTarget = target;
+        }
+        return CODE_OK;
     }
 
     int Project::clean() {
-
-        return 0;
+        // remove target/graph folder
+        std::filesystem::remove_all(pathTargetFolder() + "graph");
+        return CODE_OK;
     }
 
     int Project::rebuild() {
         clean();
-        return build();
+        return build(lastBuildTarget.c_str());
     }
 
     Project::Project(const char *baseDir,bool createIfNotExist) : baseDir(baseDir),
@@ -249,6 +261,7 @@ namespace sight {
         out << YAML::Key << "nodeOrPortId" << YAML::Value << projectConfig.nodeOrPortId.load();
         out << YAML::Key << "typeIdIncr" << YAML::Value << typeIdIncr.load();
         out << YAML::Key << "lastOpenGraph" << YAML::Value << lastOpenGraph;
+        out << YAML::Key << "lastBuildTarget" << YAML::Value << lastBuildTarget;
 
         out << YAML::Key << "typeMap" << YAML::BeginMap;
         for (const auto & item : this->typeMap) {
@@ -335,6 +348,10 @@ namespace sight {
             auto temp = root["lastOpenGraph"];
             if (temp.IsDefined()) {
                 this->lastOpenGraph = temp.as<std::string>();
+            }
+            temp = root["lastBuildTarget"];
+            if (temp.IsDefined()) {
+                this->lastBuildTarget = temp.as<std::string>();
             }
 
             temp = root["typeMap"];
@@ -588,6 +605,36 @@ namespace sight {
     void Project::updateEntitiesToTemplateNode() const {
         for( const auto& item: this->entitiesMap){
             addTemplateNode(item.second);
+        }
+    }
+
+    void Project::parseAllGraphs() const {
+        auto targetPathString = pathTargetFolder();
+        targetPathString += "graph/";
+
+        for (const auto& item : directory_iterator(pathGraphFolder())) {
+            if (item.is_directory()) {
+                
+            } else if (item.is_regular_file()) {
+                auto path = item.path();
+                if (!path.has_extension() || path.extension().generic_string() != ".yaml") {
+                    continue;
+                }
+
+                std::string source;
+                if (parseGraph(path.c_str(), source) == CODE_OK) {
+                    // parse success, write
+                    auto relative = std::filesystem::relative(path, pathGraphFolder());
+                    std::filesystem::path targetPath(targetPathString + relative.generic_string());
+                    targetPath.replace_extension(".js");
+                    dbg(targetPath.generic_string());
+                    std::filesystem::create_directories(targetPath.parent_path());
+
+                    std::ofstream out(targetPath);
+                    out << source;
+                    out.close();
+                }
+            }
         }
     }
 

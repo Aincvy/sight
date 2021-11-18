@@ -12,6 +12,7 @@
 #include "sys/types.h"
 
 #include "absl/container/btree_map.h"
+#include "v8.h"
 
 namespace sight {
 
@@ -170,8 +171,10 @@ namespace sight {
      */
     struct BuildTarget {
         std::string name;
-        // if has children, then execute them in order.
-        std::vector<std::string> children;
+
+        v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function>> buildFunction;
+
+        int build() const;
     };
 
     enum class ProjectFileType {
@@ -196,7 +199,8 @@ namespace sight {
 
     /**
      * project class.
-     * todo add thread safe guard
+     * todo add thread safe guard.
+     * Consider change data by js thread, use data by ui thread.
      */
     class Project {
     public:
@@ -205,7 +209,7 @@ namespace sight {
         Project() = default;
         Project(const char* baseDir, bool createIfNotExist);
 
-        int build();
+        int build(const char* target);
         int clean();
         int rebuild();
 
@@ -313,6 +317,8 @@ namespace sight {
 
         void updateEntitiesToTemplateNode() const;
 
+        void parseAllGraphs() const;
+
     private:
         std::string baseDir;
         bool createIfNotExist;
@@ -324,6 +330,7 @@ namespace sight {
         absl::btree_map<uint, TypeInfo> typeInfoMap;
 
         std::string lastOpenGraph{};
+        std::string lastBuildTarget{};
 
         // key: name, 
         absl::btree_map<std::string, BuildTarget> buildTargetMap;

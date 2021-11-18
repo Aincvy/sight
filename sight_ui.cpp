@@ -148,14 +148,25 @@ namespace sight {
         }
 
         void showMainProjectMenu(){
-            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.build)) {
-                currentProject()->build();
+            if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.build)) {
+                // currentProject()->build();
+                auto p = currentProject();
+                for (const auto& item : p->getBuildTargetMap()) {
+                    if (ImGui::MenuItem(item.first.c_str())) {
+                        dbg(item.first);
+                        addJsCommand(JsCommandType::ProjectBuild, item.first.c_str());
+                    }
+                }
+
+                ImGui::EndMenu();
             }
             if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.rebuild)) {
-                currentProject()->rebuild();
+                // currentProject()->rebuild();
+                addJsCommand(JsCommandType::ProjectRebuild);
             }
             if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.clean)) {
-                currentProject()->clean();
+                // currentProject()->clean();
+                addJsCommand(JsCommandType::ProjectClean);
             }
             ImGui::Separator();
             if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.parseGraph)) {
@@ -190,7 +201,8 @@ namespace sight {
                 // if (p) {
                 //     dbg(serializeJsNode(*p));
                 // }
-                addJsCommand(JsCommandType::Test, "/Volumes/mac_extend/Project/sight/scripts/run_in_test.js");
+                // addJsCommand(JsCommandType::Test, "/Volumes/mac_extend/Project/sight/scripts/run_in_test.js");
+                currentProject()->parseAllGraphs();
             }
             if (ImGui::MenuItem("Crash")) {
                 // produce a crash for test.
