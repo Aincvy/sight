@@ -1,4 +1,5 @@
 #include "dbg.h"
+#include "imgui_internal.h"
 #include "imgui_node_editor.h"
 #include "sight_defines.h"
 #include "sight_keybindings.h"
@@ -124,14 +125,6 @@ namespace sight {
         void showMainViewMenu(){
             if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.view)) {
             }
-            if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.graph)) {
-                if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.entity)) {
-                    // show entity graph
-                    changeGraph("./entity", true);
-                }
-                ImGui::EndMenu();
-            }
-
             if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.layout)) {
                 if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.reset)) {
                     g_UIStatus->windowStatus.layoutReset = true;
@@ -1128,7 +1121,7 @@ namespace sight {
 
         // Create window with graphics context
         glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
-        GLFWwindow* window = glfwCreateWindow(1600, 900, "sight - a low-code tool", nullptr, NULL);
+        GLFWwindow* window = glfwCreateWindow(1600, 900, "sight - a code generate tool", nullptr, NULL);
         if (window == nullptr)
             return 1;
         glfwMakeContextCurrent(window);
@@ -1166,6 +1159,7 @@ namespace sight {
         // project path 
         auto project = currentProject();
         if (project) {
+            ImGui::SetCurrentFont(fontPointer);
             onProjectAndUILoadSuccess(project);
         }
 
@@ -1199,7 +1193,7 @@ namespace sight {
             glfwSwapBuffers(window);
 
             g_UIStatus->needInit = false;
-            // printf("before uv run\n");
+
             uv_run(uvLoop, UV_RUN_NOWAIT);
         }
 

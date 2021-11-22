@@ -1,7 +1,7 @@
 # sight
 **WIP**
 
-A low-code tool for web server dev.
+A js code generate platform.  It parse a graph to a js file. 
 
 For macos only, now. 
 
@@ -26,3 +26,12 @@ brew install libuv
 brew install abseil
 ```
 
+
+
+## Screenshot
+
+![example1](./docs/screenshot/example1.png)
+
+![example1](./docs/screenshot/example1-js.png)
+
+It still has some work to do, this graph is just an example.

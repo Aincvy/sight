@@ -623,3 +623,38 @@ addTemplateNode({
     },
 
 });
+
+addTemplateNode({
+    __meta_name: "Comment",
+    __meta_address: "built-in/sundry",
+    __meta_func: {
+        generateCodeWork($, $$) {
+            return `// ${$.comment.value}`;
+        },
+        // do nothing.
+        onReverseActive($) {
+        },
+    },
+    __meta_events: {
+        onInstantiate() {
+
+        },
+        // called after graph load
+        onReload() {
+
+        },
+        onMsg() {
+
+        },
+    },
+    __meta_inputs: {
+    },
+    __meta_outputs: {
+    },
+
+    comment: {
+        type: 'LargeString',
+        defaultValue: '',
+    },
+
+});

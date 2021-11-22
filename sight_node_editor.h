@@ -5,6 +5,7 @@
 #pragma once
 #include <cstddef>
 #include <string>
+#include <sys/stat.h>
 #include <vector>
 #include <map>
 
@@ -415,6 +416,38 @@ namespace sight {
         SightNodePort instantiate() const;
     };
 
+    struct SightNodeFixedStyle {
+        constexpr static int iconSize = 20;
+        constexpr static int iconTitlePadding = 3;
+        constexpr static int nameCharsPadding = 1;
+        constexpr static int fullAlpha = 255;
+
+        constexpr static int commonTypeLength = 120;
+        constexpr static int numberTypeLength = 100;
+        constexpr static int vector3TypeLength = 200;
+        constexpr static int charTypeLength = 20;
+
+    };
+
+    struct SightNodeStyle{
+        struct PortTypeStyle{
+            int maxCharSize = 0; 
+            int inputWidth = 0;
+
+            float totalWidth = 0;
+        };
+
+        // this node's max width
+        float width = 0;
+
+        PortTypeStyle fieldStype;
+        PortTypeStyle inputStype;
+        PortTypeStyle outputStype;
+
+        bool largeStringEffect = false;
+        bool initialized = false;
+    };
+
     /**
      * js node  / template node
      */
@@ -447,6 +480,8 @@ namespace sight {
         ScriptFunctionWrapper onReload;
         ScriptFunctionWrapper onMsg;
 
+        SightNodeStyle nodeStyle;
+
         SightJsNode();
         ~SightJsNode() = default;
 
@@ -472,6 +507,9 @@ namespace sight {
         void resetTo(SightJsNode const& node);
 
         void reset(); 
+
+        void updateStyle();
+        bool isStyleInitialized() const;
 
     };
 
@@ -833,5 +871,10 @@ namespace sight {
      * @return false 
      */
     bool isNodeEditorReady();
+
+    inline bool isNodePortShowValue(SightNodePort const& port){
+        uint type = port.getType();
+        return port.options.showValue && type != IntTypeProcess && type != IntTypeObject;
+    }
 
 }

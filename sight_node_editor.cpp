@@ -149,7 +149,7 @@ namespace sight {
         void showNodePortIcon(IconType iconType, ImColor color, bool isConnected = false) {
             auto cursorPos = ImGui::GetCursorScreenPos();
             auto drawList = ImGui::GetWindowDrawList();
-            const int iconSize = 20;
+            constexpr int iconSize = SightNodeFixedStyle::iconSize;
             const ImVec2 size(iconSize, iconSize);
             auto rect = ImRect(cursorPos, cursorPos + size);
             auto rect_x = rect.Min.x;
@@ -361,6 +361,7 @@ namespace sight {
             }
 
             ImGui::Dummy(size);
+            // ImGui::Dummy(ImVec2(1,1));
         }
 
         /**
@@ -375,9 +376,14 @@ namespace sight {
 
             auto color = ImColor(0,99,160,255);
             auto project = currentProject();
+            auto templateNode = node->templateNode;
+            if (!templateNode->isStyleInitialized()) {
+                const_cast<SightJsNode*>(templateNode)->updateStyle();
+            }
+            auto& nodeStyle = templateNode->nodeStyle;
 
             ed::BeginNode(node->nodeId);
-            ImGui::Dummy(ImVec2(7,5));
+            // ImGui::Dummy(ImVec2(7,5));
             auto chainInPort = node->chainInPort;
             auto [typeProcess, _] = project->findTypeInfo(chainInPort->type);
 
@@ -392,12 +398,13 @@ namespace sight {
 
             auto chainOutPort = node->chainOutPort;
             if (chainOutPort) {
-                ImGui::SameLine(215);
+                ImGui::SameLine(templateNode->nodeStyle.width - SightNodeFixedStyle::iconSize);
+                // ImGui::SameLine(0);
                 ed::BeginPin(chainOutPort->id, ed::PinKind::Output);
                 showNodePortIcon(typeProcess.style->iconType, typeProcess.style->color, chainOutPort->isConnect());
                 ed::EndPin();
             }
-            ImGui::Dummy(ImVec2(0,3));
+            ImGui::Dummy(ImVec2(0,SightNodeFixedStyle::iconTitlePadding));
 
             // fields
             for (auto &item: node->fields) {
@@ -408,16 +415,16 @@ namespace sight {
                 auto & options = item.options;
                 bool showErrorMsg = false;
                 if (options.errorMsg.empty()) {
-                    ImGui::Text("%8s", item.portName.c_str());
+                    ImGui::Text("%*s", nodeStyle.fieldStype.maxCharSize, item.portName.c_str());
                 } else {
-                    ImGui::TextColored(currentUIStatus()->uiColors->errorText, "%8s", item.portName.c_str());
+                    ImGui::TextColored(currentUIStatus()->uiColors->errorText, "%*s", nodeStyle.fieldStype.maxCharSize, item.portName.c_str());
                     if (ImGui::IsItemHovered()) {
                         // show error msg
                         showErrorMsg = true;
                     }
                 }
                 ImGui::SameLine();
-                showNodePortValue(&item, true);
+                showNodePortValue(&item, true, nodeStyle.fieldStype.inputWidth);
 
                 if (showErrorMsg) {
                     ImGui::TextColored(currentUIStatus()->uiColors->errorText, "%8s", options.errorMsg.c_str());
@@ -425,49 +432,71 @@ namespace sight {
             }
 
             // inputPorts
-            ImGui::BeginGroup();
-            bool hasInputShow = false;
-            for (auto& item : node->inputPorts) {
-                if (item.portName.empty() || !item.options.show) {
-                    continue;     // do not show the chain port. (Process port)
+            bool isAnyInputShow = false;
+            bool isInputGroupShow = false;
+            if (node->inputPorts.size() > 1) {
+                ImGui::BeginGroup();
+                isInputGroupShow = true;
+                for (auto& item : node->inputPorts) {
+                    if (item.portName.empty() || !item.options.show) {
+                        continue;     // do not show the chain port. (Process port)
+                    }
+
+                    ed::BeginPin(item.id, ed::PinKind::Input);
+                    ed::PinPivotAlignment(ImVec2(0, 0.5f));
+                    ed::PinPivotSize(ImVec2(0, 0));
+
+                    // port icon
+                    // use fake type here
+                    auto [tmpTypeInfo, find] = project->findTypeInfo(item.type);
+                    if (!find || !tmpTypeInfo.style) {
+                        showNodePortIcon(IconType::Circle, color, item.isConnect());
+                    } else {
+                        showNodePortIcon(tmpTypeInfo.style->iconType, tmpTypeInfo.style->color, item.isConnect());
+                    }
+
+                    ImGui::SameLine();
+                    ImGui::Text("%s", item.portName.c_str());
+
+                    if (item.type != IntTypeProcess && item.options.showValue) {
+                        ImGui::SameLine();
+                        showNodePortValue(&item, true, nodeStyle.inputStype.inputWidth);
+                    }
+                    ed::EndPin();
+                    isAnyInputShow = true;
                 }
-
-                ed::BeginPin(item.id, ed::PinKind::Input);
-                ed::PinPivotAlignment(ImVec2(0, 0.5f));
-                ed::PinPivotSize(ImVec2(0, 0));
-
-                // port icon
-                // use fake type here
-                auto [tmpTypeInfo, find] = project->findTypeInfo(item.type);
-                if (!find || !tmpTypeInfo.style) {
-                    showNodePortIcon(IconType::Circle, color, item.isConnect());
-                } else {
-                    showNodePortIcon(tmpTypeInfo.style->iconType, tmpTypeInfo.style->color, item.isConnect());
-                }
-
+                ImGui::EndGroup();
                 ImGui::SameLine();
-                ImGui::Text("%s", item.portName.c_str());
-                ed::EndPin();
-
-                hasInputShow = true;
-            }
-            if (!hasInputShow) {
-                ImGui::Dummy(ImVec2(35, 20));
             }
 
-            ImGui::EndGroup();
-            ImGui::SameLine();
             ImGui::BeginGroup();
             for (SightNodePort &item : node->outputPorts) {
                 if (item.portName.empty() || !item.options.show) {
-                    continue;       // do not show the chain port. (Process port)
+                    continue;       // do not show the title bar port. 
                 }
 
-                // test value
-                if (item.type == IntTypeProcess || !item.options.showValue){
+                float currentItemWidth = isNodePortShowValue(item) ? nodeStyle.outputStype.inputWidth : 0;
+                // fill space
+                currentItemWidth += SightNodeFixedStyle::iconSize;
+                currentItemWidth += ImGui::CalcTextSize(std::string(nodeStyle.outputStype.maxCharSize + SightNodeFixedStyle::nameCharsPadding, 'A').c_str()).x;
+                if (isAnyInputShow) {
+                    currentItemWidth += nodeStyle.inputStype.totalWidth;
+                }
+                auto spaceX = ImGui::GetStyle().ItemSpacing.x;
+                currentItemWidth += spaceX;
+                if (isInputGroupShow) {
+                    currentItemWidth += spaceX;
+                }
+                if (nodeStyle.width > 0) {
+                    auto x = nodeStyle.width - currentItemWidth;
+                    if (x != 0) {
+                        ImGui::Dummy(ImVec2(x, 0));
+                        ImGui::SameLine();
+                    }
+                }
 
-                } else {
-                    showNodePortValue(&item, true);
+                if (isNodePortShowValue(item)) {
+                    showNodePortValue(&item, true, nodeStyle.outputStype.inputWidth);
                     ImGui::SameLine();
                 }
 
@@ -478,7 +507,7 @@ namespace sight {
                 //     ImGui::Text("%8s", item.portName.c_str());
                 //     ImGui::SameLine();
                 // }
-                ImGui::Text("%8s", item.portName.c_str());
+                ImGui::Text("%-*s", nodeStyle.outputStype.maxCharSize, item.portName.c_str());
                 ImGui::SameLine();
 
                 // port icon  
@@ -489,14 +518,18 @@ namespace sight {
                 } else {
                     showNodePortIcon(tmpTypeInfo.style->iconType, tmpTypeInfo.style->color, item.isConnect());
                 }
-                // ImGui::Dummy(ImVec2(20,20));
-                // ImGui::Text("new line?");
 
                 ed::EndPin();
+                // if (ImGui::IsItemClicked()) {
+                //     dbg(ImGui::GetItemRectSize().x, currentItemWidth);
+                // }
             }
 
             ImGui::EndGroup();
             ed::EndNode();
+            // if (ImGui::IsItemClicked()) {
+            //     dbg(ImGui::GetItemRectSize().x, nodeStyle.width);
+            // }
             return 0;
         }
 
@@ -734,7 +767,7 @@ namespace sight {
             // fake type, do not show it's value.
             return;
         }
-
+        
         char labelBuf[NAME_BUF_SIZE];
         sprintf(labelBuf, "## %d", port->id);
 
@@ -782,16 +815,12 @@ namespace sight {
         case IntTypeString:
         {
             int flags = options.readonly ? ImGuiInputTextFlags_ReadOnly : 0;
-            width = width + width / 2.0f;
             bool showed = false;
             if (fromGraph) {
                 
             } else {
                 // only show in inspector
                 if (!options.alternatives.empty()) {
-                    // ImGui::Text("%8s", "");
-                    // ImGui::SameLine();
-                    ImGui::SetNextItemWidth(width);
                     std::string comboLabel = labelBuf;
                     comboLabel += ".combo";
                     if (ImGui::BeginCombo(comboLabel.c_str(), port->value.u.string, ImGuiComboFlags_NoArrowButton)) {
@@ -846,7 +875,6 @@ namespace sight {
         case IntTypeVector3:
         {
             int flags = options.readonly ? ImGuiSliderFlags_ReadOnly : 0;
-            ImGui::SetNextItemWidth(width * 2);
             if (ImGui::DragFloat3(labelBuf, port->value.u.vector3, 1, 0, 0, "%.3f", flags)) {
                 onNodePortValueChange(port);
             }
@@ -855,7 +883,6 @@ namespace sight {
         case IntTypeVector4:
         {
             int flags = options.readonly ? ImGuiSliderFlags_ReadOnly : 0;
-            ImGui::SetNextItemWidth(width * 2);
             if (ImGui::DragFloat4(labelBuf, port->value.u.vector4, 1, 0, 0, "%.3f", flags)) {
                 onNodePortValueChange(port);
             }
@@ -864,7 +891,7 @@ namespace sight {
         case IntTypeChar:
         {
             int flags = options.readonly ? ImGuiInputTextFlags_ReadOnly : 0;
-            ImGui::SetNextItemWidth(width / 3.0f);
+            ImGui::SetNextItemWidth(SightNodeFixedStyle::charTypeLength);
             if (ImGui::InputText(labelBuf, port->value.u.string, 2, 0)) {
                 onNodePortValueChange(port);
             }
@@ -885,12 +912,13 @@ namespace sight {
                         auto & largeString = value->u.largeString;
                         // request resize
                         // dbg("request resize", largeString.bufferSize, data->BufSize, data->BufTextLen);
-                        if (data->BufSize != largeString.bufferSize) {
-                            value->stringCheck(data->BufSize);
-                        }
-                        // if (value->stringCheck(data->BufTextLen)) {
-                        //     data->Buf = value->u.largeString.pointer;    
+                        // if (data->BufSize != largeString.bufferSize) {
+                        //     value->stringCheck(data->BufSize);
                         // }
+                        if (value->stringCheck(data->BufTextLen)) {
+                            data->Buf = value->u.largeString.pointer;
+                            dbg("resize", largeString.bufferSize, data->BufSize, data->BufTextLen);
+                        }
                     }
                     return 0;
                 };
@@ -899,7 +927,6 @@ namespace sight {
                     
                 }
                 if (ImGui::IsItemDeactivatedAfterEdit()) {
-                    dbg(1);
                     onNodePortValueChange(port);
                 }
             }
@@ -1412,6 +1439,87 @@ namespace sight {
         this->fullTemplateAddress.clear();
         
         // todo
+    }
+
+    void SightJsNode::updateStyle() {
+        auto& style = this->nodeStyle;
+        if (this->nodeName == "VarDeclare") {
+            dbg(1);
+        }
+
+        auto nodeFunc = [](std::vector<SightJsNodePort*> const& p, SightNodeStyle::PortTypeStyle& typeStyle, bool isField){
+            typeStyle.inputWidth = 0;
+
+            for( const auto& itemPointer: p){
+                const auto& item = *itemPointer;
+
+                auto charSize = item.portName.size();
+                if (charSize > typeStyle.maxCharSize) {
+                    typeStyle.maxCharSize = charSize;
+                }
+
+                if (isField || item.options.showValue) {
+                    int tmpWidth = 0;
+                    switch (item.type) {
+                    case IntTypeVector3:
+                    case IntTypeVector4:
+                    case IntTypeColor:
+                        tmpWidth = SightNodeFixedStyle::vector3TypeLength;
+                        break;
+                    case IntTypeInt:
+                    case IntTypeFloat:
+                    case IntTypeLong:
+                    case IntTypeDouble:
+                        tmpWidth = SightNodeFixedStyle::numberTypeLength;
+                        break;
+                    case IntTypeProcess:
+                    case IntTypeObject:
+                        tmpWidth = 0;
+                        break;
+                    default:
+                        tmpWidth = SightNodeFixedStyle::commonTypeLength;
+                        break;
+                    }
+                    if (tmpWidth > typeStyle.inputWidth) {
+                        typeStyle.inputWidth = tmpWidth;
+                    }
+                }
+            }
+
+            if (typeStyle.maxCharSize > 0) {
+                std::string tmp(typeStyle.maxCharSize + SightNodeFixedStyle::nameCharsPadding, 'A');
+                auto tmpSize = ImGui::CalcTextSize(tmp.c_str());
+                auto imguiStyle = ImGui::GetStyle();
+
+                // typeStyle.totalWidth = typeStyle.inputWidth + imguiStyle.ItemSpacing.x + tmpSize.x + imguiStyle.ItemInnerSpacing.x * 2;
+                typeStyle.totalWidth = typeStyle.inputWidth + tmpSize.x;
+                if (!isField) {
+                    typeStyle.totalWidth += SightNodeFixedStyle::iconSize + imguiStyle.ItemSpacing.x;
+                } else {
+
+                }
+            } else {
+                typeStyle.totalWidth = typeStyle.inputWidth;
+            }
+        };
+
+        
+        nodeFunc(this->fields, style.fieldStype, true);
+        nodeFunc(this->inputPorts, style.inputStype, false);
+        nodeFunc(this->outputPorts, style.outputStype, false);
+
+        auto inputOutputTotalWidth = style.inputStype.totalWidth + style.outputStype.totalWidth;
+        style.width = std::max(inputOutputTotalWidth, style.fieldStype.totalWidth);
+        if (style.width <= 0) {
+            // do not have any fields or ports
+            style.width = ImGui::CalcTextSize(this->nodeName.c_str()).x;
+            style.width += (SightNodeFixedStyle::iconSize + SightNodeFixedStyle::iconTitlePadding) * 2 + SightNodeFixedStyle::iconTitlePadding * 2;
+        }
+        style.initialized = true;
+    }
+
+    bool SightJsNode::isStyleInitialized() const {
+        return nodeStyle.initialized;
     }
 
     void SightNodeConnection::removeRefs(SightNodeGraph *graph) {
@@ -2277,6 +2385,7 @@ namespace sight {
                 auto findResult = std::find_if(list->begin(), list->end(), [pointer](SightNodeTemplateAddress const& address) {
                     return address.name == pointer->part;
                 });
+                // templateNode->updateStyle();
                 if (findResult == list->end()) {
                     // not found
                     templateNode->compact();

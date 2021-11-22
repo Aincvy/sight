@@ -136,6 +136,9 @@ addTemplateNode({
     _string: 'String',
     _bool: 'bool',
     _color: 'Color',
+    _char: 'char',
+    _vector3: 'Vector3',
+    _vector4: 'Vector4',
 
 });
 
