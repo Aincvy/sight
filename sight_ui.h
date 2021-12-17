@@ -14,12 +14,14 @@
 #include <string>
 #include <sys/types.h>
 #include <v8.h>
+#include <string_view>
 
 
 namespace sight {
 
     struct SightNode;
     struct SightNodeConnection;
+    struct SightEntity;
 
     enum class UICommandType{
         UICommandHolder,
@@ -46,8 +48,9 @@ namespace sight {
      */
     struct MyUILabels{
         // static ids
-        static constexpr const char* modalAskData = "Ask ?###modalAskData";
+        static constexpr const char* modalAskData = "###modalAskData";
         static constexpr const char* modalSaveData = "###modalSaveData";
+        static constexpr const char* modalAlertData = "###modalAlertData";
 
         // dynamic ids, strcat on program load.
     };
@@ -73,10 +76,10 @@ namespace sight {
      * cache for create entity window.
      */
     struct UICreateEntity {
+        bool edit = false;
         char name[NAME_BUF_SIZE] = {0};
         char templateAddress[NAME_BUF_SIZE] = {0};
         struct EntityField* first = nullptr;
-
 
 
         void addField();
@@ -102,6 +105,8 @@ namespace sight {
         void moveItemDown();
 
         void loadFrom(struct SightNode* node);
+
+        void loadFrom(SightEntity const& info);
 
         void reset();
 
@@ -129,6 +134,7 @@ namespace sight {
         bool testWindow = false;
         bool aboutWindow = false;
         bool projectSettingsWindow = false;
+        bool entityListWindow = false;
 
         bool layoutReset = false;
 
@@ -136,6 +142,7 @@ namespace sight {
         bool popupGraphName = false;
         bool popupAskModal = false;
         bool popupSaveModal = false;
+        bool popupAlertModal = false;
     };
 
     struct UIColors {
@@ -188,6 +195,7 @@ namespace sight {
 
         char littleName[LITTLE_NAME_BUF_SIZE] {0};
         char name[NAME_BUF_SIZE]{0};
+        char entityListSearch[TINY_NAME_BUF_SIZE]{ 0 };
     };
 
     struct ModalAskData {
@@ -195,6 +203,11 @@ namespace sight {
         std::string content;
 
         std::function<void(bool)> callback;
+    };
+
+    struct ModalAlertData {
+        std::string title;
+        std::string content;
     };
 
     enum class SaveOperationResult {
@@ -224,6 +237,7 @@ namespace sight {
         struct UIBuffer buffer;
         struct ModalAskData modalAskData;
         struct ModalSaveData modalSaveData;
+        struct ModalAlertData modalAlertData;
 
         struct LanguageKeys* languageKeys = nullptr;
         struct UIColors* uiColors = nullptr;
@@ -329,5 +343,9 @@ namespace sight {
     void openSaveModal(const char* title, const char* content, std::function<void(SaveOperationResult)> const& callback);
 
     bool isUICommandFree();
+
+    void openAskModal(std::string_view title, std::string_view content, std::function<void(bool)> callback);
+
+    void openAlertModal(std::string_view title = "Alert!", std::string_view content = "");
 
 }

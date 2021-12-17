@@ -2455,6 +2455,45 @@ namespace sight {
         return CODE_OK;
     }
 
+    bool delTemplateNode(std::string_view fullName) {
+        auto address = resolveAddress(std::string{ fullName });
+        auto pointer = address;
+        auto* list = &g_NodeEditorStatus->templateAddressList;
+        bool delFlag = false;
+
+        while (pointer) {
+            if (!pointer->next) {
+                // this is the name
+                auto findResult = std::find_if(list->begin(), list->end(), [pointer](SightNodeTemplateAddress const& address) {
+                    return address.name == pointer->part;
+                });
+
+                if (findResult != list->end()) {
+                    list->erase(findResult);
+                    delFlag = true;
+                }
+            } else {
+                bool findElement = false;
+                for (auto iter = list->begin(); iter != list->end(); iter++) {
+                    if (iter->name == pointer->part) {
+                        findElement = true;
+                        list = &iter->children;
+                        break;
+                    }
+                }
+
+                if (!findElement) {
+                    list->push_back(SightNodeTemplateAddress(pointer->part));
+                    list = &list->back().children;
+                }
+            }
+
+            pointer = pointer->next;
+        }
+        freeAddress(address);
+        return delFlag;
+    }
+
     int addEntity(const UICreateEntity &createEntityData) {
         auto p = currentProject();
         SightEntity entity;
@@ -2464,7 +2503,7 @@ namespace sight {
         auto c = createEntityData.first;
         while (c) {
             entity.fields.emplace_back(c->name, c->type, c->defaultValue);
-
+            
             c = c->next;
         }
         

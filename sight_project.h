@@ -5,6 +5,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <vector>
 #include <map>
@@ -152,11 +153,13 @@ namespace sight {
      * 
      */
     struct SightEntity {
-        std::string name;
-        std::string templateAddress;
+        std::string name {};
+        std::string templateAddress {};
 
         std::vector<SightEntityField> fields;
-        std::string simpleName;
+        std::string simpleName {};
+
+        mutable uint typeId = 0;
 
         void fixTemplateAddress();
         void fixSimpleName();
@@ -250,6 +253,8 @@ namespace sight {
          */
         uint getIntType(std::string const& str, bool addIfNotFound = false);
 
+        bool delIntType(uint type);
+
         /**
          *
          * @param type
@@ -313,11 +318,24 @@ namespace sight {
 
         std::string getLastOpenGraph() const;
 
+        absl::btree_map<std::string, SightEntity> const& getEntitiesMap() const;
+
         bool addEntity(SightEntity const& entity);
+
+        bool delEntity(std::string_view fullName);
 
         void updateEntitiesToTemplateNode() const;
 
         void parseAllGraphs() const;
+
+        /**
+         * @brief check is any graph has the template node's instance.
+         * 
+         * @param templateAddress 
+         * @return true 
+         * @return false 
+         */
+        bool isAnyGraphHasTemplate(std::string_view templateAddress, std::string* pathOut = nullptr);
 
     private:
         std::string baseDir;

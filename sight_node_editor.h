@@ -5,6 +5,7 @@
 #pragma once
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <sys/stat.h>
 #include <vector>
 #include <map>
@@ -823,6 +824,8 @@ namespace sight {
      * @return
      */
     int addTemplateNode(const SightNodeTemplateAddress& templateAddress);
+
+    bool delTemplateNode(std::string_view fullName);
 
     /**
      *

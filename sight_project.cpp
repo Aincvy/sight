@@ -140,6 +140,7 @@ namespace sight {
         YAML::Emitter& operator << (YAML::Emitter& out, SightEntity const& entity){
             out << YAML::Key << entity.templateAddress << YAML::BeginMap;            
             out << YAML::Key << "name" << YAML::Value << entity.name;
+            out << YAML::Key << "typeId" << YAML::Value << entity.typeId;
 
             out << YAML::Key << "fields" << YAML::BeginMap;
             for( const auto& item: entity.fields){
@@ -158,6 +159,10 @@ namespace sight {
             SightEntity entity;
             entity.templateAddress = templateAddress;
             entity.name = node["name"].as<std::string>();
+            auto tmp = node["typeId"];
+            if (tmp.IsDefined()) {
+                entity.typeId = tmp.as<uint>();
+            }
 
             auto fieldsNode = node["fields"];
             for( const auto& item: fieldsNode){
@@ -503,6 +508,19 @@ namespace sight {
         return 0;
     }
 
+    bool Project::delIntType(uint type) {
+        auto iter = typeInfoMap.find(type);
+        if (iter == typeInfoMap.end()) {
+            return false;
+        }
+
+        if (typeMap.erase(iter->second.name) <= 0) {
+            dbg("del failed from typeMap", iter->second.name);
+        }
+        
+        return typeInfoMap.erase(iter), true;
+    }
+
     std::string Project::getBaseDir() const {
         return baseDir;
     }
@@ -586,6 +604,10 @@ namespace sight {
         return lastOpenGraph;
     }
 
+    absl::btree_map<std::string, SightEntity> const& Project::getEntitiesMap() const {
+        return this->entitiesMap;
+    }
+
     bool Project::addEntity(SightEntity const& entity) {
         if (this->entitiesMap.contains(entity.templateAddress)) {
             return false;
@@ -600,6 +622,22 @@ namespace sight {
 
         // update to template
         return (this->entitiesMap[entity.templateAddress] = entity).effect();
+    }
+
+    bool Project::delEntity(std::string_view fullName) {
+        auto iter = this->entitiesMap.find(fullName);
+        if(iter != entitiesMap.end()){
+            // delete type
+            auto & entity = iter->second;
+            if (entity.typeId > 0) {
+                delIntType(entity.typeId);
+                entity.typeId = 0;
+            }
+            delTemplateNode(fullName);
+            entitiesMap.erase(iter);
+            return true;
+        }
+        return false;
     }
 
     void Project::updateEntitiesToTemplateNode() const {
@@ -636,6 +674,55 @@ namespace sight {
                 }
             }
         }
+    }
+
+    bool Project::isAnyGraphHasTemplate(std::string_view templateAddress, std::string* pathOut) {
+        auto g = getCurrentGraph();
+        std::string currentGraphPath;
+
+        auto checkNodesFunc = [templateAddress, pathOut](SightNodeGraph* g) {
+            for (const auto& item : g->getNodes()) {
+                if (templateAddress == item.templateAddress()) {
+                    if (pathOut) {
+                        pathOut->assign(g->getFilePath());
+                    }
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        if (g) {
+            if (checkNodesFunc(g)) {
+                return true;
+            }
+            currentGraphPath = g->getFilePath();
+        }
+
+        for (const auto& item : directory_iterator(pathGraphFolder())) {
+            if (!item.is_regular_file()) {
+                continue;
+            }
+
+            auto path = item.path();
+            if (!path.has_extension() || path.extension().generic_string() != ".yaml") {
+                continue;
+            }
+            if (path.generic_string() == currentGraphPath) {
+                continue;
+            }
+
+            SightNodeGraph graph;
+            if (graph.load(path.c_str()) != CODE_OK) {
+                dbg("graph load failed", path.c_str());
+                continue;
+            }
+
+            if (checkNodesFunc(&graph)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     std::string Project::pathEntityFolder() const {
@@ -930,6 +1017,9 @@ namespace sight {
     }
 
     void SightEntity::fixTemplateAddress() {
+        if (!startsWith(templateAddress, "entity/")) {
+            templateAddress = "entity/" + templateAddress;
+        }
         if (!endsWith(templateAddress, name)) {
             if (!endsWith(templateAddress, "/")) {
                 templateAddress += "/";
@@ -947,7 +1037,7 @@ namespace sight {
 
     int SightEntity::effect() const {
         auto &entity = *this;
-        sight::getIntType(entity.name, true);
+        this->typeId = sight::getIntType(entity.name, true);
     
         // update to template
         return addTemplateNode(entity);

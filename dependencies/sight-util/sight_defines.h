@@ -14,6 +14,7 @@
 // used for name string
 #define NAME_BUF_SIZE 64
 #define LITTLE_NAME_BUF_SIZE 32
+#define TINY_NAME_BUF_SIZE 16
 
 #define LITTLE_ARRAY_SIZE 128
 #define MEDIUM_ARRAY_SIZE 486

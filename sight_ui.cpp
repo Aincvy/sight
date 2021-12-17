@@ -35,6 +35,9 @@
 #include <sys/types.h>
 #include <vector>
 
+#include <absl/strings/match.h>
+
+
 #define COMMON_LANGUAGE_KEYS g_UIStatus->languageKeys->commonKeys
 #define WINDOW_LANGUAGE_KEYS g_UIStatus->languageKeys->windowNames
 #define MENU_LANGUAGE_KEYS g_UIStatus->languageKeys->menuKeys
@@ -70,6 +73,14 @@ namespace sight {
             }
         }
 
+        void activeWindowCreateEntity(){
+            if (g_UIStatus->windowStatus.createEntity) {
+                ImGui::SetWindowFocus(WINDOW_LANGUAGE_KEYS.createEntity);
+            } else {
+                g_UIStatus->windowStatus.createEntity = true;
+            }
+        }
+
         void showMainFileMenu(UIStatus& uiStatus){
             if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS._new)) {
                 if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.graph)) {
@@ -85,11 +96,7 @@ namespace sight {
                 }
                 ImGui::Separator();
                 if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.entity)) {
-                    if (g_UIStatus->windowStatus.createEntity) {
-                        ImGui::SetWindowFocus(WINDOW_LANGUAGE_KEYS.createEntity);
-                    } else {
-                        g_UIStatus->windowStatus.createEntity = true;
-                    }
+                    activeWindowCreateEntity();
                 }
 
                 ImGui::EndMenu();
@@ -187,6 +194,15 @@ namespace sight {
             }
         }
 
+        void showEntityMenu(){
+            if (ImGui::MenuItem("Create")) {
+                activeWindowCreateEntity();
+            }
+            if (ImGui::MenuItem("List")) {
+                g_UIStatus->windowStatus.entityListWindow = true;
+            }
+        }
+
         void showMainCustomMenu(){
             if (ImGui::MenuItem("Trigger")) {
                 // auto p = findTemplateNode("test/http/HttpGetReqNode");
@@ -230,6 +246,10 @@ namespace sight {
                 }
                 if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.view)) {
                     showMainViewMenu();
+                    ImGui::EndMenu();
+                }
+                if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.entity)) {
+                    showEntityMenu();
                     ImGui::EndMenu();
                 }
                 if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.project)) {
@@ -482,7 +502,6 @@ namespace sight {
             auto & createEntityData = g_UIStatus->createEntityData;
 
             if (ImGui::Begin(WINDOW_LANGUAGE_KEYS.createEntity, &g_UIStatus->windowStatus.createEntity)) {
-                //LeftLabeledInput(COMMON_LANGUAGE_KEYS.className, g_UIStatus->createEntityData.name, NAME_BUF_SIZE);
                 ImGui::InputText(COMMON_LANGUAGE_KEYS.className, g_UIStatus->createEntityData.name, NAME_BUF_SIZE);
                 ImGui::InputText(COMMON_LANGUAGE_KEYS.address, g_UIStatus->createEntityData.templateAddress, NAME_BUF_SIZE);
                 // maybe need a help marker ?
@@ -578,20 +597,99 @@ namespace sight {
 
                 // buttons
                 if (ImGui::Button(COMMON_LANGUAGE_KEYS.ok)) {
-                    // add entity
-                    int r = addEntity(createEntityData);
-                    if (r == 0) {
-                        createEntityData.reset();
-                        g_UIStatus->windowStatus.createEntity = false;
+                    if (createEntityData.edit) {
+                        openAlertModal("Alert!", "Edit is not impl.");
+                    } else {
+                        // add entity
+                        int r = addEntity(createEntityData);
+                        if (r == 0) {
+                            createEntityData.reset();
+                            g_UIStatus->windowStatus.createEntity = false;
+                        }
                     }
                 }
                 ImGui::SameLine();
                 if (ImGui::Button(COMMON_LANGUAGE_KEYS.cancel)) {
                     g_UIStatus->windowStatus.createEntity = false;
                 }
+                if (createEntityData.edit) {
+                    // In edit mode
+                    ImGui::SameLine();
+                    ImGui::Text("Edit Mode");
+                }
+                ImGui::End();
             }
+        }
 
-            ImGui::End();
+        void showEntityListWindow(){
+            if (ImGui::Begin("Entity List", &g_UIStatus->windowStatus.entityListWindow)) {
+                ImGui::InputText("Filter", g_UIStatus->buffer.entityListSearch, std::size(g_UIStatus->buffer.entityListSearch));
+                ImGui::SameLine(ImGui::GetWindowWidth() - 60);
+                
+                if (ImGui::Button("Create")) {
+                    dbg(1);
+                    activeWindowCreateEntity();
+                }
+                ImGui::Separator();
+
+                auto p = currentProject();
+                // also be a template address.
+                std::string delFullName{};
+                auto entityListSearch = g_UIStatus->buffer.entityListSearch;
+
+                for( const auto& [name, info]: p->getEntitiesMap()){
+                    if (strlen(entityListSearch) > 0) {
+                        if (!absl::StrContains(name, entityListSearch)) {
+                            continue;
+                        }
+                    }
+
+                    ImGui::Text("%8s", info.simpleName.c_str());
+                    ImGui::SameLine();
+                    ImGui::Text("%18s", name.c_str());
+                    ImGui::SameLine();
+                    // ImGui::SetNextItemWidth(float item_width)
+                    // maybe use google icon fonts will be better.
+                    std::string editButtonLabel{"Edit##edit-"};
+                    editButtonLabel += name;
+                    if (ImGui::Button(editButtonLabel.c_str())) {
+                        // edit
+                        auto& createEntityData = g_UIStatus->createEntityData;
+                        createEntityData.loadFrom(info);
+                        createEntityData.edit = true;
+
+                        activeWindowCreateEntity();
+                    }
+                    ImGui::SameLine();
+                    std::string delButtonLabel{ "Del##del-" };
+                    delButtonLabel += name;
+                    if (ImGui::Button(delButtonLabel.c_str())) {
+                        delFullName = name;
+                    }
+                }
+
+                if (!delFullName.empty()) {
+                    // check if used.
+                    std::string pathOut;
+                    if (p->isAnyGraphHasTemplate(delFullName, &pathOut)) {
+                        // used, cannot be deleted.
+                        std::string contentString = { "Used in graph: " };
+                        contentString += pathOut;
+                        openAlertModal("Alert! Cannot be deleted!", contentString);
+                    } else {
+                        // delete ask
+                        std::string str{ "! You only can delete the NOT-USED entity !\nYou will delete: " };
+                        str += delFullName;
+                        openAskModal("Delete entity", str.c_str(), [p, delFullName](bool f) {
+                            dbg(f);
+                            if (f) {
+                                p->delEntity(delFullName);
+                            }
+                        });
+                    }
+                }
+                ImGui::End();
+            }
         }
 
         void showAboutWindow(){
@@ -762,6 +860,7 @@ namespace sight {
             return;
         }
 
+        // ask
         auto& modalAskData = g_UIStatus->modalAskData;
         if (windowStatus.popupAskModal) {
             windowStatus.popupAskModal = false;
@@ -793,6 +892,32 @@ namespace sight {
             return;
         }
 
+        // alert
+        auto& modalAlertData = g_UIStatus->modalAlertData;
+        if (windowStatus.popupAlertModal) {
+            windowStatus.popupAlertModal = false;
+
+            if (!endsWith(modalAlertData.title, MyUILabels::modalAlertData)) {
+                modalAlertData.title += MyUILabels::modalAlertData;
+            }
+            ImGui::OpenPopup(MyUILabels::modalAlertData);
+
+            // Always center this window when appearing
+            ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+            ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        }
+        if (ImGui::BeginPopupModal(modalAlertData.title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::Text("%s", modalAlertData.content.c_str());
+            ImGui::Dummy(ImVec2(0, 18));
+
+            if (buttonOK(COMMON_LANGUAGE_KEYS.ok)) {
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+            return;
+        }
+
+        // save
         auto& modalSaveData = g_UIStatus->modalSaveData;
         if (windowStatus.popupSaveModal) {
             windowStatus.popupSaveModal = false;
@@ -860,17 +985,21 @@ namespace sight {
         showInspectorWindow();
         showNodeEditorGraph(uiStatus);
 
-        if (uiStatus.windowStatus.createEntity) {
+        auto& windowStatus = uiStatus.windowStatus;
+        if (windowStatus.createEntity) {
             showCreateEntityWindow();
         }
-        if (uiStatus.windowStatus.testWindow) {
+        if (windowStatus.testWindow) {
             showDemoWindow(false);
         }
-        if (uiStatus.windowStatus.aboutWindow) {
+        if (windowStatus.aboutWindow) {
             showAboutWindow();
         }
-        if (uiStatus.windowStatus.projectSettingsWindow) {
+        if (windowStatus.projectSettingsWindow) {
             showProjectSettingsWindow();
+        }
+        if (windowStatus.entityListWindow) {
+            showEntityListWindow();
         }
 
         nodeEditorFrameEnd();
@@ -1341,6 +1470,23 @@ namespace sight {
         return uiCommandFree;
     }
 
+    void openAskModal(std::string_view title, std::string_view content, std::function<void(bool)> callback) {
+        auto& data = g_UIStatus->modalAskData;
+        data.title = title;
+        data.content = content;
+        data.callback = callback;
+
+        g_UIStatus->windowStatus.popupAskModal = true;
+    }
+
+    void openAlertModal(std::string_view title, std::string_view content) {
+        auto& data = g_UIStatus->modalAlertData;
+        data.title = title;
+        data.content = content;
+
+        g_UIStatus->windowStatus.popupAlertModal = true;
+    }
+
 
     void UICreateEntity::addField() {
         auto p = (struct EntityField*) calloc(1, sizeof (struct EntityField));
@@ -1527,6 +1673,7 @@ namespace sight {
         if (!node) {
             return;
         }
+        reset();
 
         sprintf(this->name, "%s", node->nodeName.c_str());
 
@@ -1542,7 +1689,25 @@ namespace sight {
 
     }
 
+    void UICreateEntity::loadFrom(SightEntity const& info) {
+        reset();
+
+        // convert data to  createEntityData
+        snprintf(this->name, std::size(this->name), "%s", info.simpleName.c_str());
+        snprintf(this->templateAddress, std::size(this->templateAddress), "%s", info.templateAddress.c_str());
+
+        for( const auto& item: info.fields){
+            addField();
+
+            auto p = lastField();
+            snprintf(p->name, std::size(p->name), "%s", item.name.c_str());
+            snprintf(p->type, std::size(p->type), "%s", item.type.c_str());
+            snprintf(p->defaultValue, std::size(p->defaultValue), "%s", item.defaultValue.c_str());
+        }
+    }
+
     void UICreateEntity::reset() {
+        edit = false;
         sprintf(this->name, "");
         sprintf(this->templateAddress, "");
 
