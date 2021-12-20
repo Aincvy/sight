@@ -17,10 +17,12 @@
 #include "filesystem"
 #include "fstream"
 #include <algorithm>
+#include <cassert>
 #include <cstdio>
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <sys/types.h>
 #include <tuple>
 #include <utility>
@@ -446,7 +448,6 @@ namespace sight {
                 }
 
                 auto entity = loadEntity(key, item.second);
-                entity.fixSimpleName();
                 this->entitiesMap[key] = entity;
 
                 getIntType(entity.name, true);
@@ -578,6 +579,21 @@ namespace sight {
         return emptyString;
     }
 
+    bool Project::changeTypeName(std::string const& from, std::string const& to) {
+        auto iter = typeMap.find(from);
+        if (iter == typeMap.end()) {
+            return false;
+        }
+
+        auto type = iter->second;
+        auto &info = typeInfoMap[type];
+        info.name = to;
+
+        typeMap.erase(iter);
+        typeMap[to] = type;
+        return true;
+    }
+
     uint Project::addType(const std::string &name) {
         return addType(name, ++(typeIdIncr));
     }
@@ -624,7 +640,63 @@ namespace sight {
         }
 
         // update to template
-        return (this->entitiesMap[entity.templateAddress] = entity).effect();
+        return (this->entitiesMap[entity.templateAddress] = entity).effect() == CODE_OK;
+    }
+
+    bool Project::updateEntity(SightEntity const& entity, SightEntity const& oldEntity) {
+        for (const auto& item : entity.fields) {
+            if (getIntType(item.type) <= 0) {
+                dbg("type not found", item.type);
+                return false;
+            }
+        }
+
+        auto iter = this->entitiesMap.find(entity.templateAddress);
+        auto& editTemplateAddress = oldEntity.templateAddress;
+
+        // check condition
+        if (editTemplateAddress != entity.templateAddress) {
+            // template address have been changed.
+            if (iter != this->entitiesMap.end()) {
+                return false;
+            }
+        } else {
+            if (iter == this->entitiesMap.end()) {
+                return false;
+            }
+        }
+
+        // update type name.
+        if (entity.name != oldEntity.name) {
+            // name have been changed.
+            changeTypeName(oldEntity.name, entity.name);
+        }
+
+        // update template address
+        if (editTemplateAddress != entity.templateAddress) {
+            // template address have been changed.
+
+            // delete old
+            assert(entitiesMap.erase(editTemplateAddress) > 0);
+            delTemplateNode(editTemplateAddress);
+
+            // add new one
+            this->entitiesMap[entity.templateAddress] = entity;
+            addTemplateNode(entity);
+        } else {
+            // update fields
+            auto& entityInMap = iter->second;
+            auto& f = entityInMap.fields;
+            f.clear();
+            f.assign(entity.fields.begin(), entity.fields.end());
+
+            // entityInMap.name = entity.name;
+            // if a entity's name has been changed, then it's templateAddress will be changed.
+        }
+
+        
+        
+        return true;
     }
 
     bool Project::delEntity(std::string_view fullName) {
@@ -1008,6 +1080,10 @@ namespace sight {
         // }
     }
 
+    std::string TypeInfo::getSimpleName() const {
+        return getLastAfter(name, ".");
+    }
+
     void TypeStyle::init() {
         this->iconType = IconType::Circle;
         this->color = IM_COL32_WHITE;
@@ -1020,21 +1096,16 @@ namespace sight {
     }
 
     void SightEntity::fixTemplateAddress() {
+        auto simpleName = this->getSimpleName();
+
         if (!startsWith(templateAddress, "entity/")) {
             templateAddress = "entity/" + templateAddress;
         }
-        if (!endsWith(templateAddress, name)) {
+        if (!endsWith(templateAddress, simpleName)) {
             if (!endsWith(templateAddress, "/")) {
                 templateAddress += "/";
             }
-            templateAddress += name;
-        }
-        fixSimpleName();
-    }
-
-    void SightEntity::fixSimpleName() {
-        if (simpleName.empty()) {
-            simpleName = name;
+            templateAddress += simpleName;
         }
     }
 
@@ -1046,13 +1117,17 @@ namespace sight {
         return addTemplateNode(entity);
     }
 
+    std::string SightEntity::getSimpleName() const {
+        return getLastAfter(name, ".");
+    }
+
     SightEntity::operator SightNodeTemplateAddress() const {
         SightNodeTemplateAddress address;
         address.name = this->templateAddress;
         address.templateNode = new SightJsNode();
         
         auto & node = *address.templateNode;
-        node.nodeName = this->simpleName;
+        node.nodeName = this->getSimpleName();
         node.fullTemplateAddress = this->templateAddress;
 
         for( const auto& item: this->fields){

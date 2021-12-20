@@ -121,8 +121,6 @@ namespace sight {
 
         TypeStyle* style = nullptr;
         TypeInfoRender render;
-        // 
-        std::string simpleName;
 
         void initValue(SightNodeValue & value) const;
 
@@ -132,6 +130,8 @@ namespace sight {
          * @param rhs 
          */
         void mergeFrom(TypeInfo const& rhs);
+
+        std::string getSimpleName() const;
     };
 
 
@@ -157,14 +157,14 @@ namespace sight {
         std::string templateAddress {};
 
         std::vector<SightEntityField> fields;
-        std::string simpleName {};
 
         mutable uint typeId = 0;
 
         void fixTemplateAddress();
-        void fixSimpleName();
 
         int effect() const;
+        
+        std::string getSimpleName() const;
 
         operator SightNodeTemplateAddress() const;
     };
@@ -262,6 +262,8 @@ namespace sight {
          */
         std::string const & getTypeName(int type);
 
+        bool changeTypeName(std::string const& from, std::string const& to);
+
         /**
          *
          * @param name need type's full name
@@ -321,7 +323,7 @@ namespace sight {
         absl::btree_map<std::string, SightEntity> const& getEntitiesMap() const;
 
         bool addEntity(SightEntity const& entity);
-
+        bool updateEntity(SightEntity const& entity, SightEntity const& oldEntity);
         bool delEntity(std::string_view fullName);
 
         void updateEntitiesToTemplateNode() const;
@@ -417,8 +419,6 @@ namespace sight {
     std::tuple<const char**, size_t> getIconTypeStrings();
 
     const char* getIconTypeName(IconType iconType);
-
-
 
     bool inline isBuiltInType(uint type){
         return type < IntTypeNext;

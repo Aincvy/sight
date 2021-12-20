@@ -3,6 +3,18 @@
 //
 #pragma once
 
+#include "sight_ui.h"
+#include "sight_project.h"
+
 namespace sight {
+
+    /**
+     *
+     * @param createEntityData
+     * @return 
+     */
+    int addEntity(const UICreateEntity& createEntityData);
+
+    int updateEntity(const UICreateEntity& createEntityData);
     
 }

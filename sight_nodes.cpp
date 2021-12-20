@@ -1478,24 +1478,6 @@ namespace sight {
         return delFlag;
     }
 
-    int addEntity(const UICreateEntity &createEntityData) {
-        auto p = currentProject();
-        SightEntity entity;
-        entity.name = createEntityData.name;
-        entity.templateAddress = createEntityData.templateAddress;
-
-        auto c = createEntityData.first;
-        while (c) {
-            entity.fields.emplace_back(c->name, c->type, c->defaultValue);
-            
-            c = c->next;
-        }
-        
-        entity.fixTemplateAddress();
-        p->addEntity(entity);
-        return CODE_OK;
-    }
-
     const SightJsNode* findTemplateNode(const SightNode *node) {
         return node->templateNode;
     }

@@ -6,6 +6,8 @@
 
 #include "string"
 #include <algorithm>
+#include <cstddef>
+#include <cstdio>
 #include <string>
 #include <string_view>
 
@@ -102,15 +104,6 @@ namespace sight {
                        [](unsigned char c){ return std::toupper(c); });
     }
 
-    /**
-     * @brief 
-     * 
-     * @param path 
-     * @return true if file is hidden
-     * @return false 
-     */
-    bool isFileHidden(const char* path);
-
     inline std::string strJoin(const char* s1, const char* s2, const char* joiner = "##") {
         std::string str(s1);
         str += joiner;
@@ -136,5 +129,31 @@ namespace sight {
         auto size = std::count_if(str.begin(), str.end(), [](char c) { return c == '\n'; });
         return size + (pos == str.size() - 1 ? 0 : 1);
     }
+
+    inline void assign(char* buf, std::string_view str, size_t len = -1) {
+        if (len > 0) {
+            snprintf(buf, len, "%s", str.data());
+        } else {
+            sprintf(buf, "%s", str.data());
+        }
+    }
+
+    /**
+     * @brief 
+     * 
+     * @param path 
+     * @return true if file is hidden
+     * @return false 
+     */
+    bool isFileHidden(const char* path);
+
+    /**
+     * @brief Get the Last After separator
+     * If the source do not have the separator, then return the source.
+     * @param source 
+     * @param separator 
+     * @return std::string 
+     */
+    std::string getLastAfter(std::string_view source, std::string_view separator);
 
 }

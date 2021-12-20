@@ -25,6 +25,7 @@ namespace sight {
 
     struct LanguageCommonKeys {
         char className[SHORT_KEYS_BUF_SIZE] = "name";
+        char fullName[SHORT_KEYS_BUF_SIZE] = "fullName";
         char address[SHORT_KEYS_BUF_SIZE] = "address";
         char preview[SHORT_KEYS_BUF_SIZE] = "Preview";
         char ok[SHORT_KEYS_BUF_SIZE] = "OK";
@@ -33,6 +34,7 @@ namespace sight {
         char fieldName[SHORT_KEYS_BUF_SIZE] = "name";
         char fieldType[SHORT_KEYS_BUF_SIZE] = "type";
         char fieldDefaultValue[SHORT_KEYS_BUF_SIZE] = "value";
+        char readonly[SHORT_KEYS_BUF_SIZE] = "readonly";
     };
 
     struct LanguageMenuKeys {
@@ -50,6 +52,7 @@ namespace sight {
         char entity[SHORT_KEYS_BUF_SIZE] = "Entity";
         char open[SHORT_KEYS_BUF_SIZE] = "Open";
         char save[SHORT_KEYS_BUF_SIZE] = "Save";
+        char saveAll[SHORT_KEYS_BUF_SIZE] = "Save All";
         char options[SHORT_KEYS_BUF_SIZE] = "Options";
         char exit[SHORT_KEYS_BUF_SIZE] = "Exit";
 

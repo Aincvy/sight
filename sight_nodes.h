@@ -826,13 +826,6 @@ namespace sight {
 
     /**
      *
-     * @param createEntityData
-     * @return 0 ok.
-     */
-    int addEntity(const UICreateEntity & createEntityData);
-
-    /**
-     *
      * @param node
      * @return
      */

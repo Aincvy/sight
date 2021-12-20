@@ -8,6 +8,7 @@
 #include "sight.h"
 #include "sight_widgets.h"
 #include "sight_language.h"
+#include "sight_project.h"
 
 #include "absl/container/flat_hash_set.h"
 #include <functional>
@@ -21,7 +22,6 @@ namespace sight {
 
     struct SightNode;
     struct SightNodeConnection;
-    struct SightEntity;
 
     enum class UICommandType{
         UICommandHolder,
@@ -76,7 +76,9 @@ namespace sight {
      * cache for create entity window.
      */
     struct UICreateEntity {
+        // char editTemplateAddress[NAME_BUF_SIZE] = { 0 };
         bool edit = false;
+        SightEntity editingEntity{};
         char name[NAME_BUF_SIZE] = {0};
         char templateAddress[NAME_BUF_SIZE] = {0};
         struct EntityField* first = nullptr;
@@ -109,6 +111,8 @@ namespace sight {
         void loadFrom(SightEntity const& info);
 
         void reset();
+
+        bool isEditMode() const;
 
     private:
 

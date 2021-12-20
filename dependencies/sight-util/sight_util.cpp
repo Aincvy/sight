@@ -8,6 +8,8 @@
 #include "sstream"
 
 #include <cstring>
+#include <string>
+#include <string_view>
 #include <sys/stat.h>
 
 #ifdef __APPLE__
@@ -101,6 +103,18 @@ namespace sight {
         }
         
         return false;
+    }
+
+    std::string getLastAfter(std::string_view source, std::string_view separator) {
+        if (separator.empty()) {
+            return std::string{source};
+        }
+        auto pos = source.rfind(separator);
+        if (pos == std::string_view::npos) {
+            return std::string{ source };
+        }
+
+        return std::string{ source.substr(pos + separator.length()) };
     }
 
 }

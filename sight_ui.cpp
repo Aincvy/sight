@@ -7,6 +7,7 @@
 #include "sight_ui.h"
 #include "sight_nodes.h"
 #include "sight_ui_node_editor.h"
+#include "sight_ui_project.h"
 #include "sight.h"
 #include "sight_js.h"
 #include "sight_js_parser.h"
@@ -33,6 +34,7 @@
 
 #include <GLFW/glfw3.h>
 #include <string>
+#include <string_view>
 #include <sys/types.h>
 #include <vector>
 
@@ -82,6 +84,21 @@ namespace sight {
             }
         }
 
+        bool checkTemplateNodeIsUsed(Project* p, std::string_view templateAddress, bool alert = true){
+            std::string pathOut;
+            if (p->isAnyGraphHasTemplate(templateAddress, &pathOut)) {
+                // used, cannot be deleted.
+                if (alert) {
+                    std::string contentString = { "Used in graph: " };
+                    contentString += pathOut;
+                    openAlertModal("Alert! Operation denied", contentString);
+                }
+                return true;
+            }
+
+            return false;
+        }
+
         void showMainFileMenu(UIStatus& uiStatus){
             if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS._new)) {
                 if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.graph)) {
@@ -103,12 +120,10 @@ namespace sight {
                 ImGui::EndMenu();
             }
 
-            // if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.open)) {
-            //     dbg("open graph file");
-                
-            // }
-            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.save, g_UIStatus->keybindings->saveFile.tipsText())) {
-                dbg("save graph");
+            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.save)) {
+
+            }
+            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.saveAll, g_UIStatus->keybindings->saveFile.tipsText())) {
                 saveAnyThing();
             }
 
@@ -501,7 +516,15 @@ namespace sight {
             auto & createEntityData = g_UIStatus->createEntityData;
 
             if (ImGui::Begin(WINDOW_LANGUAGE_KEYS.createEntity, &g_UIStatus->windowStatus.createEntity)) {
-                ImGui::InputText(COMMON_LANGUAGE_KEYS.className, g_UIStatus->createEntityData.name, NAME_BUF_SIZE);
+                static std::string nameBuf{};
+                auto fullName = g_UIStatus->createEntityData.name;
+                if (ImGui::InputText(COMMON_LANGUAGE_KEYS.fullName, fullName, std::size(g_UIStatus->createEntityData.name))) {
+                    // update nameBuf
+                    nameBuf = getLastAfter(fullName, ".");
+                }
+                ImGui::InputText(COMMON_LANGUAGE_KEYS.className, nameBuf.data(), std::size(nameBuf), ImGuiInputTextFlags_ReadOnly);
+                ImGui::SameLine();
+                ImGui::Text("(%s)", COMMON_LANGUAGE_KEYS.readonly);
                 ImGui::InputText(COMMON_LANGUAGE_KEYS.address, g_UIStatus->createEntityData.templateAddress, NAME_BUF_SIZE);
                 // maybe need a help marker ?
 
@@ -594,16 +617,50 @@ namespace sight {
                 ImGui::InputTextMultiline("##preview", buf, NAME_BUF_SIZE, ImVec2(0,0), ImGuiInputTextFlags_ReadOnly);
                 ImGui::PopStyleColor();
 
+                auto resetDataAndCloseWindow = []() {
+                    g_UIStatus->createEntityData.reset();
+                    g_UIStatus->windowStatus.createEntity = false;
+                };
+
                 // buttons
                 if (ImGui::Button(COMMON_LANGUAGE_KEYS.ok)) {
-                    if (createEntityData.edit) {
-                        openAlertModal("Alert!", "Edit is not impl.");
+                    if (createEntityData.isEditMode()) {
+                        // 
+                        if (nameBuf.empty()) {
+                            nameBuf = getLastAfter(fullName, ".");
+                        }
+                        
+                        std::string nowTemplateAddress = createEntityData.templateAddress;
+                        if (!endsWith(nowTemplateAddress, nameBuf)) {
+                            // name changed
+                            auto simpleName = createEntityData.editingEntity.getSimpleName();
+                            auto pos = nowTemplateAddress.rfind(simpleName);
+                            if (pos != std::string::npos) {
+                                nowTemplateAddress.erase(pos) += nameBuf;
+                                // sprintf(createEntityData.templateAddress, "%s", nowTemplateAddress.c_str());
+                                assign(createEntityData.templateAddress, nowTemplateAddress);
+                            }
+                        }
+
+                        auto p = currentProject();
+                        if (checkTemplateNodeIsUsed(p, createEntityData.editingEntity.templateAddress)) {
+                            // todo update used-entity.
+
+                        }  else {
+                            // not used entity.
+                            if (updateEntity(createEntityData) == CODE_OK) {
+                                resetDataAndCloseWindow();
+                            } else {
+                                dbg("update entity failed.");
+                            }
+                        }
                     } else {
                         // add entity
                         int r = addEntity(createEntityData);
                         if (r == 0) {
-                            createEntityData.reset();
-                            g_UIStatus->windowStatus.createEntity = false;
+                            resetDataAndCloseWindow();
+                        } else {
+                            dbg(r);
                         }
                     }
                 }
@@ -611,7 +668,7 @@ namespace sight {
                 if (ImGui::Button(COMMON_LANGUAGE_KEYS.cancel)) {
                     g_UIStatus->windowStatus.createEntity = false;
                 }
-                if (createEntityData.edit) {
+                if (createEntityData.isEditMode()) {
                     // In edit mode
                     ImGui::SameLine();
                     ImGui::Text("Edit Mode");
@@ -643,7 +700,7 @@ namespace sight {
                         }
                     }
 
-                    ImGui::Text("%8s", info.simpleName.c_str());
+                    ImGui::Text("%8s", info.getSimpleName().c_str());
                     ImGui::SameLine();
                     ImGui::Text("%18s", name.c_str());
                     ImGui::SameLine();
@@ -656,6 +713,7 @@ namespace sight {
                         auto& createEntityData = g_UIStatus->createEntityData;
                         createEntityData.loadFrom(info);
                         createEntityData.edit = true;
+                        createEntityData.editingEntity = info;
 
                         activeWindowCreateEntity();
                     }
@@ -669,12 +727,8 @@ namespace sight {
 
                 if (!delFullName.empty()) {
                     // check if used.
-                    std::string pathOut;
-                    if (p->isAnyGraphHasTemplate(delFullName, &pathOut)) {
+                    if (checkTemplateNodeIsUsed(p, delFullName)) {
                         // used, cannot be deleted.
-                        std::string contentString = { "Used in graph: " };
-                        contentString += pathOut;
-                        openAlertModal("Alert! Cannot be deleted!", contentString);
                     } else {
                         // delete ask
                         std::string str{ "! You only can delete the NOT-USED entity !\nYou will delete: " };
@@ -1708,7 +1762,7 @@ namespace sight {
         reset();
 
         // convert data to  createEntityData
-        snprintf(this->name, std::size(this->name), "%s", info.simpleName.c_str());
+        snprintf(this->name, std::size(this->name), "%s", info.name.c_str());
         snprintf(this->templateAddress, std::size(this->templateAddress), "%s", info.templateAddress.c_str());
 
         for( const auto& item: info.fields){
@@ -1722,9 +1776,10 @@ namespace sight {
     }
 
     void UICreateEntity::reset() {
-        edit = false;
         sprintf(this->name, "");
         sprintf(this->templateAddress, "");
+        this->editingEntity = {};
+        this->edit = false;
 
         auto c = first;
         while (c) {
@@ -1737,6 +1792,9 @@ namespace sight {
         first = nullptr;
     }
 
+    bool UICreateEntity::isEditMode() const {
+        return edit;
+    }
 
     UIColors::UIColors() {
 
