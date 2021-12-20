@@ -5,7 +5,8 @@
 #include "sight_keybindings.h"
 #include "sight_plugin.h"
 #include "sight_ui.h"
-#include "sight_node_editor.h"
+#include "sight_nodes.h"
+#include "sight_ui_node_editor.h"
 #include "sight.h"
 #include "sight_js.h"
 #include "sight_js_parser.h"
@@ -461,9 +462,7 @@ namespace sight {
                             }
 
                             selection->selectedFiles.clear();
-                            // dbg("double click, open file", item.path);
                             if (item.fileType == ProjectFileType::Graph) {
-                                // currentProject()->openGraph(item.path.c_str(), false);
                                 uiChangeGraph(item.path.c_str());
                             } else {
                                 dbg("unHandle file type", item.fileType);
@@ -1337,7 +1336,7 @@ namespace sight {
     }
 
     void destroyWindows() {
-        destroyNodeEditor();
+        destroyNodeEditor(true, true);
         glfwTerminate();
 
         g_UIStatus->v8GlobalContext.Reset();
@@ -1436,24 +1435,40 @@ namespace sight {
 
     void uiChangeGraph(const char* path ) {
         auto g = getCurrentGraph(); 
-        if (!g) {
-            return;
-        }
+        // if (!g) {
+        //     return;
+        // }
 
-        if (!g->editing) {
+        auto openGraphFunc = [path]() {
+            char tmp[NAME_BUF_SIZE]{0};
+            auto t = currentProject()->openGraph(path, false, tmp);
+            if (t) {
+                // open succeed.
+                changeNodeEditorGraph(tmp);
+            }
+        };
+        if (g == nullptr || !g->editing) {
             // 
-            currentProject()->openGraph(path, false);
+            // currentProject()->openGraph(path, false);
+            openGraphFunc();
             return;
         }
 
         std::string stringPath(path);
-        openSaveModal("Save File?", "Current Graph do not save, do you want save file?", [stringPath](SaveOperationResult r) {
-            if (r == SaveOperationResult::Drop) {
-                currentProject()->openGraph(stringPath.c_str(), false);
+        openSaveModal("Save File?", "Current Graph do not save, do you want save file?", [stringPath, openGraphFunc,g](SaveOperationResult r) {
+            if (r == SaveOperationResult::Cancel) {
+                return;
             } else if (r == SaveOperationResult::Save) {
-                getCurrentGraph()->save();
-                currentProject()->openGraph(stringPath.c_str(), false);
+                g->save();
             }
+            openGraphFunc();
+
+            // if (r == SaveOperationResult::Drop) {
+            //     currentProject()->openGraph(stringPath.c_str(), false);
+            // } else if (r == SaveOperationResult::Save) {
+            //     getCurrentGraph()->save();
+            //     currentProject()->openGraph(stringPath.c_str(), false);
+            // }
         });
     }
 

@@ -294,7 +294,7 @@ namespace sight {
          * @return SightNodeGraph* 
          */
         SightNodeGraph* createGraph(const char* path, bool fixPath = true);
-        SightNodeGraph* openGraph(const char* path, bool fixPath = true);
+        SightNodeGraph* openGraph(const char* path, bool fixPath = true, char* pathWithoutExtOut = nullptr);
 
         /**
          * @brief if has last open graph, then open it.

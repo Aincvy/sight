@@ -11,7 +11,7 @@
 
 #include "sight.h"
 #include "shared_queue.h"
-#include "sight_node_editor.h"
+#include "sight_nodes.h"
 
 #include "v8.h"
 #include "v8pp/module.hpp"

@@ -6,7 +6,6 @@
 #include "sight.h"
 #include "sight_ui.h"
 #include "sight_js.h"
-#include "sight_node_editor.h"
 #include "sight_project.h"
 #include "sight_util.h"
 

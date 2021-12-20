@@ -21,7 +21,6 @@
 #include "sight.h"
 #include "sight_defines.h"
 #include "sight_js.h"
-#include "sight_node_editor.h"
 #include "shared_queue.h"
 #include "sight_log.h"
 #include "sight_ui.h"
@@ -2283,7 +2282,7 @@ namespace sight {
     int parseGraph(const char* filename, std::string& source) {
         dbg(filename);
         SightNodeGraph graph;
-        int i = graph.load(filename, false);
+        int i = graph.load(filename);
         if (i == 1) {
             return 1;
         }
@@ -2298,7 +2297,6 @@ namespace sight {
             dbg("error graph",filename, status);
             return 3;
         }
-
 
         // parse the enter node.
         auto &data = g_V8Runtime->parsingGraphData;

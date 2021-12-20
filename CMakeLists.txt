@@ -19,7 +19,8 @@ target_include_directories(
 )
 target_sources(sight PRIVATE
         sight_ui.cpp
-        sight_node_editor.cpp
+        sight_ui_node_editor.cpp
+        sight_nodes.cpp
         sight_js.cpp
         sight_js_parser.cpp
         sight_project.cpp

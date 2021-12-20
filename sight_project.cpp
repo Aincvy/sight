@@ -3,14 +3,12 @@
 //
 
 #include "sight_project.h"
-#include "dbg.h"
-#include "imgui.h"
 #include "sight_js.h"
 #include "sight_js_parser.h"
 #include "sight_ui.h"
 #include "sight_util.h"
 #include "sight.h"
-#include "sight_node_editor.h"
+#include "sight_nodes.h"
 #include "sight_memory.h"
 
 #include "sight_widgets.h"
@@ -19,6 +17,7 @@
 #include "filesystem"
 #include "fstream"
 #include <algorithm>
+#include <cstdio>
 #include <fstream>
 #include <iterator>
 #include <string>
@@ -531,7 +530,7 @@ namespace sight {
         return g;
     }
 
-    SightNodeGraph* Project::openGraph(const char* path, bool fixPath) {
+    SightNodeGraph* Project::openGraph(const char* path, bool fixPath, char* pathWithoutExtOut) {
         std::string targetPath = fixPath ? pathGraphFolder() + path : path;
         std::filesystem::path temp(targetPath);
         if (temp.has_extension()) {
@@ -542,6 +541,9 @@ namespace sight {
         }
         dbg(targetPath);
         changeGraph(targetPath.c_str());
+        if (pathWithoutExtOut) {
+            sprintf(pathWithoutExtOut, "%s", targetPath.c_str());
+        }
         lastOpenGraph = targetPath;
         return getCurrentGraph();
     }
@@ -551,7 +553,8 @@ namespace sight {
             return;
         }
 
-        openGraph(lastOpenGraph.c_str(), false);
+        // openGraph(lastOpenGraph.c_str(), false);
+        uiChangeGraph(lastOpenGraph.c_str());
     }
 
     ProjectFile const& Project::getFileCache() const {

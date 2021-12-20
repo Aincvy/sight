@@ -22,7 +22,6 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 
-namespace ed = ax::NodeEditor;
 using Isolate = v8::Isolate;
 
 namespace sight {
@@ -676,7 +675,7 @@ namespace sight {
          * -1: file not found.
          * -2: bad file.
          */
-        int load(const char *path, bool isLoadEntity = false);
+        int load(const char *path);
 
         int save();
 
@@ -732,20 +731,18 @@ namespace sight {
         void reset();
     };
 
+
     /**
      * sight  node editor status
      */
     struct NodeEditorStatus {
 
         SightNodeGraph* graph = nullptr;
-        SightNodeGraph* entityGraph = nullptr;
-        ed::EditorContext* context = nullptr;
-        // file path buf.
-        char contextConfigFileBuf[NAME_BUF_SIZE * 2] = {0};
+
         // node template | for render
         std::vector<SightNodeTemplateAddress> templateAddressList;
 
-        SightArray<SightJsNode> templateNodeArray{LITTLE_ARRAY_SIZE * 2};
+        SightArray<SightJsNode> templateNodeArray{ LITTLE_ARRAY_SIZE * 2 };
         SightArray<SightJsNodePort> templateNodePortArray{ MEDIUM_ARRAY_SIZE };
 
         NodeEditorStatus();
@@ -756,15 +753,15 @@ namespace sight {
          * @param path
          * @return
          */
-        int createGraph(const char*path);
+        int createGraph(const char* path);
 
         /**
          * Try to load graph first, if failed, then create one.
          * Recommend use function `changeGraph`.
          * @param path
-         * @return
+         * @return CODE_OK, CODE_FAIL
          */
-        int loadOrCreateGraph(const char*path);
+        int loadOrCreateGraph(const char* path);
 
         /**
          *
@@ -774,39 +771,19 @@ namespace sight {
         SightJsNode* findTemplateNode(const char* path);
 
     private:
-
     };
-
-    /**
-     * init
-     * @return
-     */
-    int initNodeEditor();
-
-    /**
-     * destroy and free
-     * @return
-     *
-     */
-    int destroyNodeEditor();
-
-    void nodeEditorFrameBegin();
-
-    void nodeEditorFrameEnd();
-
-    int showNodeEditorGraph(UIStatus const& uiStatus);
-
-    void onNodePortValueChange(SightNodePort* port);
 
     /**
      * @brief 
      * 
-     * @param port 
-     * @param width 
-     * @param type     TypeInfo's id
-     * @param fromGraph   true: for drawing graph, false: not
+     * @return int  CODE_FAIL if already init.
      */
-    void showNodePortValue(SightNodePort* port, bool fromGraph = false, int width = 120, int type = -1);
+    int initNodeStatus();
+
+    int destoryNodeStatus();
+
+    void onNodePortValueChange(SightNodePort* port);
+
 
     uint nextNodeOrPortId();
 
@@ -833,18 +810,19 @@ namespace sight {
      */
     SightNodeGraph* getCurrentGraph();
 
+    NodeEditorStatus* getCurrentNodeStatus();
+
     /**
      *
      */
-    void disposeGraph(bool context = true);
+    void disposeGraph();
 
     /**
      * change graph to another one.  
      * !!DO NOT USE THIS FUNCTION DIRECTLY, USE `Project` CLASS !!
      * @param pathWithoutExt   like './simple'  without dot.
-     * @param loadEntityGraph  is pathWithoutExt a entity graph?  may deprecated.
      */
-    void changeGraph(const char* pathWithoutExt, bool loadEntityGraph = false);
+    void changeGraph(const char* pathWithoutExt);
 
     /**
      *
@@ -852,12 +830,6 @@ namespace sight {
      * @return 0 ok.
      */
     int addEntity(const UICreateEntity & createEntityData);
-
-    /**
-     * Load all entities.
-     * @return
-     */
-    int loadEntities();
 
     /**
      *
