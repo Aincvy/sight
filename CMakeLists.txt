@@ -30,6 +30,7 @@ target_sources(sight PRIVATE
         sight_widgets.cpp
         sight_keybindings.cpp
         sight_external_widgets.cpp
+        # dependencies/imgui/imgui_demo.cpp           # for debug
 )
 
 # depend
@@ -37,6 +38,7 @@ target_include_directories(
     sight PRIVATE
         dependencies/v8pp
         dependencies/stb
+        dependencies/IconFontCppHeaders
 )
 
 target_sources(sight PRIVATE

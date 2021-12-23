@@ -20,6 +20,8 @@
 #include "sight_widgets.h"
 #include "v8pp/convert.hpp"
 
+#include "IconsMaterialDesign.h"
+
 #include <algorithm>
 #include <cstddef>
 #include <cstdio>
@@ -307,6 +309,10 @@ namespace sight {
             }
             ImGui::Text(u8"在吗，这里是下一行");
 
+            ImGui::Button(ICON_MD_SEARCH " Search");
+            ImGui::Text(ICON_MD_REPEAT " Repeat");
+            ImGui::Button(ICON_MD_REPEAT_ONE " 重复");
+
             ImGui::End();
         }
 
@@ -442,7 +448,7 @@ namespace sight {
 
             for (const auto& item : folder.files) {
                 if (item.fileType == ProjectFileType::Directory) {
-                    if (ImGui::TreeNode(item.path.c_str(), "<dir> %s", item.filename.c_str())) {
+                    if (ImGui::TreeNode(item.path.c_str(), "%s %s", ICON_MD_FOLDER, item.filename.c_str())) {
                         showProjectFolder(item);
                         ImGui::TreePop();
                     }
@@ -455,7 +461,9 @@ namespace sight {
                     std::string name;
                     switch (item.fileType) {
                         case ProjectFileType::Graph:
-                            name = "<graph> ";
+                            // name = "<graph> ";
+                            // name = "\xee\xae\xbb ";
+                            name = ICON_MD_POLYLINE;
                             name += item.filename;
                             name += "##";
                             name += item.path;
@@ -1321,7 +1329,12 @@ namespace sight {
         io.Fonts->AddFontDefault();
         ImFontConfig config;
         config.MergeMode = true;
-        auto fontPointer = io.Fonts->AddFontFromFileTTF((resourceFolder + "font/FangZhengKaiTiJianTi-1.ttf").c_str(), 16, &config, io.Fonts->GetGlyphRangesChineseSimplifiedCommon());
+        config.GlyphMinAdvanceX = 13.0f;
+        auto fontPointer = io.Fonts->AddFontFromFileTTF((resourceFolder + "font/FangZhengKaiTiJianTi-1.ttf").c_str(), 16.0f, &config, io.Fonts->GetGlyphRangesChineseSimplifiedCommon());
+        static const ImWchar icon_ranges[] = { ICON_MIN_MD, ICON_MAX_MD, 0 };
+        config.GlyphOffset.y += 5.5f;
+        auto iconFontPointer = io.Fonts->AddFontFromFileTTF((resourceFolder + "font/MaterialIconsOutlined-Regular.otf").c_str(), 18.0f, &config, icon_ranges);
+        
         io.Fonts->Build();
 
         g_UIStatus->io = &io;
@@ -1363,6 +1376,8 @@ namespace sight {
 
             mainWindowFrame(*g_UIStatus);
 
+            // ImGui::ShowDemoWindow();     // for debug
+ 
             // Rendering
             ImGui::Render();
             int display_w, display_h;
