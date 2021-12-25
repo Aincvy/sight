@@ -1,4 +1,3 @@
-#include "dbg.h"
 #include "imgui_internal.h"
 #include "imgui_node_editor.h"
 #include "sight_defines.h"
@@ -38,6 +37,7 @@
 #include <string>
 #include <string_view>
 #include <sys/types.h>
+#include <uv.h>
 #include <vector>
 
 #include <absl/strings/match.h>
@@ -456,19 +456,21 @@ namespace sight {
                         selection->selectedFiles.clear();
                     }
                 } else {
-
                     bool selected = selection->selectedFiles.contains(item.path);
                     std::string name;
                     switch (item.fileType) {
                         case ProjectFileType::Graph:
                             // name = "<graph> ";
                             // name = "\xee\xae\xbb ";
-                            name = ICON_MD_POLYLINE;
+                            name = ICON_MD_POLYLINE " ";
                             name += item.filename;
                             name += "##";
                             name += item.path;
                         break;
                         case ProjectFileType::Regular:
+                            name = ICON_MD_INSERT_DRIVE_FILE " ";
+                            name += strJoin(item.filename, item.path);
+                        break;
                         case ProjectFileType::Plugin:
                         case ProjectFileType::Directory:
                             name = strJoin(item.filename, item.path);
@@ -687,7 +689,9 @@ namespace sight {
 
         void showEntityListWindow(){
             if (ImGui::Begin("Entity List", &g_UIStatus->windowStatus.entityListWindow)) {
-                ImGui::InputText("Filter", g_UIStatus->buffer.entityListSearch, std::size(g_UIStatus->buffer.entityListSearch));
+                // ImGui::Text(ICON_MD_SEARCH);
+                // ImGui::SameLine();
+                ImGui::InputText(ICON_MD_SEARCH "##Filter", g_UIStatus->buffer.entityListSearch, std::size(g_UIStatus->buffer.entityListSearch));
                 ImGui::SameLine(ImGui::GetWindowWidth() - 60);
                 
                 if (ImGui::Button("Create")) {
@@ -1331,10 +1335,12 @@ namespace sight {
         config.MergeMode = true;
         config.GlyphMinAdvanceX = 13.0f;
         auto fontPointer = io.Fonts->AddFontFromFileTTF((resourceFolder + "font/FangZhengKaiTiJianTi-1.ttf").c_str(), 16.0f, &config, io.Fonts->GetGlyphRangesChineseSimplifiedCommon());
+        // icon
         static const ImWchar icon_ranges[] = { ICON_MIN_MD, ICON_MAX_MD, 0 };
         config.GlyphOffset.y += 5.5f;
         auto iconFontPointer = io.Fonts->AddFontFromFileTTF((resourceFolder + "font/MaterialIconsOutlined-Regular.otf").c_str(), 18.0f, &config, icon_ranges);
-        
+
+
         io.Fonts->Build();
 
         g_UIStatus->io = &io;
@@ -1413,7 +1419,15 @@ namespace sight {
         g_UIStatus->arrayBufferAllocator = nullptr;
         g_UIStatus->isolate->Dispose();
         g_UIStatus->isolate = nullptr;
-    
+
+        // free uv
+        uv_loop_close(g_UIStatus->uvLoop);
+        free(g_UIStatus->uvLoop);
+        g_UIStatus->uvLoop = nullptr;
+        delete g_UIStatus->uvAsync;
+        g_UIStatus->uvAsync = nullptr;
+
+
         exitSight();
 
         delete g_UIStatus;

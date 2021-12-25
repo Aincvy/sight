@@ -2,7 +2,6 @@
 //
 #pragma once
 #include "imgui.h"
-#include "sight_defines.h"
 #include "uv.h"
 
 #include "sight.h"
@@ -135,7 +134,7 @@ namespace sight {
     struct UIWindowStatus {
         bool nodeGraph = false;
         bool createEntity = false;
-        bool testWindow = true;
+        bool testWindow = false;
         bool aboutWindow = false;
         bool projectSettingsWindow = false;
         bool entityListWindow = false;

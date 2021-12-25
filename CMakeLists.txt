@@ -81,12 +81,6 @@ target_include_directories(sight PRIVATE YAML_CPP_INCLUDE_DIR)
 target_link_libraries(sight PRIVATE ${YAML_CPP_LIBRARIES})
 MESSAGE(STATUS "Found yaml-cpp at: ${YAML_CPP_INCLUDE_DIR}")
 
-# other macos kit
-# target_link_libraries(
-#         sight PRIVATE
-#         "-framework CoreFoundation"
-#         "-framework ApplicationServices"
-# )
 
 # custom commands 
 add_custom_target(copyFiles)

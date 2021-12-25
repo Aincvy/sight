@@ -956,6 +956,10 @@ namespace sight {
         return iconTypeStrings[static_cast<int>(iconType) - static_cast<int>(IconType::Flow)];
     }
 
+    bool checkTypeCompatibility(uint type1, uint type2) {
+        return type1 == type2;
+    }
+
     TypeInfoRender::TypeInfoRender()
     {
         this->data.i = 0;

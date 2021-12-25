@@ -1,5 +1,6 @@
 #pragma once
 
+#include "imgui.h"
 #include <vector>
 #include <string>
 
@@ -25,4 +26,7 @@ namespace sight {
      */
     bool ComboFilter(const char* id, char* buffer, int bufferlen, std::vector<std::string> hints, ComboFilterState& s);
 
+
+    std::ostream& operator<<(std::ostream& out, const ImVec2& v);
+    
 }

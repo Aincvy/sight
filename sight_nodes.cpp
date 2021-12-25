@@ -7,6 +7,7 @@
 #include <cstring>
 #include <iterator>
 #include <string>
+#include <sys/termios.h>
 #include <sys/types.h>
 #include <utility>
 #include <vector>
@@ -100,7 +101,7 @@ namespace sight {
 
         CURRENT_GRAPH->addNode(*node);
         delete node;
-        return 0;
+        return CODE_OK;
     }
 
     SightNodeGraph *getCurrentGraph() {
@@ -142,6 +143,10 @@ namespace sight {
 
     bool SightNodePort::isConnect() const {
         return !connections.empty();
+    }
+
+    bool SightNodePort::isTitleBarPort() const {
+        return portName.empty();
     }
 
     int SightNodePort::connectionsSize() const {
@@ -200,6 +205,36 @@ namespace sight {
             this->fields.push_back(port);
         }
 
+    }
+
+    SightNodePort* SightNode::getOppositeTitleBarPort(NodePortType type) const {
+        if (type == NodePortType::Input) {
+            return chainOutPort;
+        } else if (type == NodePortType::Output) {
+            return chainInPort;
+        }
+        return nullptr;
+    }
+
+    SightNodePort* SightNode::getOppositePortByType(NodePortType kind, uint type) {
+        auto searchFunc = [type](std::vector<SightNodePort> & list) -> SightNodePort* {
+            SightNodePort* p = nullptr;
+            for( auto& item: list){
+                // todo type check 
+                if (item.getType() == type) {
+                    p = &item;
+                    break;
+                }
+            }
+            return p;
+        };
+
+        if (kind == NodePortType::Input) {
+            return searchFunc(this->outputPorts);
+        } else if (kind == NodePortType::Output) {
+            return searchFunc(this->inputPorts);
+        }
+        return nullptr;
     }
 
     SightNode *SightNode::clone() const{

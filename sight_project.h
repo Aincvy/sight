@@ -420,6 +420,8 @@ namespace sight {
 
     const char* getIconTypeName(IconType iconType);
 
+    bool checkTypeCompatibility(uint type1, uint type2);
+
     bool inline isBuiltInType(uint type){
         return type < IntTypeNext;
     }

@@ -166,6 +166,8 @@ namespace sight {
          */
         bool isConnect() const;
 
+        bool isTitleBarPort() const;
+
         /**
          *
          * @return
@@ -295,6 +297,17 @@ namespace sight {
          * @param port
          */
         void addPort(const SightNodePort & port);
+
+        SightNodePort* getOppositeTitleBarPort(NodePortType type) const;
+
+        /**
+         * @brief Get the Opposite Port By Type object
+         * 
+         * @param kind 
+         * @param type 
+         * @return SightNodePort* 
+         */
+        SightNodePort* getOppositePortByType(NodePortType kind, uint type);
 
         /**
          * clone this node
@@ -566,7 +579,7 @@ namespace sight {
         /**
          * If has children, then show them, otherwise, show self.
          */
-        void showContextMenu(const ImVec2 &openPopupPosition);
+        void showContextMenu();
 
         /**
          * @brief Free external memory.

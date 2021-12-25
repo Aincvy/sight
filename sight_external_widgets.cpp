@@ -3,6 +3,9 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 
+#include <iostream>
+
+#include "sight_defines.h"
 
 
 namespace sight {
@@ -181,4 +184,16 @@ namespace sight {
         }
         return done;
     }
+
+    std::ostream& operator<<(std::ostream& out, const ImVec2& v) {
+        out << v.x << ", " << v.y;
+        return out;
+    }
+
+    void test() {
+        auto pos = ImVec2(1, 2);
+        std::cout << pos;     // it's ok
+        // dbg(pos);             //  Type does not support the << ostream operator
+    }
+
 }

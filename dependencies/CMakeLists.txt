@@ -38,9 +38,7 @@ target_link_libraries(
         "-framework AppKit"
 )
 
-
 # imgui-node-editor
-
 SET(
         IMGUI_NODE_EDITOR_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/imgui-node-editor/crude_json.cpp
@@ -85,7 +83,7 @@ target_include_directories(
         ${CMAKE_CURRENT_LIST_DIR}/dbg-macro
 )
 
-# dbg
+# macro
 IF (CMAKE_BUILD_TYPE STREQUAL "Debug")
     message(STATUS "in debug mode, add defines")
     target_compile_definitions(sight-util PUBLIC SIGHT_DEBUG)
