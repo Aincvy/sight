@@ -853,6 +853,8 @@ namespace sight {
      */
     bool isNodeEditorReady();
 
+    const char* getNodePortTypeName(NodePortType kind);
+
     inline bool isNodePortShowValue(SightNodePort const& port){
         uint type = port.getType();
         return port.options.showValue && type != IntTypeProcess && type != IntTypeObject;

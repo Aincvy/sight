@@ -26,7 +26,7 @@ namespace sight {
         SightKeyWrapper openGraph;
         SightKeyWrapper duplicateNode;
 
-
+        SightKeyWrapper esc;
     };
 
 

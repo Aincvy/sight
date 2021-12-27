@@ -55,24 +55,6 @@ namespace sight {
 
     namespace {
         // private members and functions
-    
-        /**
-         * Sync id, value. From src to dst.
-         * @param src
-         * @param dst
-         */
-        void syncNodePort(std::vector<SightNodePort> & src, std::vector<SightNodePort> & dst){
-            for (auto &item : dst) {
-                for (const auto &srcItem : src) {
-                    if (srcItem.portName == item.portName) {
-                        // same port.
-                        item.id = srcItem.id;
-                        item.value = srcItem.value;
-                        break;
-                    }
-                }
-            }
-        }
 
     }
 
@@ -568,9 +550,9 @@ namespace sight {
 
     void SightJsNode::updateStyle() {
         auto& style = this->nodeStyle;
-        if (this->nodeName == "VarDeclare") {
-            dbg(1);
-        }
+        // if (this->nodeName == "VarDeclare") {
+        //     dbg(1);
+        // }
 
         auto nodeFunc = [](std::vector<SightJsNodePort*> const& p, SightNodeStyle::PortTypeStyle& typeStyle, bool isField){
             typeStyle.inputWidth = 0;
@@ -1519,6 +1501,20 @@ namespace sight {
 
     SightJsNode* findTemplateNode(const char* path) {
         return g_NodeEditorStatus->findTemplateNode(path);
+    }
+
+    const char* getNodePortTypeName(NodePortType kind) {
+        switch (kind) {
+        case NodePortType::Input:
+            return "Input";
+        case NodePortType::Output:
+            return "Output";
+        case NodePortType::Both:
+            return "Both";
+        case NodePortType::Field:
+            return "Field";
+        }
+        return nullptr;
     }
 
     SightAnyThingData::SightAnyThingData() {

@@ -1,5 +1,6 @@
 #include "sight_ui_node_editor.h"
 
+#include "dbg.h"
 #include "sight_external_widgets.h"
 
 #include "imgui_node_editor.h"
@@ -13,6 +14,8 @@
 #include "sight_widgets.h"
 #include <cassert>
 #include <iostream>
+
+#include "absl/strings/substitute.h"
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui_canvas.h"
@@ -121,18 +124,44 @@ namespace sight {
 
 
         // node editor functions
-        void showContextMenu(uint nodeId, uint linkId, uint pinId) {
-            // ed::Suspend();
-
-            if (ImGui::BeginPopup(NODE_CONTEXT_MENU)) {
-                if (ImGui::MenuItem("itemA")) {
-                    dbg("item a");
+        
+        void checkResetCreateStatus(){
+            if (g_ContextStatus->contextMenuCreateNodeOpen) {
+                if (!ImGui::IsPopupOpen(BACKGROUND_CONTEXT_MENU)) {
+                    g_ContextStatus->resetAfterCreateNode();
                 }
+            } else {
+                if (g_ContextStatus->portForCreateNode) {
+                    if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+                        g_ContextStatus->resetAfterCreateNode();
+                    }
+                }
+            }
+        }
+
+        // this function need node editor be suspend
+        void showContextMenu(uint nodeId, uint linkId, uint pinId) {
+            if (ImGui::BeginPopup(NODE_CONTEXT_MENU)) {
                 if (ImGui::MenuItem("debugInfo")) {
                     // show debug info.
                     dbg(nodeId);
                     auto nodePointer = CURRENT_GRAPH->findNode(nodeId);
                     dbg(nodePointer);
+                    if (nodePointer) {
+                        auto nodeFunc = [](std::vector<SightNodePort> const& list) {
+                            if (list.empty()) {
+                                return ;
+                            }
+
+                            dbg(getNodePortTypeName(list.front().kind));
+                            for( const auto& item: list){
+                                auto portInfoMsg = absl::Substitute("$0, $1", item.getId(), item.portName);
+                                dbg(portInfoMsg);
+                            }
+                        };
+
+                        CALL_NODE_FUNC(nodePointer);
+                    }
                 }
                 ImGui::EndPopup();
             }
@@ -164,13 +193,6 @@ namespace sight {
                 ImGui::EndPopup();
             }
 
-            if (g_ContextStatus->contextMenuCreateNodeOpen) {
-                if (!ImGui::IsPopupOpen(BACKGROUND_CONTEXT_MENU)) {
-                    g_ContextStatus->resetAfterCreateNode();
-                }
-            }
-
-            // ed::Resume();
         }
 
         void showNodePortIcon(IconType iconType, ImColor color, bool isConnected = false, int alpha = 255) {
@@ -416,8 +438,29 @@ namespace sight {
                 dbg(filterType);
             }
 
-            auto getAlpha = [filterType](uint portType) {
-                return filterType > 0 && portType != filterType ? 48 : 255;
+            auto getAlpha = [](SightNodePort const& port) {
+                constexpr int invalidAlpha = 48;
+                constexpr int fullAlpha = 255;
+                if (g_ContextStatus->portForCreateNode) {
+                    auto filterPort = g_ContextStatus->portForCreateNode.get();
+                    if (filterPort->kind == port.kind) {
+                        return fullAlpha;
+                    }
+
+                    // check type
+                    auto filterType = filterPort->getType();
+                    uint portType = port.getType();
+                    if (filterType > 0) {
+                        auto leftType = filterType;
+                        auto rightType = portType;
+                        if (filterPort->kind == NodePortType::Input) {
+                            std::swap(leftType, rightType);
+                        }
+                        return checkTypeCompatibility(leftType, rightType) ? fullAlpha : invalidAlpha;
+                    }
+                }
+
+                return fullAlpha;
             };
 
             ed::BeginNode(node->nodeId);
@@ -428,7 +471,7 @@ namespace sight {
             if (chainInPort) {
                 ed::BeginPin(chainInPort->id, ed::PinKind::Input);
                 showNodePortIcon(typeProcess.style->iconType, typeProcess.style->color, chainInPort->isConnect(),
-                                 getAlpha(chainInPort->getType()));
+                                 getAlpha(*chainInPort));
                 ed::EndPin();
                 ImGui::SameLine();
             }
@@ -441,7 +484,7 @@ namespace sight {
                 // ImGui::SameLine(0);
                 ed::BeginPin(chainOutPort->id, ed::PinKind::Output);
                 showNodePortIcon(typeProcess.style->iconType, typeProcess.style->color, chainOutPort->isConnect(),
-                                 getAlpha(chainOutPort->getType()));
+                                 getAlpha(*chainOutPort));
                 ed::EndPin();
             }
             ImGui::Dummy(ImVec2(0, SightNodeFixedStyle::iconTitlePadding));
@@ -489,8 +532,7 @@ namespace sight {
                     // port icon
                     // use fake type here
                     auto [tmpTypeInfo, find] = project->findTypeInfo(item.type);
-                    auto alpha = getAlpha(item.getType());
-                    auto floatAlpha = alpha / 255.f;
+                    auto alpha = getAlpha(item);
                     if (!find || !tmpTypeInfo.style) {
                         showNodePortIcon(IconType::Circle, color, item.isConnect(), alpha);
                     } else {
@@ -498,7 +540,7 @@ namespace sight {
                     }
 
                     ImGui::SameLine();
-                    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, floatAlpha);
+                    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha / 255.f);
                     ImGui::Text("%s", item.portName.c_str());
                     ImGui::PopStyleVar();
 
@@ -551,13 +593,15 @@ namespace sight {
                 //     ImGui::Text("%8s", item.portName.c_str());
                 //     ImGui::SameLine();
                 // }
+                auto alpha = getAlpha(item);
+                ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha / 255.f);
                 ImGui::Text("%-*s", nodeStyle.outputStype.maxCharSize, item.portName.c_str());
+                ImGui::PopStyleVar();
                 ImGui::SameLine();
 
                 // port icon
                 // use fake type here
                 auto [tmpTypeInfo, find] = project->findTypeInfo(item.type);
-                auto alpha = getAlpha(item.getType());
                 if (!find || !tmpTypeInfo.style) {
                     showNodePortIcon(IconType::Circle, color, item.isConnect(), alpha);
                 } else {
@@ -600,6 +644,7 @@ namespace sight {
             //
 
             // some flags
+            bool flagBackgroundContextMenu = false;
 
             // Handle creation action, returns true if editor want to create new object (node or link)
             if (ed::BeginCreate()) {
@@ -638,7 +683,7 @@ namespace sight {
                         else {
                             if (ed::AcceptNewItem()) {
                                 // Since we accepted new link, lets add one to our list of links.
-                                auto id = graph->createConnection(inputPort->getId(), inputPort->getId());
+                                auto id = graph->createConnection(inputPort->getId(), outputPort->getId());
                                 if (id > 0) {
                                     // valid connection.
                                     auto connection = graph->findConnection(id);
@@ -666,13 +711,11 @@ namespace sight {
                             }
                         }
 
-                        
-
                         // You may choose to reject connection between these nodes
                         // by calling ed::RejectNewItem(). This will allow editor to give
                         // visual feedback by changing link thickness and color.
-                    }
-                } 
+                    } 
+                }
 
                 ed::PinId pinId = 0;
                 if (ed::QueryNewNode(&pinId)) {
@@ -684,12 +727,13 @@ namespace sight {
                         dbg("new node");
                         
                         if (portHandle) {
-                            g_ContextStatus->contextMenuCreateNodeOpen = true;
+                            flagBackgroundContextMenu = true;
                         } else {
                             dbg("invalid port handle");
                         }
                     }   
                 }
+                
             }
             ed::EndCreate();     // Wraps up object creation action handling.
 
@@ -735,19 +779,31 @@ namespace sight {
                     }
                 }
             }
+            if (uiStatus.keybindings->esc.isKeyDown()) {
+                if (g_ContextStatus->contextMenuCreateNodeOpen) {
+                    g_ContextStatus->resetAfterCreateNode();
+                }
+            }
 
+            // right click
             auto openPopupPosition = ImGui::GetMousePos();     // this line must be before  ed::Suspend();
             static ed::NodeId contextNodeId = 0;
             static ed::LinkId contextLinkId = 0;
             static ed::PinId contextPinId = 0;
+
             ed::Suspend();
+
             if (ed::ShowNodeContextMenu(&contextNodeId)) {
                 ImGui::OpenPopup(NODE_CONTEXT_MENU);
             } else if (ed::ShowPinContextMenu(&contextPinId)) {
                 ImGui::OpenPopup(PIN_CONTEXT_MENU);
             } else if (ed::ShowLinkContextMenu(&contextLinkId)) {
                 ImGui::OpenPopup(LINK_CONTEXT_MENU);
-            } else if (ed::ShowBackgroundContextMenu() || g_ContextStatus->contextMenuCreateNodeOpen) {
+            } else if (ed::ShowBackgroundContextMenu()) {
+                flagBackgroundContextMenu = true;
+            }
+
+            if (flagBackgroundContextMenu) {
                 g_ContextStatus->nextNodePosition = openPopupPosition;
                 g_ContextStatus->contextMenuCreateNodeOpen = true;
                 ImGui::OpenPopup(BACKGROUND_CONTEXT_MENU);
@@ -755,6 +811,8 @@ namespace sight {
 
             showContextMenu(static_cast<uint>(contextNodeId.Get()),
                             static_cast<uint>(contextLinkId.Get()), static_cast<uint>(contextPinId.Get()));
+            checkResetCreateStatus();
+
             ed::Resume();
             // End of interaction with editor.
             ed::End();
@@ -1052,8 +1110,6 @@ namespace sight {
                 auto node = this->templateNode->instantiate();
                 auto nodeId = node->getNodeId();
                 ed::SetNodePosition(nodeId, g_ContextStatus->nextNodePosition);
-                // std::cout << g_ContextStatus->nextNodePosition;
-                // dbg(g_ContextStatus->nextNodePosition);
                 if (addNode(node) == CODE_OK) {
                     node = nullptr;
                     // check port
@@ -1076,7 +1132,6 @@ namespace sight {
                         }
                     }
                 }
-                // g_ContextStatus->resetAfterCreateNode();
             }
         } else {
             if (ImGui::BeginMenu(name.c_str())) {

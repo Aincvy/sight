@@ -145,7 +145,7 @@ namespace sight {
         keyMap["0"] = keyArray.add(SightKey(GLFW_KEY_0));
 
         // others
-
+        keyMap["esc"] = keyArray.add(SightKey(GLFW_KEY_ESCAPE));
     }
 
 #elif _WIN32

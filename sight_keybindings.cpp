@@ -84,6 +84,7 @@ namespace sight {
         CHECK_RETURN("openGraph", keybindingds->openGraph);
         CHECK_RETURN("duplicateNode", keybindingds->duplicateNode);
 
+        keybindingds->esc = getFromKeyMap("esc");
         return keybindingds;
     }
 

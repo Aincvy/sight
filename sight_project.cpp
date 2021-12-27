@@ -957,7 +957,11 @@ namespace sight {
     }
 
     bool checkTypeCompatibility(uint type1, uint type2) {
-        return type1 == type2;
+        if (type1 == type2) {
+            return true;
+        }
+
+        return type2 == IntTypeObject && type1 != IntTypeProcess;
     }
 
     TypeInfoRender::TypeInfoRender()
