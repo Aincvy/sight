@@ -1,6 +1,7 @@
 #include "imgui_internal.h"
 #include "imgui_node_editor.h"
 #include "sight_defines.h"
+#include "sight_external_widgets.h"
 #include "sight_keybindings.h"
 #include "sight_plugin.h"
 #include "sight_ui.h"
@@ -60,6 +61,8 @@ static std::atomic<bool> uiCommandFree = true;
 namespace sight {
 
     using directory_iterator = std::filesystem::directory_iterator;
+
+    const ImVec4 UIColors::red = rgba(255, 0, 0, 255);
 
     namespace {
         // private members and functions.
@@ -312,6 +315,19 @@ namespace sight {
             ImGui::Button(ICON_MD_SEARCH " Search");
             ImGui::Text(ICON_MD_REPEAT " Repeat");
             ImGui::Button(ICON_MD_REPEAT_ONE " 重复");
+ 
+            static bool toggle = false;
+            ImGui::Text("Toggle");
+            ImGui::SameLine();
+            ToggleButton("Toggle", &toggle);
+
+            const ImU32 col = ImGui::GetColorU32(ImGuiCol_ButtonHovered);
+            const ImU32 bg = ImGui::GetColorU32(ImGuiCol_Button);
+
+            ImGui::Spinner("##spinner", 15, 6, col);
+            ImGui::BufferingBar("##buffer_bar", 0.7f, ImVec2(400, 6), bg, col);
+
+            ImGui::LoadingIndicatorCircle("circle", 20.f, ImColor(col), ImColor(bg), 12, 6);
 
             ImGui::End();
         }
@@ -333,7 +349,7 @@ namespace sight {
 
             int selectedCount = ed::GetSelectedObjectCount();
             if (selectedCount > 0) {
-                selection.selectedItems.clear();
+                selection.selectedNodeOrLinks.clear();
 
                 std::vector<ed::NodeId> selectedNodes;
                 std::vector<ed::LinkId> selectedLinks;
@@ -342,23 +358,18 @@ namespace sight {
 
                 int c = ed::GetSelectedNodes(selectedNodes.data(), selectedCount);
                 int d = ed::GetSelectedLinks(selectedLinks.data(), selectedCount);
-
                 selectedNodes.resize(c);
                 selectedLinks.resize(d);
 
-                if (c == 1) {
-                    selection.node = getCurrentGraph()->findNode(static_cast<uint>(selectedNodes[0].Get()));
-                    if (selection.node) {
-                        sprintf(g_UIStatus->buffer.inspectorNodeName, "%s", selection.node->nodeName.c_str());
-                    }
-                }
-
                 for (const auto & item : selectedNodes) {
-                    selection.selectedItems.insert(static_cast<uint>(item.Get()));    
+                    selection.selectedNodeOrLinks.insert(static_cast<uint>(item.Get()));
+                }
+                for( const auto& item: selectedLinks){
+                    selection.selectedNodeOrLinks.insert(static_cast<uint>(item.Get()));
                 }
                 
             } else {
-                selection.resetSelectedNodes();
+                selection.selectedNodeOrLinks.clear();
             }
             
             auto graph = getCurrentGraph();
@@ -368,27 +379,26 @@ namespace sight {
                     ImGui::SameLine();
                 
                     auto nodeId = node.nodeId;
-                    auto findResult = std::find(selection.selectedItems.begin(), selection.selectedItems.end(), nodeId);
-                    bool isSelected = findResult != selection.selectedItems.end();
+                    auto findResult = std::find(selection.selectedNodeOrLinks.begin(), selection.selectedNodeOrLinks.end(), nodeId);
+                    bool isSelected = findResult != selection.selectedNodeOrLinks.end();
                     if (Selectable(static_cast<int>(nodeId), node.nodeName.c_str(), isSelected)) {
                         auto pointer = graph->findNode(nodeId);
                         if (!pointer) {
                             dbg("error" , nodeId);
                         } else {
-                            bool anySelect = selection.node != nullptr;
+                            bool anySelect = !selection.selectedNodeOrLinks.empty();
                             bool appendNode = false;
                             if (anySelect) {
                                 if (!g_UIStatus->io->KeyCtrl) {
                                     // not control
-                                    selection.selectedItems.clear();
+                                    selection.selectedNodeOrLinks.clear();
                                     ed::ClearSelection();
                                 }  else {
                                     appendNode = true;
                                 }
                             }
                             
-                            selection.node = pointer;
-                            selection.selectedItems.insert(nodeId);
+                            selection.selectedNodeOrLinks.insert(nodeId);
                             sprintf(g_UIStatus->buffer.inspectorNodeName, "%s", node.nodeName.c_str());
 
                             ed::SelectNode(nodeId, appendNode);
@@ -411,24 +421,24 @@ namespace sight {
             // what's here?
             // it's should be show what user selected.
             auto & selection = g_UIStatus->selection;
-            auto node = selection.node;
-            if (selection.selectedItems.size() > 1) {
-                ImGui::Text("%zu nodes is selected.", selection.selectedItems.size());
+            if (selection.selectedNodeOrLinks.empty()) {
+                
+            } else if (selection.selectedNodeOrLinks.size() > 1) {
+                ImGui::Text("%zu nodes is selected.", selection.selectedNodeOrLinks.size());
+                ImGui::TextColored(UIColors::red, "Now, we do not support mutiple items edit.");
             } else {
+                auto node = selection.getSelectedNode();
+                SightNodeConnection* connection = nullptr;
                 if (node) {
-                    // show node info 
+                    // show node info
                     ImGui::Text("node id: ");
                     ImGui::SameLine();
                     ImGui::TextColored(g_UIStatus->uiColors->nodeIdText, "%d ", node->nodeId);
                     ImGui::Text("name: " );
                     ImGui::SameLine();
                     auto & nameBuf = g_UIStatus->buffer.inspectorNodeName;
-                    if (ImGui::InputText("## Inspector.node.name", nameBuf, std::size(nameBuf))) {
-                        dbg("InputText");
-                        // node->nodeName = nameBuf;
-                    }
+                    ImGui::InputText("## node.name", nameBuf, std::size(nameBuf));
                     if (ImGui::IsItemDeactivatedAfterEdit()) {
-                        dbg("1");
                         node->nodeName = nameBuf;
                     }
             
@@ -436,9 +446,21 @@ namespace sight {
                     ImGui::Text("Ports");
                     ImGui::Separator();
                     showNodePorts(node);
+                }  
+                if ((connection = selection.getSelectedConnection())) {
+                    if (node) {
+                        ImGui::Separator();
+                        ImGui::Text("Connection Info");
+                    }
+                    ImGui::Text("connection id: ");
+                    ImGui::SameLine();
+                    ImGui::TextColored(g_UIStatus->uiColors->nodeIdText, "%d ", connection->connectionId);
+
+                    leftText("priority: ");
+                    ImGui::InputInt("## connection.priority", &connection->priority);
                 }
             }
-            
+
 
             ImGui::End();
         }
@@ -1865,10 +1887,19 @@ namespace sight {
         return this->projectPath;
     }
 
-    void Selection::resetSelectedNodes() {
-        this->node = nullptr;
-        this->selectedItems.clear();
+    SightNode* Selection::getSelectedNode() const {
+        if (selectedNodeOrLinks.empty()) {
+            return nullptr;
+        }
+        return getCurrentGraph()->findNode( *selectedNodeOrLinks.begin() );
+    }
 
+    SightNodeConnection* Selection::getSelectedConnection() const {
+        if (selectedNodeOrLinks.empty()) {
+            return nullptr;
+        }
+
+        return getCurrentGraph()->findConnection(*selectedNodeOrLinks.begin());
     }
 
 }

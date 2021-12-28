@@ -2266,11 +2266,29 @@ namespace sight {
         }
 
         // active the next.
-        auto connection = node->findConnectionByProcess();
-        if (!connection.bad()) {
-            parsingLink.link.push_back(connection.target->node);
-        } else {
-            dbg("bad connection", node->nodeName);
+        // auto connection = node->findConnectionByProcess();
+        // if (!connection.bad()) {
+        //     parsingLink.link.push_back(connection.target->node);
+        // } else {
+        //     dbg("bad connection", node->nodeName);
+        // }
+
+        auto port = node->findPortByProcess();
+        if (port) {
+            auto g = node->graph;
+            if (port->connections.size() == 1) {
+                parsingLink.link.push_back(SightNodePortConnection(g, port->connections.front(), node).target->node);
+            } else {
+                // question: append 1st item to parsingLink.link ? 
+                // use reverse order.
+                for (auto iter = port->connections.rbegin(); iter != port->connections.rend(); iter++) {
+                    auto& item = *iter;
+                    data.addNewLink(SightNodePortConnection(g, item, node).target->node);
+                }
+                // for (auto& item : port->connections) {
+                //     data.addNewLink(SightNodePortConnection(g, item, node).target->node);
+                // }
+            }
         }
     }
 

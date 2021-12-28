@@ -186,4 +186,10 @@ namespace sight {
         return rgba(r, g, b, 255);
     }
 
+    template<class... Args>
+    void leftText(const char* format, Args&&... args) {
+        ImGui::Text(format, args...);
+        ImGui::SameLine();
+    }
+    
 }

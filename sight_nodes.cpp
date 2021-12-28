@@ -160,6 +160,20 @@ namespace sight {
         return count;
     }
 
+    void SightNodePort::sortConnections() {
+        if (this->connections.size() <= 1) {
+            return;
+        }
+
+        std::sort(connections.begin(), connections.end(), [](SightNodeConnection* c1, SightNodeConnection* c2) {
+            if (c1->priority < c2->priority) {
+                return false;
+            }
+            return true;
+        });
+
+    }
+
     const char *SightNodePort::getDefaultValue() const {
         return this->value.u.string;
     }
@@ -279,6 +293,28 @@ namespace sight {
         return {};
     }
 
+    SightNodePort* SightNode::findPortByProcess() {
+        if (chainOutPort->type == IntTypeProcess && chainOutPort->isConnect()) {
+            return chainOutPort;
+        }
+
+        SightNodePort* p = nullptr;
+        for(auto& item: this->outputPorts){
+            if (item.isTitleBarPort() || !item.isConnect()) {
+                continue;
+            }
+
+            if (p) {
+                p = nullptr;
+                break;
+            } else {
+                p = &item;
+            }
+        }
+
+        return p;
+    }
+
     void SightNode::updateChainPortPointer() {
         for (auto &item : inputPorts) {
             if (item.portName.empty()) {
@@ -320,6 +356,16 @@ namespace sight {
         nodeFunc(this->outputPorts, NodePortType::Output);
 
         updateChainPortPointer();
+    }
+
+    void SightNode::sortConnections() {
+        for(auto& item: this->inputPorts){
+            item.sortConnections();
+        }
+
+        for(auto& item: this->outputPorts){
+            item.sortConnections();
+        }
     }
 
     void SightNode::reset() {
@@ -799,6 +845,7 @@ namespace sight {
             out << YAML::Key << connection.connectionId << YAML::Value << YAML::BeginMap;
             out << YAML::Key << "left" << YAML::Value << connection.leftPortId();
             out << YAML::Key << "right" << YAML::Value << connection.rightPortId();
+            out << YAML::Key << "priority" << YAML::Value << connection.priority;
             out << YAML::EndMap;
         }
         out << YAML::EndMap;
@@ -996,8 +1043,13 @@ namespace sight {
                 auto connectionId = item.first.as<int>();
                 auto left = item.second["left"].as<int>();
                 auto right = item.second["right"].as<int>();
+                auto priority = 10;
+                auto priorityNode = item.second["priority"];
+                if (priorityNode.IsDefined()) {
+                    priority = priorityNode.as<int>();
+                }
 
-                createConnection(left, right, connectionId);
+                createConnection(left, right, connectionId, priority);
             }
 
             this->editing = false;
@@ -1083,7 +1135,7 @@ namespace sight {
         return findSightAnyThing(id).asConnection();
     }
 
-    int SightNodeGraph::createConnection(uint leftPortId, uint rightPortId, uint connectionId) {
+    int SightNodeGraph::createConnection(uint leftPortId, uint rightPortId, uint connectionId, int priority) {
         if (leftPortId == rightPortId) {
             return -2;
         }
@@ -1097,9 +1149,9 @@ namespace sight {
             return -3;
         }
 
-        if (left->getType() == IntTypeProcess && left->isConnect()) {
-            return -4;
-        }
+        // if (left->getType() == IntTypeProcess && left->isConnect()) {
+        //     return -4;
+        // }
 
         auto id = connectionId > 0 ? connectionId : nextNodeOrPortId();
         // find color ;
@@ -1107,13 +1159,14 @@ namespace sight {
         auto [typeInfo, find] = currentProject()->findTypeInfo(left->getType());
         if (find && typeInfo.style) {
             color = typeInfo.style->color;
-        }
+        }        
 
         SightNodeConnection connection = {
-                id,
-                leftPortId,
-                rightPortId,
-                color,
+            id,
+            leftPortId,
+            rightPortId,
+            color,
+            priority,
         };
         addConnection(connection, left, right);
         return id;
@@ -1134,7 +1187,10 @@ namespace sight {
         }
 
         left->connections.push_back(p);
+        left->sortConnections();
+
         right->connections.push_back(p);
+        right->sortConnections();
     }
 
     const SightArray <SightNode> & SightNodeGraph::getNodes() const {
@@ -1165,6 +1221,12 @@ namespace sight {
 
             // port events
             // CALL_NODE_FUNC(p);
+        }
+    }
+
+    void SightNodeGraph::sortConnections() {
+        for(auto& item: this->nodes){
+            item.sortConnections();
         }
     }
 

@@ -9,7 +9,7 @@
 #include "sight_language.h"
 #include "sight_project.h"
 
-#include "absl/container/flat_hash_set.h"
+#include "absl/container/btree_set.h"
 #include <functional>
 #include <string>
 #include <sys/types.h>
@@ -158,6 +158,8 @@ namespace sight {
         ImVec4 nodeIdText = rgb(51, 184, 255);
         ImVec4 errorText = rgba(239, 35, 60, 255);
 
+        const static ImVec4 red;
+
         UIColors();
     };
 
@@ -179,16 +181,26 @@ namespace sight {
         std::string projectPath;
         
     public:
-        absl::flat_hash_set<std::string> selectedFiles;
-        // selected node 
-        SightNode* node = nullptr;
-        SightNodeConnection* connection = nullptr;
-        // node or port or connection 
-        absl::flat_hash_set<uint> selectedItems;
+
+        absl::btree_set<std::string> selectedFiles;
+        // node or port or connection
+        absl::btree_set<uint> selectedNodeOrLinks;
 
         std::string getProjectPath() const;
 
-        void resetSelectedNodes();
+        /**
+         * @brief Get the Selected Node object
+         * If multiple items is selected, then return a !!random!! one
+         * @return SightNode* nullptr if no one node is selected.
+         */
+        SightNode* getSelectedNode() const;
+
+        /**
+         * @brief Get the Selected Connection object
+         * If multiple items is selected, then return a !!random!! one
+         * @return SightNodeConnection* nullptr if no one connection is selected.
+         */
+        SightNodeConnection* getSelectedConnection() const;
 
         friend void onProjectAndUILoadSuccess(Project* project);
     };

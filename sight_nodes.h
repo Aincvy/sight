@@ -195,6 +195,12 @@ namespace sight {
          */
         int clearLinks();
 
+        /**
+         * @brief sort connectino by connection's priority
+         * 
+         */
+        void sortConnections();
+
         SightNodeGraph* getGraph();
         const SightNodeGraph* getGraph() const;
 
@@ -210,6 +216,10 @@ namespace sight {
         uint right;
         // left port color  
         uint leftColor = IM_COL32_WHITE;
+
+        // priority for generate code.
+        // number bigger, priority higher.
+        int priority = 10;
 
         /**
          * Remove from left and right port.
@@ -327,6 +337,13 @@ namespace sight {
         SightNodePortConnection findConnectionByProcess();
 
         /**
+         * @brief be similar with findConnectionByProcess()
+         * 
+         * @return SightNodePort* 
+         */
+        SightNodePort* findPortByProcess();
+
+        /**
          *
          */
         void updateChainPortPointer();
@@ -335,6 +352,12 @@ namespace sight {
          * add chain ports, if not exist.
          */
         void tryAddChainPorts(uint type = IntTypeProcess);
+
+        /**
+         * @brief sort all port's connections.
+         * 
+         */
+        void sortConnections();
 
         /**
          * @brief Reset node for next time used.
@@ -619,7 +642,7 @@ namespace sight {
          * @return If create success, the connection's id.
          * -1: one of left,right is invalid. -2: they are same. -3: same kind. -4 left only can accept 1 connections
          */
-        int createConnection(uint leftPortId, uint rightPortId, uint connectionId = 0);
+        int createConnection(uint leftPortId, uint rightPortId, uint connectionId = 0, int priority = 10);
 
         /**
          *
@@ -714,6 +737,12 @@ namespace sight {
         SightNodeGraphExternalData& getExternalData();
 
         void callNodeEventsAfterLoad();
+
+        /**
+         * @brief call all node's sortConnections() function.
+         * 
+         */
+        void sortConnections();
 
     private:
 

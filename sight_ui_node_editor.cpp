@@ -141,6 +141,11 @@ namespace sight {
 
         // this function need node editor be suspend
         void showContextMenu(uint nodeId, uint linkId, uint pinId) {
+            auto showPortDebugInfo = [](SightNodePort const& item) {
+                auto portInfoMsg = absl::Substitute("$0, $1", item.getId(), item.portName);
+                dbg(portInfoMsg);
+            };
+
             if (ImGui::BeginPopup(NODE_CONTEXT_MENU)) {
                 if (ImGui::MenuItem("debugInfo")) {
                     // show debug info.
@@ -148,15 +153,16 @@ namespace sight {
                     auto nodePointer = CURRENT_GRAPH->findNode(nodeId);
                     dbg(nodePointer);
                     if (nodePointer) {
-                        auto nodeFunc = [](std::vector<SightNodePort> const& list) {
+                        auto nodeFunc = [&showPortDebugInfo](std::vector<SightNodePort> const& list) {
                             if (list.empty()) {
                                 return ;
                             }
 
                             dbg(getNodePortTypeName(list.front().kind));
                             for( const auto& item: list){
-                                auto portInfoMsg = absl::Substitute("$0, $1", item.getId(), item.portName);
-                                dbg(portInfoMsg);
+                                // auto portInfoMsg = absl::Substitute("$0, $1", item.getId(), item.portName);
+                                // dbg(portInfoMsg);
+                                showPortDebugInfo(item);
                             }
                         };
 
@@ -166,9 +172,21 @@ namespace sight {
                 ImGui::EndPopup();
             }
             if (ImGui::BeginPopup(PIN_CONTEXT_MENU)) {
-                if (ImGui::MenuItem("itemA")) {
-                    dbg("item a");
+                auto port = CURRENT_GRAPH->findPort(pinId);
+                if (ImGui::MenuItem("portDebugInfo")) {
+                    if (port) {
+                        showPortDebugInfo(*port);
+                    } else {
+                        dbg("no-port-info");
+                    }
                 }
+                if (ImGui::MenuItem("showFlow")) {
+                    for( const auto& item: port->connections){
+                        ed::Flow(item->connectionId);
+                        dbg(item->connectionId);
+                    }
+                }
+
                 ImGui::EndPopup();
             }
             if (ImGui::BeginPopup(LINK_CONTEXT_MENU)) {
@@ -432,12 +450,6 @@ namespace sight {
             auto& nodeStyle = templateNode->nodeStyle;
 
             // filter
-            uint filterType = 0;
-            if (g_ContextStatus->portForCreateNode) {
-                filterType = g_ContextStatus->portForCreateNode->getType();
-                dbg(filterType);
-            }
-
             auto getAlpha = [](SightNodePort const& port) {
                 constexpr int invalidAlpha = 48;
                 constexpr int fullAlpha = 255;
@@ -683,7 +695,12 @@ namespace sight {
                         else {
                             if (ed::AcceptNewItem()) {
                                 // Since we accepted new link, lets add one to our list of links.
-                                auto id = graph->createConnection(inputPort->getId(), outputPort->getId());
+                                int priority = 10;
+                                if (inputPort->connectionsSize() >= 1) {
+                                    priority = inputPort->connections.back()->priority - 1;
+                                }
+
+                                auto id = graph->createConnection(inputPort->getId(), outputPort->getId(),0, priority);
                                 if (id > 0) {
                                     // valid connection.
                                     auto connection = graph->findConnection(id);
@@ -768,8 +785,9 @@ namespace sight {
             // handle keyboard
             if (uiStatus.keybindings->controlKey.isKeyDown()) {
                 if (uiStatus.keybindings->duplicateNode) {
+                    // todo mutiple nodes
                     dbg("duplicate node");
-                    auto tmpNode = uiStatus.selection.node;
+                    auto tmpNode = uiStatus.selection.getSelectedNode();
                     if (tmpNode && tmpNode->templateNode) {
                         auto node = tmpNode->templateNode->instantiate();
                         auto pos = ed::GetNodePosition(tmpNode->nodeId);
@@ -890,8 +908,6 @@ namespace sight {
         sprintf(configFilePath, "%s.json", pathWithoutExt.data());
         config.SettingsFile = configFilePath;
         g_ContextStatus->context = ed::CreateEditor(&config);
-
-        // changeGraph(pathWithoutExt.data());
 
         return CODE_OK;
     }
