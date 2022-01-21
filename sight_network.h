@@ -32,7 +32,7 @@ namespace sight {
         int index = -1;     // -1 means not init.
         uv_os_fd_t fd;
 
-        std::stringstream bufferStream;
+        std::stringstream* buffer;
         short pkgLen = 0;
 
         SightNetClient(uv_tcp_t* client, int index);

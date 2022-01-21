@@ -1,6 +1,6 @@
 #include "sight_network.h"
-#include "dbg.h"
 #include "sight.h"
+#include "dbg.h"
 
 #include <cassert>
 #include <cstdlib>
@@ -51,7 +51,7 @@ namespace sight {
             auto netClient = netServer.findClient(client);
             assert(netClient != nullptr);
             dbg(nread, buf->len);
-            netClient->bufferStream.write(buf->base, nread);
+            netClient->buffer->write(buf->base, nread);
 
         }
 
@@ -109,15 +109,21 @@ namespace sight {
         : client(client),
           index(index)
     {
-        uv_fileno((const uv_handle_t *) client, &fd);
+        uv_fileno((const uv_handle_t*)client, &fd);
+        buffer = new std::stringstream();
     }
 
     SightNetClient::~SightNetClient()
     {
         dbg(index);
+        if (buffer) {
+            delete buffer;
+            buffer = nullptr;
+        }
     }
 
     void SightNetClient::checkMsg() {
+        auto& bufferStream = *buffer;
         bufferStream.seekg(0, std::ios::end);
         int bufferLen = bufferStream.tellg();
         bufferStream.seekg(0, std::ios::beg);

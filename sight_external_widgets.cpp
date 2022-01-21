@@ -213,14 +213,7 @@ namespace sight {
         out << v.x << ", " << v.y;
         return out;
     }
-
-    void test() {
-        auto pos = ImVec2(1, 2);
-        std::cout << pos;     // it's ok
-        dbg(pos);             //  Type does not support the << ostream operator
-        // operator<<(std::cout, pos);
-    }
-
+    
 }
 
 namespace ImGui {
