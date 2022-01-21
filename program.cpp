@@ -8,6 +8,7 @@
 #include "sight_js.h"
 #include "sight_project.h"
 #include "sight_util.h"
+#include "sight_network.h"
 
 #ifdef SIGHT_DEBUG
 #include "backward.hpp"
@@ -44,6 +45,10 @@ int main(int argc, char* argv[]){
     dbg("start js thread!");
     std::thread jsThread(sight::jsThreadRun, argv[0]);
 
+    // dbg("start network thread");
+    // initNetworkServer(23655);
+    // std::thread networkThread(sight::runNetworkThread);
+    
     sight::initOpenGL();
     sight::showLoadingWindow();
     sight::showMainWindow();

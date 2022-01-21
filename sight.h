@@ -55,6 +55,14 @@ namespace sight {
     };
 
     /**
+     * @brief 
+     * 
+     */
+    struct SightSettings {
+        ushort networkListenPort = 39455;
+    };
+    
+    /**
      * exit program.
      * do clean work except ui and node_editor
      */
@@ -67,5 +75,7 @@ namespace sight {
      */
     void* copyObject(void* from, size_t size);
 
+
+    
 
 }     // namespace sight

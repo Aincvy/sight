@@ -30,6 +30,7 @@ target_sources(sight PRIVATE
         sight_widgets.cpp
         sight_keybindings.cpp
         sight_external_widgets.cpp
+        sight_network.cpp
         # dependencies/imgui/imgui_demo.cpp           # for debug
 )
 
