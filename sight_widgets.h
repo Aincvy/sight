@@ -142,7 +142,16 @@ namespace sight {
      * @param basePath 
      * @return std::string 
      */
-    std::string openFileDialog(const char* basePath);
+    std::string openFileDialog(const char* basePath, int* status);
+
+    /**
+     * @brief 
+     * powered by https://github.com/btzy/nativefiledialog-extended
+     * 
+     * @param basePath 
+     * @return std::string 
+     */
+    std::string openFolderDialog(const char* basePath, int* status);
 
     /**
      * @brief 

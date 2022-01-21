@@ -389,7 +389,11 @@ namespace sight {
      * @param createIfNotExist 
      * @return int 
      */
-    int initProject(const char* baseDir, bool createIfNotExist = false);
+    int openProject(const char* baseDir, bool createIfNotExist = false, bool callLoadSuccess = true);
+
+    int disposeProject();
+
+    int verifyProjectFolder(const char* folder);
 
     Project* currentProject();
 

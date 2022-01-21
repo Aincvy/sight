@@ -1,3 +1,4 @@
+#include "dbg.h"
 #include "imgui_internal.h"
 #include "imgui_node_editor.h"
 #include "sight_defines.h"
@@ -37,6 +38,7 @@
 #include <GLFW/glfw3.h>
 #include <string>
 #include <string_view>
+#include <sys/termios.h>
 #include <sys/types.h>
 #include <uv.h>
 #include <vector>
@@ -73,7 +75,7 @@ namespace sight {
          */
         void saveAnyThing(){
             int i ;
-            if ((i = getCurrentGraph()->save()) != CODE_OK) {
+            if ((i = currentGraph()->save()) != CODE_OK) {
                 dbg(i);
             }
             if ((i = currentProject()->save()) != CODE_OK) {
@@ -125,8 +127,13 @@ namespace sight {
                 ImGui::EndMenu();
             }
 
+            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.openProject)) {
+                bool folderError;
+                std::string lastOpenFolder;
+                uiOpenProject(folderError, lastOpenFolder);
+            }
             if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.save)) {
-
+                currentGraph()->save();
             }
             if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.saveAll, g_UIStatus->keybindings->saveFile.tipsText())) {
                 saveAnyThing();
@@ -372,7 +379,7 @@ namespace sight {
                 selection.selectedNodeOrLinks.clear();
             }
             
-            auto graph = getCurrentGraph();
+            auto graph = currentGraph();
             if (graph) {
                 for (const auto & node : graph->getNodes()) {
                     ImGui::TextColored(g_UIStatus->uiColors->nodeIdText, "%d ", node.nodeId);
@@ -502,7 +509,7 @@ namespace sight {
                         dbg(item.path);
 
                         if (ImGui::IsMouseDoubleClicked(0)) {
-                            auto g = getCurrentGraph();
+                            auto g = currentGraph();
                             if (g && item.path == g->getFilePath()) {
                                 // same file, do nothing.
                                 return;
@@ -1257,17 +1264,18 @@ namespace sight {
         bindNodeTypes(isolate, context, module);
         context->Global()->Set(context, v8pp::to_v8(isolate, "sight"), module.new_instance()).ToChecked();
 
-        // load plugins
-        addJsCommand(JsCommandType::InitParser);
-        addJsCommand(JsCommandType::InitPluginManager);
-        addJsCommand(JsCommandType::EndInit);
-
         uint progress = 0;
-        
+        int leftFrame = 0;
+        bool pluginStartLoad = false;
+        bool exitFlag = false;
+        bool folderError = false;
+        std::string lastOpenFolder = ".";
+
         // Main loop
-        while (!glfwWindowShouldClose(window))
+        while (!glfwWindowShouldClose(window) && !exitFlag)
         {
-            if (g_UIStatus->isLoadingOver()) {
+            auto project = currentProject();
+            if (g_UIStatus->isLoadingOver() && project && leftFrame <= 0) {
                 break;
             }
 
@@ -1288,8 +1296,43 @@ namespace sight {
             ImGui::SetNextWindowSize(ImVec2(width, height));
             ImGui::Begin("loading", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize);
             ImGui::Text("sight is loading...");
-            
             ImGui::Text("past frame: %d", ++progress);
+            ImGui::Separator();
+            ImGui::BeginChild("content view", ImVec2(0, -ImGui::GetFrameHeightWithSpacing()));
+            ImGui::Dummy(ImVec2(1,5));
+            if (project) {
+                ImGui::Text("Project: %s", project->getBaseDir().c_str());
+
+                if (!pluginStartLoad) {
+                    pluginStartLoad = true;
+
+                    // load plugins
+                    addJsCommand(JsCommandType::InitParser);
+                    addJsCommand(JsCommandType::InitPluginManager);
+                    addJsCommand(JsCommandType::EndInit);
+                } else {
+                    ImGui::Text("Loading plugins...");
+                }
+            } else {
+                ImGui::Text("If project doesn't exist, then will create it.");
+                if (ImGui::Button(MENU_LANGUAGE_KEYS.openProject)) {
+                    uiOpenProject(folderError, lastOpenFolder, false);
+                }
+
+                ImGui::Dummy(ImVec2(1,5));
+                if (lastOpenFolder != ".") {
+                    ImGui::Text("Try Open Folder: %s", lastOpenFolder.c_str());
+                }
+                if (folderError) {
+                    ImGui::Text("Folder do not empty, or not a sight project folder, or loading !");
+                }
+            }
+            
+            ImGui::EndChild();
+
+            if (ImGui::Button("Exit")) {
+                exitFlag = true;
+            }
             ImGui::End();
 
             // Rendering
@@ -1539,10 +1582,7 @@ namespace sight {
     }
 
     void uiChangeGraph(const char* path ) {
-        auto g = getCurrentGraph(); 
-        // if (!g) {
-        //     return;
-        // }
+        auto g = currentGraph(); 
 
         auto openGraphFunc = [path]() {
             char tmp[NAME_BUF_SIZE]{0};
@@ -1553,8 +1593,6 @@ namespace sight {
             }
         };
         if (g == nullptr || !g->editing) {
-            // 
-            // currentProject()->openGraph(path, false);
             openGraphFunc();
             return;
         }
@@ -1575,6 +1613,37 @@ namespace sight {
             //     currentProject()->openGraph(stringPath.c_str(), false);
             // }
         });
+    }
+
+    void uiOpenProject(bool& folderError, std::string& lastOpenFolder, bool callLoadSuccess) {
+        // try open 
+        int status = CODE_OK;
+        std::string path = openFolderDialog(lastOpenFolder.c_str(), &status);
+        if (status == CODE_OK) {
+            dbg(path);
+            folderError = false;
+
+            lastOpenFolder = path;
+            if (verifyProjectFolder(lastOpenFolder.c_str()) != CODE_OK) {
+                folderError = true;
+            } else {
+                // free resource
+                auto g = currentGraph();
+                if (g) {
+                    g->save();
+                    disposeGraph();
+                    g = nullptr;
+                }
+                disposeProject();
+
+                if (openProject(lastOpenFolder.c_str(), true, callLoadSuccess) == CODE_OK) {
+                    getSightSettings()->lastOpenProject = lastOpenFolder;
+                    saveSightSettings();
+                } else {
+                    folderError = true;
+                }
+            }
+        }
     }
 
     void openSaveModal(const char* title, const char* content, std::function<void(SaveOperationResult)> const& callback) {
@@ -1891,7 +1960,7 @@ namespace sight {
         if (selectedNodeOrLinks.empty()) {
             return nullptr;
         }
-        return getCurrentGraph()->findNode( *selectedNodeOrLinks.begin() );
+        return currentGraph()->findNode( *selectedNodeOrLinks.begin() );
     }
 
     SightNodeConnection* Selection::getSelectedConnection() const {
@@ -1899,7 +1968,7 @@ namespace sight {
             return nullptr;
         }
 
-        return getCurrentGraph()->findConnection(*selectedNodeOrLinks.begin());
+        return currentGraph()->findConnection(*selectedNodeOrLinks.begin());
     }
 
 }

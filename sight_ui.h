@@ -348,6 +348,8 @@ namespace sight {
      */
     void uiChangeGraph(const char* path );
 
+    void uiOpenProject(bool& folderError, std::string& lastOpenFolder, bool callLoadSuccess = true);
+
     /**
      * @brief open a save modal on next frame.
      * 

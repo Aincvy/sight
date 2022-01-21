@@ -850,7 +850,7 @@ namespace sight {
      *
      * @return
      */
-    SightNodeGraph* getCurrentGraph();
+    SightNodeGraph* currentGraph();
 
     NodeEditorStatus* getCurrentNodeStatus();
 

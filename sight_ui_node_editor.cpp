@@ -26,7 +26,7 @@
 #define PIN_CONTEXT_MENU "PinContextMenu"
 #define NODE_CONTEXT_MENU "NodeContextMenu"
 
-#define CURRENT_GRAPH getCurrentGraph()
+#define CURRENT_GRAPH currentGraph()
 
 static struct {
     ed::EditorContext* context = nullptr;
@@ -636,6 +636,9 @@ namespace sight {
             if (ImGui::Button("Reload## reload graph")) {
                 dbg("Not impl");
             }
+            if (ImGui::Button("Parse")) {
+                dbg("Not impl");
+            }
             ImGui::Separator();
 
             // Start interaction with editor.
@@ -1024,6 +1027,7 @@ namespace sight {
         }
         case IntTypeVector3:
         {
+            // fixme: vector3 and vector4 has a value change bug.
             int flags = options.readonly ? ImGuiSliderFlags_ReadOnly : 0;
             if (ImGui::DragFloat3(labelBuf, port->value.u.vector3, 1, 0, 0, "%.3f", flags)) {
                 onNodePortValueChange(port);

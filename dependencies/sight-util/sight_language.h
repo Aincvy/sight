@@ -52,6 +52,7 @@ namespace sight {
         char entity[SHORT_KEYS_BUF_SIZE] = "Entity";
         char open[SHORT_KEYS_BUF_SIZE] = "Open";
         char save[SHORT_KEYS_BUF_SIZE] = "Save";
+        char openProject[SHORT_KEYS_BUF_SIZE] = "Open Project...";
         char saveAll[SHORT_KEYS_BUF_SIZE] = "Save All";
         char options[SHORT_KEYS_BUF_SIZE] = "Options";
         char exit[SHORT_KEYS_BUF_SIZE] = "Exit";

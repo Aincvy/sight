@@ -40,18 +40,31 @@ int main(int argc, char* argv[]){
 #endif
     signal(SIGSEGV, handler);
 
-    initProject("./project", true);
+    dbg(argv[0]);
+    dbg("load settings");
+    loadSightSettings(nullptr);
+
+    dbg("init project");
+    auto settings = getSightSettings();
+    if (!settings->lastOpenProject.empty()) {
+        openProject(settings->lastOpenProject.c_str(), true);
+    } else {
+        // 
+        dbg("no path, do not load project.");
+    }
 
     dbg("start js thread!");
     std::thread jsThread(sight::jsThreadRun, argv[0]);
 
     // dbg("start network thread");
-    // initNetworkServer(23655);
+    // initNetworkServer(getSightSettings()->networkListenPort);
     // std::thread networkThread(sight::runNetworkThread);
     
     sight::initOpenGL();
     sight::showLoadingWindow();
-    sight::showMainWindow();
+    if (currentProject() != nullptr) {
+        sight::showMainWindow();
+    }
     sight::destroyWindows();
 
     jsThread.join();

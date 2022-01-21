@@ -4,6 +4,7 @@
 #pragma once
 
 #include <future>
+#include <string>
 
 #include "sight_defines.h"
 
@@ -11,6 +12,8 @@ namespace sight {
 
     extern const std::string resourceFolder;
     extern const std::string whoAmI;
+
+    constexpr const char* sightIsProject = "sight-project";
 
     /**
      *
@@ -39,11 +42,14 @@ namespace sight {
         CODE_OK = 0,
         CODE_FAIL = 1,
         CODE_NOT_IMPLEMENTED,
+        CODE_ERROR,
 
         CODE_FILE_ERROR = 100,
         CODE_FILE_NOT_EXISTS,
         CODE_FILE_FORMAT_ERROR,
+        CODE_FILE_INIT,
 
+        CODE_USER_CANCELED = 150,
 
         CODE_PLUGIN_NO_PKG_FILE = 200,
         CODE_PLUGIN_COMPILE_FAIL,
@@ -59,8 +65,23 @@ namespace sight {
      * 
      */
     struct SightSettings {
+        std::string path = "sight.yaml";
+
+        std::string lastOpenProject = "";
         ushort networkListenPort = 39455;
     };
+
+    /**
+     * @brief 
+     * Create one if not exist.
+     * @param path  config file, yaml
+     * @return int CODE_OK or others
+     */
+    int loadSightSettings(const char* path);
+
+    int saveSightSettings();
+
+    SightSettings* getSightSettings();
     
     /**
      * exit program.
@@ -75,7 +96,5 @@ namespace sight {
      */
     void* copyObject(void* from, size_t size);
 
-
-    
 
 }     // namespace sight

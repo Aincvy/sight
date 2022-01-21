@@ -37,6 +37,7 @@
     return i;                                                      \
 }
 
+#define SET_CODE(code, i) if(code) *code = i;
 
 namespace sight {
 

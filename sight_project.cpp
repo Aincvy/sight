@@ -3,6 +3,7 @@
 //
 
 #include "sight_project.h"
+#include "dbg.h"
 #include "sight_js.h"
 #include "sight_js_parser.h"
 #include "sight_ui.h"
@@ -30,7 +31,8 @@
 
 namespace sight {
 
-    using directory_iterator = std::filesystem::directory_iterator;
+    namespace fs = std::filesystem;
+    using directory_iterator = fs::directory_iterator;
 
     static Project* g_Project = nullptr;
     static TypeInfo emptyTypeInfo;
@@ -263,7 +265,7 @@ namespace sight {
         YAML::Emitter out;
 
         out << YAML::BeginMap;
-        out << YAML::Key << whoAmI << YAML::Value << "sight-project";
+        out << YAML::Key << whoAmI << YAML::Value << sightIsProject;
         out << YAML::Key << "nodeOrPortId" << YAML::Value << projectConfig.nodeOrPortId.load();
         out << YAML::Key << "typeIdIncr" << YAML::Value << typeIdIncr.load();
         out << YAML::Key << "lastOpenGraph" << YAML::Value << lastOpenGraph;
@@ -546,7 +548,7 @@ namespace sight {
             sprintf(pathWithoutExtOut, "%s", targetPath.c_str());
         }
         lastOpenGraph = targetPath;
-        return getCurrentGraph();
+        return currentGraph();
     }
 
     void Project::checkOpenLastGraph() {
@@ -554,7 +556,6 @@ namespace sight {
             return;
         }
 
-        // openGraph(lastOpenGraph.c_str(), false);
         uiChangeGraph(lastOpenGraph.c_str());
     }
 
@@ -752,7 +753,7 @@ namespace sight {
     }
 
     bool Project::isAnyGraphHasTemplate(std::string_view templateAddress, std::string* pathOut) {
-        auto g = getCurrentGraph();
+        auto g = currentGraph();
         std::string currentGraphPath;
 
         auto checkNodesFunc = [templateAddress, pathOut](SightNodeGraph* g) {
@@ -911,7 +912,11 @@ namespace sight {
         project->checkOpenLastGraph();
     }
 
-    int initProject(const char* baseDir, bool createIfNotExist) {
+    int openProject(const char* baseDir, bool createIfNotExist, bool callLoadSuccess) {
+        if (g_Project) {
+            return CODE_FAIL;    
+        }
+
         bool hasParent = true;
         if (!std::filesystem::exists(baseDir) || !std::filesystem::is_directory(baseDir)) {
             if (createIfNotExist) {
@@ -924,11 +929,49 @@ namespace sight {
 
         g_Project = new Project(baseDir, createIfNotExist);
         auto code = g_Project->load();
-        if (code == CODE_OK) {
+        if (code == CODE_OK && callLoadSuccess) {
             dbg(baseDir);
             onProjectAndUILoadSuccess(g_Project);
         }
         return code;
+    }
+
+    int disposeProject() {
+        if (g_Project) {
+            g_Project->save();
+            delete g_Project;
+            g_Project = nullptr;
+        }
+        return CODE_OK;
+    }
+
+    int verifyProjectFolder(const char* folder) {
+        if (fs::exists(folder) && fs::is_directory(folder)) {
+            auto begin = fs::directory_iterator{folder};
+            if (begin != fs::directory_iterator{}) {
+                // has files
+                auto path = fs::path(folder);
+                path /= "project.yaml";
+                dbg(path.c_str());
+
+                if (!fs::exists(path) || !fs::is_regular_file(path)) {
+                   return CODE_FAIL; 
+                }
+
+                // load it
+                std::ifstream fin(path);
+                if (!fin.is_open()) {
+                    return CODE_FAIL;
+                }
+
+                auto root = YAML::Load(fin);
+                auto n = root[whoAmI];
+                if (!n.IsDefined() || n.as<std::string>() != sightIsProject) {
+                    return CODE_FAIL;
+                }
+            }
+        }
+        return CODE_OK;
     }
 
 

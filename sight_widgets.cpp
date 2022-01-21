@@ -235,7 +235,7 @@ namespace sight {
         return r;
     }
 
-    std::string openFileDialog(const char* basePath) {
+    std::string openFileDialog(const char* basePath, int* status) {
         // initialize NFD
         NFD::Guard nfdGuard;
         // auto-freeing memory
@@ -249,18 +249,38 @@ namespace sight {
 
         nfdresult_t result = NFD::OpenDialog(outPath, filterItem, 2, basePath);
         if (result == NFD_OKAY) {
-            std::cout << "Success!" << std::endl
-                      << outPath.get() << std::endl;
+            SET_CODE(status, CODE_OK);
             pathResult = outPath.get();
         } else if (result == NFD_CANCEL) {
-            std::cout << "User pressed cancel." << std::endl;
+            // std::cout << "User pressed cancel." << std::endl;
+            SET_CODE(status, CODE_USER_CANCELED);
         } else {
             std::cout << "Error: " << NFD::GetError() << std::endl;
+            SET_CODE(status, CODE_ERROR);
         }
-
         // NFD::Guard will automatically quit NFD.
 
         return pathResult;
+    }
+
+    std::string openFolderDialog(const char* basePath, int* status) {
+        // initialize NFD
+        NFD::Guard nfdGuard;
+        // auto-freeing memory
+        NFD::UniquePath outPath;
+
+        nfdresult_t result = NFD::PickFolder(outPath, basePath);
+        if (result == NFD_OKAY) {
+            SET_CODE(status, CODE_OK);
+            return outPath.get();
+        } else if (result == NFD_CANCEL) {
+            SET_CODE(status, CODE_USER_CANCELED);
+        } else {
+            std::cout << "Error: " << NFD::GetError() << std::endl;
+            SET_CODE(status, CODE_ERROR);
+        }
+
+        return {};
     }
 
     std::string saveFileDialog(const char* basePath) {

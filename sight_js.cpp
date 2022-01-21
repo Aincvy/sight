@@ -285,7 +285,7 @@ namespace sight {
 
         auto object = Object::New(isolate);
         auto context = isolate->GetCurrentContext();
-        auto g = getCurrentGraph();
+        auto g = currentGraph();
 
         auto left =  nodePortValue(isolate, g->findPortHandle(connection->left));
         auto right = nodePortValue(isolate, g->findPortHandle(connection->right));
@@ -660,7 +660,7 @@ namespace sight {
         }
 
         void checkTinyData(const char* key, Local<Object> data, Isolate* isolate){
-            auto g = getCurrentGraph();
+            auto g = currentGraph();
             if (!g) {
                 dbg("need a graph opened!");
                 return;
@@ -674,7 +674,7 @@ namespace sight {
         }
 
         MaybeLocal<Object> tinyData(const char* key, MaybeLocal<Object> mayData, Isolate* isolate) {
-            auto g = getCurrentGraph();
+            auto g = currentGraph();
             if (!g) {
                 dbg("need a graph opened!");
                 return {};
@@ -882,7 +882,7 @@ namespace sight {
             auto arg1 = args[0];
             if (arg1->IsUint32()) {
                 auto id = arg1->Uint32Value(context).ToChecked();
-                targetNode = getCurrentGraph()->findNode(id);
+                targetNode = currentGraph()->findNode(id);
             } else if (arg1->IsObject()) {
                 // maybe a wrap object
                 targetNode = v8pp::class_<SightNode>::unwrap_object(isolate, arg1);

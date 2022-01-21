@@ -18,5 +18,6 @@ build/*
 .history/*
 
 imgui.ini
+sight.yaml
 
 project/*

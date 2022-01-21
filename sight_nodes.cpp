@@ -86,7 +86,7 @@ namespace sight {
         return CODE_OK;
     }
 
-    SightNodeGraph *getCurrentGraph() {
+    SightNodeGraph *currentGraph() {
         return CURRENT_GRAPH;
     }
 
