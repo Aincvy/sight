@@ -14,3 +14,5 @@ saveFile: s
 openGraph: o
 
 duplicateNode: d
+undo: z
+redo: 'y'

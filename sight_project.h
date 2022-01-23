@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <functional>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -97,7 +98,7 @@ namespace sight {
         void initData();
         void freeData();
 
-        void operator()(const char* labelBuf, SightNodePort* port) const;
+        void operator()(const char* labelBuf, SightNodePort* port, std::function<void()> onValueChange) const;
 
         /**
          * @brief Does this render has a render function ?

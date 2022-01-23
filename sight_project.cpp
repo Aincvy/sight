@@ -1045,7 +1045,7 @@ namespace sight {
         }
     }
 
-    void TypeInfoRender::operator()(const char* labelBuf, SightNodePort* port) const{
+    void TypeInfoRender::operator()(const char* labelBuf, SightNodePort* port, std::function<void()> onValueChange) const {
         SightNodeValue& value = port->value;
         auto oldValue = port->value;
         auto & options = port->options;
@@ -1072,7 +1072,8 @@ namespace sight {
                     if (ImGui::Selectable(list[i].c_str(), value.u.i == i)) {
                         if (value.u.i != i) {
                             value.u.i = i;
-                            onNodePortValueChange(port);
+                            // onNodePortValueChange(port);
+                            onValueChange();
                         }
                     }
                 }

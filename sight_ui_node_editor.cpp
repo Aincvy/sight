@@ -11,6 +11,7 @@
 #include "imgui.h"
 #include "sight_nodes.h"
 #include "sight_project.h"
+#include "sight_undo.h"
 #include "sight_widgets.h"
 #include <cassert>
 #include <iostream>
@@ -636,8 +637,13 @@ namespace sight {
             if (ImGui::Button("Reload## reload graph")) {
                 dbg("Not impl");
             }
+            ImGui::SameLine();
             if (ImGui::Button("Parse")) {
                 dbg("Not impl");
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Save")) {
+                currentGraph()->save();
             }
             ImGui::Separator();
 
@@ -708,6 +714,7 @@ namespace sight {
                                     // valid connection.
                                     auto connection = graph->findConnection(id);
                                     onConnect(connection);
+                                    recordUndo(UndoRecordType::Create, id);
 
                                     // Draw new link.
                                     ed::Link(id, inputPinId, outputPinId);
@@ -768,7 +775,9 @@ namespace sight {
                         auto connectionId = static_cast<int>(deletedLinkId.Get());
                         auto connection = CURRENT_GRAPH->findConnection(connectionId);
                         OnDisconnect(connection);
-                        CURRENT_GRAPH->delConnection(connectionId);
+
+                        recordUndo(UndoRecordType::Delete, connectionId);
+                        CURRENT_GRAPH->delConnection(connectionId, true, &(lastUndoCommand()->connectionData));
                     }
 
                     // You may reject link deletion by calling:
@@ -779,7 +788,10 @@ namespace sight {
                 while (ed::QueryDeletedNode(&deletedNodeId)) {
                     // ask for node delete.
                     if (ed::AcceptDeletedItem()) {
-                        CURRENT_GRAPH->delNode(static_cast<int>(deletedNodeId.Get()));
+
+                        recordUndo(UndoRecordType::Delete, 0, ed::GetNodePosition(deletedNodeId));
+                        CURRENT_GRAPH->delNode(static_cast<int>(deletedNodeId.Get()), &(lastUndoCommand()->nodeData));
+                        // lastUndoCommand()->position = ed::GetNodePosition(deletedNodeId);
                     }
                 }
             }
@@ -931,6 +943,13 @@ namespace sight {
             usePortType = true;
         }
 
+        auto callOnValueChange = [port]() {
+            recordUndo(UndoRecordType::Update, port->getId());
+            lastUndoCommand()->portValueData = port->oldValue;
+
+            onNodePortValueChange(port);
+        };
+
         auto& options = port->options;
         switch (type) {
         case IntTypeFloat:
@@ -939,7 +958,8 @@ namespace sight {
             if (ImGui::DragFloat(labelBuf, &port->value.u.f, 0.5f, 0, 0, "%.3f", flags)) {
             }
             if (ImGui::IsItemDeactivatedAfterEdit()) {
-                onNodePortValueChange(port);
+                // onNodePortValueChange(port);
+                callOnValueChange();
             }
             break;
         }
@@ -949,7 +969,8 @@ namespace sight {
             if (ImGui::InputDouble(labelBuf, &port->value.u.d, 0, 0, "%.6f", flags)) {
             }
             if (ImGui::IsItemDeactivatedAfterEdit()) {
-                onNodePortValueChange(port);
+                // onNodePortValueChange(port);
+                callOnValueChange();
             }
             break;
         }
@@ -958,10 +979,10 @@ namespace sight {
         {
             int flags = options.readonly ? ImGuiSliderFlags_ReadOnly : 0;
             if (ImGui::DragInt(labelBuf, &port->value.u.i, 1, 0, 0, "%d", flags)) {
-                // onNodePortValueChange(port, oldValue);
             }
             if (ImGui::IsItemDeactivatedAfterEdit()) {
-                onNodePortValueChange(port);
+                // onNodePortValueChange(port);
+                callOnValueChange();
             }
             break;
         }
@@ -986,7 +1007,8 @@ namespace sight {
                             }
                             if (ImGui::Selectable(item.c_str(), item == port->value.u.string)) {
                                 snprintf(port->value.u.string, std::size(port->value.u.string), "%s", item.c_str());
-                                onNodePortValueChange(port);
+                                // onNodePortValueChange(port);
+                                callOnValueChange();
                             }
                         }
                         ImGui::EndCombo();
@@ -1004,7 +1026,8 @@ namespace sight {
                     onNodePortAutoComplete(port);
                 }
                 if (ImGui::IsItemDeactivatedAfterEdit()) {
-                    onNodePortValueChange(port);
+                    // onNodePortValueChange(port);
+                    callOnValueChange();
                 }
             }
 
@@ -1013,7 +1036,8 @@ namespace sight {
         case IntTypeBool:
         {
             if (checkBox(labelBuf, &port->value.u.b, options.readonly)) {
-                onNodePortValueChange(port);
+                // onNodePortValueChange(port);
+                callOnValueChange();
             }
             break;
         }
@@ -1021,7 +1045,8 @@ namespace sight {
         {
             int flags = options.readonly ? ImGuiColorEditFlags_DefaultOptions_ | ImGuiColorEditFlags_NoInputs : 0;
             if (ImGui::ColorEdit3(labelBuf, port->value.u.vector4, flags)) {
-                onNodePortValueChange(port);
+                // onNodePortValueChange(port);
+                callOnValueChange();
             }
             break;
         }
@@ -1030,7 +1055,8 @@ namespace sight {
             // fixme: vector3 and vector4 has a value change bug.
             int flags = options.readonly ? ImGuiSliderFlags_ReadOnly : 0;
             if (ImGui::DragFloat3(labelBuf, port->value.u.vector3, 1, 0, 0, "%.3f", flags)) {
-                onNodePortValueChange(port);
+                // onNodePortValueChange(port);
+                callOnValueChange();
             }
             break;
         }
@@ -1038,7 +1064,8 @@ namespace sight {
         {
             int flags = options.readonly ? ImGuiSliderFlags_ReadOnly : 0;
             if (ImGui::DragFloat4(labelBuf, port->value.u.vector4, 1, 0, 0, "%.3f", flags)) {
-                onNodePortValueChange(port);
+                // onNodePortValueChange(port);
+                callOnValueChange();
             }
             break;
         }
@@ -1047,7 +1074,8 @@ namespace sight {
             int flags = options.readonly ? ImGuiInputTextFlags_ReadOnly : 0;
             ImGui::SetNextItemWidth(SightNodeFixedStyle::charTypeLength);
             if (ImGui::InputText(labelBuf, port->value.u.string, 2, 0)) {
-                onNodePortValueChange(port);
+                // onNodePortValueChange(port);
+                callOnValueChange();
             }
             break;
         }
@@ -1080,7 +1108,8 @@ namespace sight {
                                               ImVec2(nWidth, 150), flags, callback, &port->value)) {
                 }
                 if (ImGui::IsItemDeactivatedAfterEdit()) {
-                    onNodePortValueChange(port);
+                    // onNodePortValueChange(port);
+                    callOnValueChange();
                 }
             }
             break;
@@ -1104,7 +1133,7 @@ namespace sight {
                 if (usePortType && typeInfo.render.asIntType > 0) {
                     showNodePortValue(port, width, typeInfo.render.asIntType);
                 } else {
-                    typeInfo.render(labelBuf, port);
+                    typeInfo.render(labelBuf, port, callOnValueChange);
                 }
             } else {
                 ImGui::LabelText(labelBuf, "Unknown type of %d", port->getType());
@@ -1131,6 +1160,8 @@ namespace sight {
                 auto nodeId = node->getNodeId();
                 ed::SetNodePosition(nodeId, g_ContextStatus->nextNodePosition);
                 if (addNode(node) == CODE_OK) {
+                    recordUndo(UndoRecordType::Create, nodeId, g_ContextStatus->nextNodePosition);
+
                     node = nullptr;
                     // check port
                     auto graph = CURRENT_GRAPH;
@@ -1148,7 +1179,10 @@ namespace sight {
 
                         if (tmp) {
                             // create connection
-                            graph->createConnection(port->getId(), tmp->getId());
+                            auto connectionId = graph->createConnection(port->getId(), tmp->getId());
+                            if (connectionId > 0) {
+                                recordUndo(UndoRecordType::Create, connectionId);
+                            }
                         }
                     }
                 }

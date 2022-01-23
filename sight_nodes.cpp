@@ -15,27 +15,18 @@
 #include <algorithm>
 #include <fstream>
 
+#include "sight_nodes.h"
 #include "sight_defines.h"
-#include "dbg.h"
 #include "sight.h"
 #include "sight_defines.h"
+#include "dbg.h"
 #include "sight_js.h"
-#include "sight_nodes.h"
 #include "sight_address.h"
-#include "sight_ui.h"
 #include "sight_util.h"
 #include "sight_project.h"
-#include "sight_keybindings.h"
 
-#include "imgui.h"
-#include "sight_widgets.h"
 #include "v8pp/convert.hpp"
 #include "v8pp/class.hpp"
-
-#define IMGUI_DEFINE_MATH_OPERATORS
-#include "imgui_canvas.h"
-#include "imgui_internal.h"
-#include "imgui_node_editor.h"
 
 #include "yaml-cpp/yaml.h"
 
@@ -1254,18 +1245,22 @@ namespace sight {
         return iter->second;
     }
 
-    int SightNodeGraph::delNode(int id) {
+    int SightNodeGraph::delNode(int id, SightNode* copyTo) {
         auto result = std::find_if(nodes.begin(), nodes.end(), [id](const SightNode& n){ return n.nodeId == id; });
         if (result == nodes.end()) {
             return CODE_FAIL;
         }
 
+        idMap.erase(id);
+        if (copyTo) {
+            *copyTo = *result;
+        }
         nodes.erase(result);
         this->editing = true;
         return CODE_OK;
     }
 
-    int SightNodeGraph::delConnection(int id, bool removeRefs) {
+    int SightNodeGraph::delConnection(int id, bool removeRefs,SightNodeConnection* copyTo) {
         auto result = std::find_if(connections.begin(), connections.end(),
                                    [id](const SightNodeConnection &c) { return c.connectionId == id; });
         if (result == connections.end()) {
@@ -1278,6 +1273,9 @@ namespace sight {
         }
         idMap.erase(id);
 
+        if (copyTo) {
+            *copyTo = *result;
+        }
         connections.erase(result);
         dbg(id);
         return CODE_OK;

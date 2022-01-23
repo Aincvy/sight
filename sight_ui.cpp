@@ -1,4 +1,3 @@
-#include "dbg.h"
 #include "imgui_internal.h"
 #include "imgui_node_editor.h"
 #include "sight_defines.h"
@@ -10,10 +9,12 @@
 #include "sight_ui_node_editor.h"
 #include "sight_ui_project.h"
 #include "sight.h"
+#include "dbg.h"
 #include "sight_js.h"
 #include "sight_js_parser.h"
 #include "sight_project.h"
 #include "sight_util.h"
+#include "sight_undo.h"
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -150,10 +151,13 @@ namespace sight {
         }
 
         void showMainEditMenu(){
-            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.undo)) {
+            auto bindings = g_UIStatus->keybindings;
+            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.undo, bindings->undo.tipsText(), false, isUndoEnable())) {
+                undo();
             }
 
-            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.redo)) {
+            if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.redo, bindings->redo.tipsText(), false, isRedoEnable())) {
+                redo();
             }
         }
 
@@ -1063,16 +1067,21 @@ namespace sight {
             dbg("save graph");
             saveAnyThing();
         }
+
+        if (g_UIStatus->keybindings->undo) {
+            undo();
+        }
+        
     }
 
     void mainWindowFrame(UIStatus & uiStatus) {
+        // HierarchyWindow and InspectorWindow will use node editor data.
+        nodeEditorFrameBegin();
+
         showModals();
         handleKeyboardInput();
         showMainMenuBar(uiStatus);
         showProjectWindow();
-
-        // HierarchyWindow and InspectorWindow will use node editor data.
-        nodeEditorFrameBegin();
 
         // windows
         showHierarchyWindow();
@@ -1428,6 +1437,8 @@ namespace sight {
             ImGui::SetCurrentFont(fontPointer);
             onProjectAndUILoadSuccess(project);
         }
+
+        initUndo();
 
         auto uvLoop = g_UIStatus->uvLoop;
         // Main loop

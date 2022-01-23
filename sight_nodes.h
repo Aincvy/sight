@@ -631,6 +631,8 @@ namespace sight {
     class SightNodeGraph{
     public:
         bool editing = false;
+        // for ...
+        const static SightAnyThingWrapper invalidAnyThingWrapper;
 
         SightNodeGraph();
         ~SightNodeGraph();
@@ -661,14 +663,14 @@ namespace sight {
          * @param id
          * @return
          */
-        int delNode(int id);
+        int delNode(int id, SightNode* copyTo = nullptr);
 
         /**
          *
          * @param id
          * @return
          */
-        int delConnection(int id, bool removeRefs = true);
+        int delConnection(int id, bool removeRefs = true, SightNodeConnection* copyTo = nullptr);
 
         /**
          * Find a node by id
@@ -756,8 +758,6 @@ namespace sight {
         SightArray<SightNodeConnection> connections{BIG_ARRAY_SIZE};
         // key: node/port/connection id, value: the pointer of the instance.
         std::map<uint, SightAnyThingWrapper> idMap;
-        // for ...
-        const static SightAnyThingWrapper invalidAnyThingWrapper;
 
         SightNodeGraphExternalData externalData;
 
