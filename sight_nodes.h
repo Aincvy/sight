@@ -4,6 +4,7 @@
 
 #pragma once
 #include <cstddef>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <sys/stat.h>
@@ -557,7 +558,7 @@ namespace sight {
          * else it will instantiate one by this node's template.
          * @return a new node, you should `delete` the object when you do not need it.
          */
-        SightNode* instantiate(bool generateId = true, bool callEvent = true) const;
+        SightNode* instantiate(bool generateId = true) const;
         
         void resetTo(SightJsNode const* node);
         void resetTo(SightJsNode const& node);
@@ -665,6 +666,7 @@ namespace sight {
          * @param rightPortId
          * @return If create success, the connection's id.
          * -1: one of left,right is invalid. -2: they are same. -3: same kind. -4 left only can accept 1 connections
+         * -5: id repeat.
          */
         int createConnection(uint leftPortId, uint rightPortId, uint connectionId = 0, int priority = 10);
 
@@ -729,11 +731,7 @@ namespace sight {
         /**
          * You should call this function at init step.
          * after call this function, this->filepath will be `path`.
-         * @return 0 success. Positive number is warning, and negative number is error.
-         * 1: templateNode not found.
-         *
-         * -1: file not found.
-         * -2: bad file.
+         * @return CODE_OK success.  
          */
         int load(const char *path);
 
@@ -767,6 +765,27 @@ namespace sight {
          * 
          */
         void sortConnections();
+
+        /**
+         * @brief Verify node, port, connection's Id 
+         * For now, only check repeat.
+         * @param errorStop 
+         * @param onNodeError    callback function, you can modify data in this function
+         * @param onPortError    callback function, you can modify data in this function
+         * @param onConnectionError   callback function, you can modify data in this function
+         * @return int CODE_OK, if no error. CODE_FAIL if error. 
+         */
+        int verifyId(bool errorStop = true, std::function<void(SightNode*)> onNodeError = nullptr, std::function<void(SightNodePort*)> onPortError = nullptr,
+                     std::function<void(SightNodeConnection*)> onConnectionError = nullptr);
+
+        /**
+         * @brief Fix repeat, invalid id
+         * 
+         */
+        void checkAndFixIdError();
+
+        void markDirty();
+        bool isDirty() const;
 
     private:
 

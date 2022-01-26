@@ -235,6 +235,26 @@ namespace sight {
             }
         }
 
+        void showObjectMenu() {
+            if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.entity)) {
+                showEntityMenu();
+                ImGui::EndMenu();
+            }
+            if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.graph)) {
+                if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.parseGraph)) {
+                    
+                } 
+                if (ImGui::MenuItem("VerifyId")) {
+                    int c = currentGraph()->verifyId();
+                    dbg(c == CODE_OK);
+                }
+                if (ImGui::MenuItem("CheckAndFixId")) {
+                    currentGraph()->checkAndFixIdError();
+                }
+                ImGui::EndMenu();
+            }
+        }
+
         void showMainCustomMenu(){
             if (ImGui::MenuItem("Trigger")) {
                 // auto p = findTemplateNode("test/http/HttpGetReqNode");
@@ -280,8 +300,8 @@ namespace sight {
                     showMainViewMenu();
                     ImGui::EndMenu();
                 }
-                if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.entity)) {
-                    showEntityMenu();
+                if (ImGui::BeginMenu("Object")) {
+                    showObjectMenu();
                     ImGui::EndMenu();
                 }
                 if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.project)) {
@@ -1613,40 +1633,6 @@ namespace sight {
         nodeWork(node->outputPorts, showValue, showOutput);
         nodeWork(node->inputPorts, showValue, showInput);
 
-    }
-
-    void uiChangeGraph(const char* path ) {
-        auto g = currentGraph(); 
-
-        auto openGraphFunc = [path]() {
-            char tmp[NAME_BUF_SIZE]{0};
-            auto t = currentProject()->openGraph(path, false, tmp);
-            if (t) {
-                // open succeed.
-                changeNodeEditorGraph(tmp);
-            }
-        };
-        if (g == nullptr || !g->editing) {
-            openGraphFunc();
-            return;
-        }
-
-        std::string stringPath(path);
-        openSaveModal("Save File?", "Current Graph do not save, do you want save file?", [stringPath, openGraphFunc,g](SaveOperationResult r) {
-            if (r == SaveOperationResult::Cancel) {
-                return;
-            } else if (r == SaveOperationResult::Save) {
-                g->save();
-            }
-            openGraphFunc();
-
-            // if (r == SaveOperationResult::Drop) {
-            //     currentProject()->openGraph(stringPath.c_str(), false);
-            // } else if (r == SaveOperationResult::Save) {
-            //     getCurrentGraph()->save();
-            //     currentProject()->openGraph(stringPath.c_str(), false);
-            // }
-        });
     }
 
     void uiOpenProject(bool& folderError, std::string& lastOpenFolder, bool callLoadSuccess) {

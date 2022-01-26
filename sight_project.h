@@ -218,6 +218,7 @@ namespace sight {
         int rebuild();
 
         uint nextNodeOrPortId();
+        uint maxNodeOrPortId() const;
 
         int load();
         int loadConfigFile();

@@ -78,6 +78,8 @@ namespace sight {
 
         std::string lastOpenProject = "";
         ushort networkListenPort = 39455;
+
+        bool autoSave = false;
     };
 
     /**

@@ -342,14 +342,6 @@ namespace sight {
      */
     void showNodePorts(SightNode* node, bool showField = true, bool showValue = true, bool showOutput = false, bool showInput = false);
 
-    /**
-     * @brief 
-     * 
-     * @return true 
-     * @return false 
-     */
-    void uiChangeGraph(const char* path );
-
     void uiOpenProject(bool& folderError, std::string& lastOpenFolder, bool callLoadSuccess = true);
 
     /**

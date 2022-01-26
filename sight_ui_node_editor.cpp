@@ -657,29 +657,36 @@ namespace sight {
                 syncPositionFrom = true;
             }
 
+            auto graph = currentGraph();
+            auto sightSettings = getSightSettings();
+
             // auto io = uiStatus.io;
             // ImGui::Text("FPS: %.2f (%.2gms)", io->Framerate, io->Framerate ? 1000.0f / io->Framerate : 0.0f);
             // ImGui::SameLine();
-            if (ImGui::Button("Reload## reload graph")) {
-                dbg("Not impl");
-            }
             ImGui::SameLine();
             if (ImGui::Button("Parse")) {
                 dbg("Not impl");
             }
             ImGui::SameLine();
             if (ImGui::Button("Save")) {
-                currentGraph()->save();
+                graph->save();
             }
             ImGui::SameLine();
-            static bool autoSave;
-            ImGui::Checkbox("Auto Save", &autoSave);   
+            ImGui::Checkbox("Auto Save", &(sightSettings->autoSave));
+            if (graph->isBroken()) {
+                ImGui::TextColored(uiStatus.uiColors->errorText, "Graph Broken!");
+            }
+            // ImGui::SameLine();
+            // if (ImGui::Button("VerifyId")) {
+            //     if (graph->verifyId() != CODE_OK) {
+            //         dbg("has error id");
+            //     }
+            // }
             ImGui::Separator();
 
             // Start interaction with editor.
             ed::Begin("My Editor", ImVec2(0.0, 0.0f));
 
-            auto graph = currentGraph();
             // nodes
             for (auto& node : graph->getNodes()) {
                 showNode(&node, syncPositionTo, syncPositionFrom);
@@ -919,10 +926,11 @@ namespace sight {
             ed::End();
 
             if (uiStatus.needInit)
-                ed::NavigateToContent();
+                ed::NavigateToContent(0);
 
-            if (syncPositionFrom && autoSave) {
-                currentGraph()->save();
+            if (syncPositionFrom && sightSettings->autoSave) {
+                graph->markDirty();
+                graph->save();
             }
 
             return 0;
@@ -1019,6 +1027,7 @@ namespace sight {
         sprintf(configFilePath, "%s.json", pathWithoutExt.data());
         config.SettingsFile = configFilePath;
         g_ContextStatus->context = ed::CreateEditor(&config);
+        g_ContextStatus->lastSyncPositionTime = 0;
         
         // ed::SetCurrentEditor(g_ContextStatus->context);
         // ed::EnableShortcuts(false);
@@ -1370,6 +1379,33 @@ namespace sight {
             recordUndo(UndoRecordType::Create, connectionId);
         }
         return connectionId;
+    }
+
+    void uiChangeGraph(const char* path) {
+        auto g = currentGraph();
+
+        auto openGraphFunc = [path]() {
+            char tmp[NAME_BUF_SIZE]{ 0 };
+            auto t = currentProject()->openGraph(path, false, tmp);
+            if (t) {
+                // open succeed.
+                changeNodeEditorGraph(tmp);
+            }
+        };
+        if (g == nullptr || !g->editing) {
+            openGraphFunc();
+            return;
+        }
+
+        std::string stringPath(path);
+        openSaveModal("Save File?", "Current Graph do not save, do you want save file?", [stringPath, openGraphFunc, g](SaveOperationResult r) {
+            if (r == SaveOperationResult::Cancel) {
+                return;
+            } else if (r == SaveOperationResult::Save) {
+                g->save();
+            }
+            openGraphFunc();
+        });
     }
 
     bool isNodeEditorReady() {

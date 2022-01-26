@@ -58,6 +58,11 @@ namespace sight {
             sightSettings.lastOpenProject = n.as<std::string>();
         }
 
+        n = root["autoSave"];
+        if (n.IsDefined()) {
+            sightSettings.autoSave = n.as<bool>();
+        }
+
         return CODE_OK;
     }
 
@@ -68,6 +73,7 @@ namespace sight {
         out << YAML::Key << whoAmI << YAML::Value << "sight-settings";
         out << YAML::Key << "networkListenPort" << YAML::Value << sightSettings.networkListenPort;
         out << YAML::Key << "lastOpenProject" << YAML::Value << sightSettings.lastOpenProject;
+        out << YAML::Key << "autoSave" << YAML::Value << sightSettings.autoSave;
 
         out << YAML::EndMap;
         std::ofstream fOut(sightSettings.path, std::ios::out | std::ios::trunc);

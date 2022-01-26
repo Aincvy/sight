@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstring>
 #include <iterator>
+#include <set>
 #include <string>
 #include <sys/termios.h>
 #include <sys/types.h>
@@ -258,7 +259,7 @@ namespace sight {
         copyFunc(node->outputPorts, this->outputPorts);
         copyFunc(node->fields, this->fields);
 
-        updateChainPortPointer();
+        // updateChainPortPointer();
     }
 
     SightNodePortConnection SightNode::findConnectionByProcess() {
@@ -492,7 +493,7 @@ namespace sight {
 
     }
 
-    SightNode* SightJsNode::instantiate(bool generateId, bool callEvent) const {
+    SightNode* SightJsNode::instantiate(bool generateId) const {
         dbg(this->nodeName);
         auto p = new SightNode();
         
@@ -534,9 +535,6 @@ namespace sight {
             CALL_NODE_FUNC(p);
         }
 
-        if (callEvent) {
-            callEventOnInstantiate(p);
-        }
         return p;
     }
 
@@ -773,7 +771,6 @@ namespace sight {
             SightNode* sightNode = nullptr;
             for (const auto &nodeKeyPair : nodeRoot) {
                 auto yamlNode = nodeKeyPair.second;
-                // sightNode = nullptr;
                 loadNodeStatus = loadNodeData(yamlNode, sightNode);
                 if (loadNodeStatus != CODE_OK) {
                     if (status == CODE_OK) {
@@ -796,13 +793,6 @@ namespace sight {
             SightNodeConnection tmpConnection;
             for (const auto &item : connectionRoot) {
                 auto connectionId = item.first.as<int>();
-                // auto left = item.second["left"].as<int>();
-                // auto right = item.second["right"].as<int>();
-                // auto priority = 10;
-                // auto priorityNode = item.second["priority"];
-                // if (priorityNode.IsDefined()) {
-                //     priority = priorityNode.as<int>();
-                // }
                 item.second >> tmpConnection;
                 createConnection(tmpConnection.left, tmpConnection.right, connectionId, tmpConnection.priority);
             }
@@ -833,6 +823,8 @@ namespace sight {
     }
 
     void SightNodeGraph::addNode(const SightNode &node) {
+        // check id repeat? 
+
         auto p = this->nodes.add(node);
         p->updateChainPortPointer();
         idMap[node.nodeId] = {
@@ -851,6 +843,7 @@ namespace sight {
             }
         };
         CALL_NODE_FUNC(p);
+        p->callEventOnInstantiate();
 
         this->editing = true;
     }
@@ -909,6 +902,11 @@ namespace sight {
         // }
 
         auto id = connectionId > 0 ? connectionId : nextNodeOrPortId();
+        auto thing = findSightAnyThing(id);
+        if (thing.type != SightAnyThingType::Invalid) {
+            return -5;
+        }
+
         // find color ;
         ImU32 color = IM_COL32_WHITE;
         auto [typeInfo, find] = currentProject()->findTypeInfo(left->getType());
@@ -985,6 +983,119 @@ namespace sight {
         }
     }
 
+    int SightNodeGraph::verifyId(bool errorStop, std::function<void(SightNode*)> onNodeError, std::function<void(SightNodePort*)> onPortError,
+                                 std::function<void(SightNodeConnection*)> onConnectionError) {
+        using set = absl::flat_hash_set<uint>;
+        set nodeIdSet;
+        set portIdSet;
+        set connectionIdSet;
+
+        int status = CODE_OK;
+        const int maxNodeOrPortId = currentProject()->maxNodeOrPortId();
+
+        auto isIdInvalid = [&nodeIdSet, &portIdSet, &connectionIdSet, maxNodeOrPortId](uint id) {
+            return nodeIdSet.contains(id) || portIdSet.contains(id) || connectionIdSet.contains(id) || id > maxNodeOrPortId;
+        };
+
+        auto nodeFunc = [&onPortError, &isIdInvalid, &portIdSet, &status](std::vector<SightNodePort>& list) {
+            for (auto& item : list) {
+                auto id = item.id;
+                if (isIdInvalid(id)) {
+                    status = CODE_FAIL;
+                    if (onPortError) {
+                        onPortError(&item);
+                    }
+                }
+
+                portIdSet.emplace(id);
+            }
+        };
+        
+        for(auto& item: nodes){
+            auto id = item.nodeId;
+            if (isIdInvalid(id)) {
+                status = CODE_FAIL;
+                // call 
+                if (onNodeError) {
+                    onNodeError(&item);
+                }
+                if (errorStop) {
+                    break;
+                }
+            }
+            nodeIdSet.emplace(id);
+
+            // check port
+            CALL_NODE_FUNC(&item);
+            if (status != CODE_OK && errorStop) {
+                // return status;
+                break;
+            }
+        }
+
+        if (status == CODE_OK || !errorStop) {
+            // check connections
+            for (auto& item : connections) {
+                auto id = item.connectionId;
+                if (isIdInvalid(id)) {
+                    status = CODE_FAIL;
+                    // call
+                    if (onConnectionError) {
+                        onConnectionError(&item);
+                    }
+                    if (errorStop) {
+                        break;
+                    }
+                }
+
+                connectionIdSet.emplace(id);
+            }
+        }
+
+        return status;
+    }
+
+    void SightNodeGraph::checkAndFixIdError() {
+        bool rebuildIdMap = false;
+        auto nodeFunc = [&rebuildIdMap, this](SightNode* node) {
+            auto n = findNode(node->nodeId);
+            if (n == node) {
+                rebuildIdMap = true;
+            }
+            node->nodeId = nextNodeOrPortId();
+        };
+        auto portFunc = [&rebuildIdMap, this](SightNodePort* port) {
+            auto p = findPort(port->id);
+            if (p == port) {
+                rebuildIdMap = true;
+            }
+
+            port->id = nextNodeOrPortId();
+        };
+        auto connectionFunc = [&rebuildIdMap, this](SightNodeConnection* connection) {
+            auto c = findConnection(connection->connectionId);
+            if (c == connection) {
+                rebuildIdMap = true;
+            }
+
+            connection->connectionId = nextNodeOrPortId();
+        };
+
+        verifyId(false, nodeFunc, portFunc, connectionFunc);
+
+        if (rebuildIdMap) {
+            dbg("Need rebuild id map, but not impl!");
+        }
+    }
+
+    void SightNodeGraph::markDirty() {
+        editing = true;
+    }
+
+    bool SightNodeGraph::isDirty() const {
+        return editing;
+    }
+
     const SightArray<SightNodeConnection>& SightNodeGraph::getConnections() const {
         return this->connections;
     }
@@ -1046,6 +1157,10 @@ namespace sight {
     }
 
     int SightNodeGraph::save() {
+        if (!editing) {
+            return CODE_OK;
+        }
+
         auto c = saveToFile(this->filepath.c_str(), false);
         if (c == CODE_OK) {
             this->editing = false;
@@ -1503,7 +1618,7 @@ namespace sight {
     }
 
     int loadPortInfo(YAML::detail::iterator_value const& item, NodePortType nodePortType, std::vector<SightNodePort>& list, bool useOldId) {
-        auto id = item.first.as<uint>();
+        auto id = item.first.as<uint>(0);
         auto values = item.second;
         auto portName = values["name"].as<std::string>();
         auto typeNode = values["type"];
@@ -1619,7 +1734,7 @@ namespace sight {
         }
 
         int status = CODE_OK;
-        auto nodePointer = useOldId ? templateNode->instantiate(false, false) : templateNode->instantiate(true, false);
+        auto nodePointer = useOldId ? templateNode->instantiate(false) : templateNode->instantiate(true);
         auto& sightNode = *nodePointer;
         if (useOldId) {
             sightNode.nodeId = yamlNode["id"].as<int>();

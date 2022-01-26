@@ -3,20 +3,20 @@
 //
 
 #include "sight_project.h"
-#include "dbg.h"
 #include "sight_js.h"
 #include "sight_js_parser.h"
-#include "sight_ui.h"
+#include "sight_ui_node_editor.h"
 #include "sight_util.h"
 #include "sight.h"
+#include "dbg.h"
 #include "sight_nodes.h"
 #include "sight_memory.h"
-
 #include "sight_widgets.h"
+
 #include "yaml-cpp/yaml.h"
 
-#include "filesystem"
-#include "fstream"
+#include <filesystem>
+#include <fstream>
 #include <algorithm>
 #include <cassert>
 #include <cstdio>
@@ -227,6 +227,10 @@ namespace sight {
 
     uint Project::nextNodeOrPortId() {
         return projectConfig.nodeOrPortId++;
+    }
+
+    uint Project::maxNodeOrPortId() const {
+        return projectConfig.nodeOrPortId;
     }
 
     std::string Project::pathConfigFile() const{

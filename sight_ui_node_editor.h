@@ -83,6 +83,13 @@ namespace sight {
      * @return int  connection id, or negative number
      */
     int uiAddConnection(uint left, uint right, uint id = 0, int priority = 10);
-    
 
+    /**
+     * @brief 
+     * 
+     * @return true 
+     * @return false 
+     */
+    void uiChangeGraph(const char* path);
+    
 }
