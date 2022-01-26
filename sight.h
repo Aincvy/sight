@@ -14,6 +14,10 @@ namespace sight {
     extern const std::string whoAmI;
 
     constexpr const char* sightIsProject = "sight-project";
+    constexpr const char* sightIsCopyText = "sight-copy-text";
+
+    constexpr const char* stringType = "type";
+    constexpr const char* stringData = "data";
 
     /**
      *
@@ -58,6 +62,11 @@ namespace sight {
         CODE_PLUGIN_DISABLED,
 
         CODE_SCRIPT_NO_RESULT = 250,
+
+        CODE_GRAPH_START = 300,
+        CODE_TEMPLATE_ADDRESS_INVALID,
+        CODE_NO_TEMPLATE_ADDRESS,
+        CODE_GRAPH_BROKEN,
     };
 
     /**

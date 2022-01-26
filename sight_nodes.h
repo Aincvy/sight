@@ -10,8 +10,7 @@
 #include <vector>
 #include <map>
 
-#include "imgui.h"
-#include "imgui_node_editor.h"
+#include "yaml-cpp/yaml.h"
 
 #include "sight_defines.h"
 #include "sight_project.h"
@@ -25,6 +24,23 @@
 using Isolate = v8::Isolate;
 
 namespace sight {
+
+    struct Vector2 {
+        float x, y;
+        Vector2() {
+            x = y = 0.0f;
+        }
+        Vector2(float _x, float _y) {
+            x = _x;
+            y = _y;
+        }
+
+        bool isZero(){
+            return x == 0 && y == 0;
+        }
+    };
+    Vector2 operator-(Vector2 const& lhs, Vector2 const& rhs);
+    Vector2 operator+(Vector2 const& lhs, Vector2 const& rhs);
 
     /**
      *
@@ -278,14 +294,10 @@ namespace sight {
         uint titleBarPortType = IntTypeProcess;
     };
 
-    struct SightBaseNode {
-
-    };
-
     /**
      * a real node.
      */
-    struct SightNode : public ResetAble, SightBaseNode {
+    struct SightNode : public ResetAble {
         std::string nodeName;
         uint nodeId;
         // this node's template node.  Real template node's `templateNode` must be nullptr.
@@ -301,6 +313,8 @@ namespace sight {
         std::vector<SightNodePort> outputPorts;
         // no input/output ports.
         std::vector<SightNodePort> fields;
+
+        Vector2 position;
 
         /**
          *
@@ -324,7 +338,7 @@ namespace sight {
          * you should `delete` this function's return value.
          * @return
          */
-        SightNode* clone() const;
+        SightNode* clone(bool generateId = true) const;
 
         /**
          * Find the next active connection.
@@ -377,6 +391,12 @@ namespace sight {
         uint getNodeId() const;
 
         const char* templateAddress() const;
+
+        /**
+         * @brief No dot call this function mutiple times.
+         * 
+         */
+        void callEventOnInstantiate();
 
     protected:
         enum class CopyFromType {
@@ -546,6 +566,8 @@ namespace sight {
 
         void updateStyle();
         bool isStyleInitialized() const;
+
+        void callEventOnInstantiate(SightNode* p) const;
 
     };
 
@@ -826,15 +848,7 @@ namespace sight {
 
     void onNodePortValueChange(SightNodePort* port);
 
-
     uint nextNodeOrPortId();
-
-    /**
-     * add and delete node memory.  (use keyword delete)
-     * @param node
-     * @return
-     */
-    int addNode(SightNode *node);
 
     /**
      *
@@ -883,6 +897,23 @@ namespace sight {
     bool isNodeEditorReady();
 
     const char* getNodePortTypeName(NodePortType kind);
+
+    YAML::Emitter& operator<< (YAML::Emitter& out, const Vector2& v);
+    YAML::Emitter& operator<< (YAML::Emitter& out, const SightNode& node);
+    YAML::Emitter& operator<< (YAML::Emitter& out, const SightNodeConnection& connection);
+    bool operator>>(YAML::Node const&node, Vector2 &v);
+    bool operator>>(YAML::Node const&node, SightNodeConnection &connection);
+    int loadNodeData(YAML::Node const& yamlNode, SightNode*& node, bool useOldId = true);
+
+    /**
+     * @brief 
+     * 
+     * @param nodes 
+     * @param connections 
+     * @param genConId   generate Connection Id ? 
+     * @return int 
+     */
+    int regenerateId(std::vector<SightNode*>& nodes, std::vector<SightNodeConnection>& connections, bool genConId = false);
 
     inline bool isNodePortShowValue(SightNodePort const& port){
         uint type = port.getType();

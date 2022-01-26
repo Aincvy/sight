@@ -343,20 +343,8 @@ namespace sight {
             ImGui::End();
         }
 
-        void showHierarchyWindow(){
-            if (g_UIStatus->windowStatus.layoutReset) {
-                ImGui::SetNextWindowPos(ImVec2(0,20));
-                ImGui::SetNextWindowSize(ImVec2(300, 285));
-            }
-
-            auto & selection = g_UIStatus->selection;
-
-            ImGui::Begin(WINDOW_LANGUAGE_KEYS.hierarchy);
-            // check and update node editor status
-            if (!isNodeEditorReady()) {
-                ImGui::End();
-                return;
-            }
+        void updateSelectedNodeFromED(){
+            auto& selection = g_UIStatus->selection;
 
             int selectedCount = ed::GetSelectedObjectCount();
             if (selectedCount > 0) {
@@ -372,16 +360,34 @@ namespace sight {
                 selectedNodes.resize(c);
                 selectedLinks.resize(d);
 
-                for (const auto & item : selectedNodes) {
+                for (const auto& item : selectedNodes) {
                     selection.selectedNodeOrLinks.insert(static_cast<uint>(item.Get()));
                 }
-                for( const auto& item: selectedLinks){
+                for (const auto& item : selectedLinks) {
                     selection.selectedNodeOrLinks.insert(static_cast<uint>(item.Get()));
                 }
-                
+
             } else {
                 selection.selectedNodeOrLinks.clear();
             }
+        }
+
+        void showHierarchyWindow(){
+            if (g_UIStatus->windowStatus.layoutReset) {
+                ImGui::SetNextWindowPos(ImVec2(0,20));
+                ImGui::SetNextWindowSize(ImVec2(300, 285));
+            }
+
+            auto & selection = g_UIStatus->selection;
+
+            ImGui::Begin(WINDOW_LANGUAGE_KEYS.hierarchy);
+            // check and update node editor status
+            if (!isNodeEditorReady()) {
+                ImGui::End();
+                return;
+            }
+
+            updateSelectedNodeFromED();
             
             auto graph = currentGraph();
             if (graph) {
@@ -1058,18 +1064,35 @@ namespace sight {
      * 
      */
     void handleKeyboardInput(){
-        if (!g_UIStatus->keybindings->controlKey.isKeyDown()) {
+        auto keybindings = g_UIStatus->keybindings;
+        if (!keybindings->controlKey.isKeyDown()) {
             return;
         }
 
         // dbg("got control key");
-        if (g_UIStatus->keybindings->saveFile) {
+        if (keybindings->saveFile) {
             dbg("save graph");
             saveAnyThing();
-        }
-
-        if (g_UIStatus->keybindings->undo) {
+        } else if (keybindings->undo) {
             undo();
+        } else if (keybindings->redo) {
+            redo();  
+        } else if (keybindings->copy) {
+            auto & selectedNodeOrLinks =g_UIStatus->selection.selectedNodeOrLinks;
+            if (selectedNodeOrLinks.size() == 1) {
+                auto n = g_UIStatus->selection.getSelectedNode();
+                if (n) {
+                    ImGui::SetClipboardText(CopyText::from(*n).c_str());
+                }
+            } else {
+                // multiple
+                std::vector<SightNode*> nodes;
+                std::vector<SightNodeConnection> connections;
+                g_UIStatus->selection.getSelected(nodes, connections);
+                if (!nodes.empty()) {
+                    ImGui::SetClipboardText(CopyText::from(nodes, connections).c_str());
+                }
+            }
         }
         
     }
@@ -1130,7 +1153,7 @@ namespace sight {
                 auto* nodePointer = (SightNode**) command->args.data;
                 auto size = command->args.dataLength;
                 for (int i = 0; i < size; ++i) {
-                    addNode(nodePointer[i]);
+                    uiAddNode(nodePointer[i]);
                 }
                 // pluginManager()->getPluginStatus().addNodesFinished = true;
                 break;
@@ -1980,6 +2003,55 @@ namespace sight {
         }
 
         return currentGraph()->findConnection(*selectedNodeOrLinks.begin());
+    }
+
+    int Selection::getSelected(std::vector<SightNode*>& nodes, std::vector<SightNodeConnection>& connections) const {
+        for (const auto& item : selectedNodeOrLinks) {
+            auto thing = currentGraph()->findSightAnyThing(item);
+            if (thing.type == SightAnyThingType::Node) {
+                auto n = thing.asNode();
+                if (n) {
+                    nodes.push_back(n);
+                }
+            } else if (thing.type == SightAnyThingType::Connection) {
+                auto c = thing.asConnection();
+                if (c) {
+                    connections.push_back(*c);
+                }
+            }
+        }
+
+        if (!nodes.empty()) {
+            // auto copy link
+            auto graph = currentGraph();
+            for (const auto& item : nodes) {     // find .......
+                for (const auto& port : item->outputPorts) {
+                    if (!port.isConnect()) {
+                        continue;
+                    }
+
+                    for (const auto& connection : port.connections) {
+                        SightNodePortConnection c(graph, connection, item);
+                        if (!c.target) {
+                            continue;
+                        }
+
+                        for (const auto& nodePointer : nodes) {
+                            if (item == nodePointer) {
+                                continue;
+                            }
+
+                            if (c.target->node == nodePointer) {
+                                connections.push_back(*connection);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return CODE_OK;
     }
 
 }

@@ -3,6 +3,7 @@
 //
 #pragma once
 
+#include "imgui.h"
 #include "sight_ui.h"
 #include "sight_nodes.h"
 #include <string_view>
@@ -12,6 +13,14 @@
 namespace ed = ax::NodeEditor;
 
 namespace sight {
+
+    ImVec2 getNodePos(SightNode* node);
+    ImVec2 getNodePos(SightNode const& node);
+    void setNodePos(SightNode* node, ImVec2 pos);
+    void setNodePos(SightNode& node, ImVec2 pos);
+
+    ImVec2 convert(Vector2 v);
+    Vector2 convert(ImVec2 v);
 
     /**
      * init
@@ -30,7 +39,6 @@ namespace sight {
     int changeNodeEditorGraph(std::string_view pathWithoutExt);
 
     int showNodeEditorGraph(UIStatus const& uiStatus);
-
 
     /**
      * @brief 
@@ -53,4 +61,28 @@ namespace sight {
      * @return false 
      */
     bool isNodeEditorReady();
+
+
+    /**
+     * add and delete node memory.  (use keyword delete)
+     * @param node
+     * @return CODE
+     */
+    int uiAddNode(SightNode* node, bool freeMemory = true);
+
+    int uiAddMultipleNodes(std::vector<SightNode*>& nodes, std::vector<SightNodeConnection> const& connections, ImVec2 startPos, bool freeMemory = true);
+    int uiAddMultipleNodes(std::vector<SightNode*>& nodes, std::vector<SightNodeConnection*> const& connections, ImVec2 startPos, bool freeMemory = true);
+
+    /**
+     * @brief 
+     * 
+     * @param left 
+     * @param right 
+     * @param id 
+     * @param priority 
+     * @return int  connection id, or negative number
+     */
+    int uiAddConnection(uint left, uint right, uint id = 0, int priority = 10);
+    
+
 }

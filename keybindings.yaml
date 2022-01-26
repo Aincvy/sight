@@ -16,3 +16,6 @@ openGraph: o
 duplicateNode: d
 undo: z
 redo: 'y'
+
+copy: 'c'
+paste: 'v'

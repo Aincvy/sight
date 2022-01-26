@@ -88,6 +88,9 @@ namespace sight {
         CHECK_RETURN("redo", keybindingds->redo);
         CHECK_RETURN("undo", keybindingds->undo);
 
+        CHECK_RETURN("copy", keybindingds->copy);
+        CHECK_RETURN("paste", keybindingds->paste);
+
         keybindingds->esc = getFromKeyMap("esc");
         return keybindingds;
     }

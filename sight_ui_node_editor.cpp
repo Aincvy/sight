@@ -15,6 +15,9 @@
 #include "sight_widgets.h"
 #include <cassert>
 #include <iostream>
+#include <string_view>
+#include <sys/stat.h>
+#include <vector>
 
 #include "absl/strings/substitute.h"
 
@@ -27,8 +30,6 @@
 #define PIN_CONTEXT_MENU "PinContextMenu"
 #define NODE_CONTEXT_MENU "NodeContextMenu"
 
-#define CURRENT_GRAPH currentGraph()
-
 static struct {
     ed::EditorContext* context = nullptr;
     // file path buf.
@@ -39,6 +40,7 @@ static struct {
 
     ImVec2 nextNodePosition{0,0};
 
+    float lastSyncPositionTime = 0;
 
     bool isNextNodePositionEmpty(){
         return nextNodePosition.x == 0 && nextNodePosition.y == 0;
@@ -148,10 +150,10 @@ namespace sight {
             };
 
             if (ImGui::BeginPopup(NODE_CONTEXT_MENU)) {
-                if (ImGui::MenuItem("debugInfo")) {
+                if (ImGui::MenuItem("DebugInfo")) {
                     // show debug info.
                     dbg(nodeId);
-                    auto nodePointer = CURRENT_GRAPH->findNode(nodeId);
+                    auto nodePointer = currentGraph()->findNode(nodeId);
                     dbg(nodePointer);
                     if (nodePointer) {
                         auto nodeFunc = [&showPortDebugInfo](std::vector<SightNodePort> const& list) {
@@ -161,27 +163,32 @@ namespace sight {
 
                             dbg(getNodePortTypeName(list.front().kind));
                             for( const auto& item: list){
-                                // auto portInfoMsg = absl::Substitute("$0, $1", item.getId(), item.portName);
-                                // dbg(portInfoMsg);
                                 showPortDebugInfo(item);
                             }
                         };
 
                         CALL_NODE_FUNC(nodePointer);
                     }
+                } else if (ImGui::MenuItem("Copy")) {
+                    dbg(nodeId);
+                    auto nodePointer = currentGraph()->findNode(nodeId);
+                    if (nodePointer) {
+                        auto str = CopyText::from(*nodePointer);
+                        ImGui::SetClipboardText(str.c_str());
+                    }
                 }
                 ImGui::EndPopup();
             }
             if (ImGui::BeginPopup(PIN_CONTEXT_MENU)) {
-                auto port = CURRENT_GRAPH->findPort(pinId);
-                if (ImGui::MenuItem("portDebugInfo")) {
+                auto port = currentGraph()->findPort(pinId);
+                if (ImGui::MenuItem("PortDebugInfo")) {
                     if (port) {
                         showPortDebugInfo(*port);
                     } else {
                         dbg("no-port-info");
                     }
                 }
-                if (ImGui::MenuItem("showFlow")) {
+                if (ImGui::MenuItem("ShowFlow")) {
                     for( const auto& item: port->connections){
                         ed::Flow(item->connectionId);
                         dbg(item->connectionId);
@@ -435,11 +442,13 @@ namespace sight {
         /**
          * render a node
          * @param node
+         * @param syncPositionTo  sync position to node editor ?
+         * @param syncPositionFrom sync position from node editor ?
          * @return
          */
-        int showNode(SightNode* node) {
+        int showNode(SightNode* node, bool syncPositionTo = false, bool syncPositionFrom = false) {
             if (!node) {
-                return -1;
+                return CODE_FAIL;
             }
 
             auto color = ImColor(0, 99, 160, 255);
@@ -476,6 +485,9 @@ namespace sight {
                 return fullAlpha;
             };
 
+            if (syncPositionTo && !node->position.isZero()) {
+                ed::SetNodePosition(node->nodeId, getNodePos(node));
+            }
             ed::BeginNode(node->nodeId);
             // ImGui::Dummy(ImVec2(7,5));
             auto chainInPort = node->chainInPort;
@@ -626,14 +638,28 @@ namespace sight {
 
             ImGui::EndGroup();
             ed::EndNode();
-            return 0;
+            if (syncPositionFrom) {
+                setNodePos(node, ed::GetNodePosition(node->nodeId));
+            }
+            
+            return CODE_OK;
         }
 
         int showNodes(UIStatus const& uiStatus) {
-            auto io = uiStatus.io;
+            bool syncPositionTo = false, syncPositionFrom = false;
+            auto now = ImGui::GetTime();
+            if (g_ContextStatus->lastSyncPositionTime <= 0) {
+                g_ContextStatus->lastSyncPositionTime = now;
+                syncPositionTo = true;
+            } else if (now - g_ContextStatus->lastSyncPositionTime >= 5) {
+                g_ContextStatus->lastSyncPositionTime = now;
+                dbg("try sync node position");
+                syncPositionFrom = true;
+            }
 
-            ImGui::Text("FPS: %.2f (%.2gms)", io->Framerate, io->Framerate ? 1000.0f / io->Framerate : 0.0f);
-            ImGui::SameLine();
+            // auto io = uiStatus.io;
+            // ImGui::Text("FPS: %.2f (%.2gms)", io->Framerate, io->Framerate ? 1000.0f / io->Framerate : 0.0f);
+            // ImGui::SameLine();
             if (ImGui::Button("Reload## reload graph")) {
                 dbg("Not impl");
             }
@@ -645,18 +671,22 @@ namespace sight {
             if (ImGui::Button("Save")) {
                 currentGraph()->save();
             }
+            ImGui::SameLine();
+            static bool autoSave;
+            ImGui::Checkbox("Auto Save", &autoSave);   
             ImGui::Separator();
 
             // Start interaction with editor.
             ed::Begin("My Editor", ImVec2(0.0, 0.0f));
 
+            auto graph = currentGraph();
             // nodes
-            for (auto& node : CURRENT_GRAPH->getNodes()) {
-                showNode(&node);
+            for (auto& node : graph->getNodes()) {
+                showNode(&node, syncPositionTo, syncPositionFrom);
             }
 
             // Submit Links
-            for (const auto& connection : CURRENT_GRAPH->getConnections()) {
+            for (const auto& connection : graph->getConnections()) {
                 ed::Link(connection.connectionId, connection.leftPortId(), connection.rightPortId(), ImColor(connection.leftColor));
             }
 
@@ -686,7 +716,6 @@ namespace sight {
                     if (inputPinId && outputPinId)     // both are valid, let's accept link
                     {
                         // ed::AcceptNewItem() return true when user release mouse button.
-                        auto graph = CURRENT_GRAPH;
                         auto inputPort = graph->findPort(static_cast<int>(inputPinId.Get()));
                         auto outputPort = graph->findPort(static_cast<int>(outputPinId.Get()));
                         assert(inputPort != nullptr);
@@ -709,13 +738,8 @@ namespace sight {
                                     priority = inputPort->connections.back()->priority - 1;
                                 }
 
-                                auto id = graph->createConnection(inputPort->getId(), outputPort->getId(),0, priority);
+                                auto id = uiAddConnection(inputPort->getId(), outputPort->getId(), 0, priority);
                                 if (id > 0) {
-                                    // valid connection.
-                                    auto connection = graph->findConnection(id);
-                                    onConnect(connection);
-                                    recordUndo(UndoRecordType::Create, id);
-
                                     // Draw new link.
                                     ed::Link(id, inputPinId, outputPinId);
                                 } else {
@@ -747,7 +771,7 @@ namespace sight {
                 ed::PinId pinId = 0;
                 if (ed::QueryNewNode(&pinId)) {
                     showLabel("+ Create Node", ImColor(32, 45, 32, 180));
-                    auto portHandle = CURRENT_GRAPH->findPortHandle(static_cast<int>(pinId.Get()));
+                    auto portHandle = graph->findPortHandle(static_cast<int>(pinId.Get()));
                     g_ContextStatus->portForCreateNode = portHandle;
 
                     if (ed::AcceptNewItem()) {
@@ -773,11 +797,11 @@ namespace sight {
                     if (ed::AcceptDeletedItem()) {
                         // Then remove link from your data.
                         auto connectionId = static_cast<int>(deletedLinkId.Get());
-                        auto connection = CURRENT_GRAPH->findConnection(connectionId);
+                        auto connection = currentGraph()->findConnection(connectionId);
                         OnDisconnect(connection);
 
                         recordUndo(UndoRecordType::Delete, connectionId);
-                        CURRENT_GRAPH->delConnection(connectionId, true, &(lastUndoCommand()->connectionData));
+                        graph->delConnection(connectionId, true, &(lastUndoCommand()->connectionData));
                     }
 
                     // You may reject link deletion by calling:
@@ -790,42 +814,86 @@ namespace sight {
                     if (ed::AcceptDeletedItem()) {
 
                         recordUndo(UndoRecordType::Delete, 0, ed::GetNodePosition(deletedNodeId));
-                        CURRENT_GRAPH->delNode(static_cast<int>(deletedNodeId.Get()), &(lastUndoCommand()->nodeData));
+                        graph->delNode(static_cast<int>(deletedNodeId.Get()), &(lastUndoCommand()->nodeData));
                         // lastUndoCommand()->position = ed::GetNodePosition(deletedNodeId);
                     }
                 }
             }
             ed::EndDelete();     // Wrap up deletion action
 
+            auto openPopupPosition = ImGui::GetMousePos();     // this line must be before  ed::Suspend();
+
             // handle keyboard
-            if (uiStatus.keybindings->controlKey.isKeyDown()) {
-                if (uiStatus.keybindings->duplicateNode) {
-                    // todo mutiple nodes
+            auto keybindings = uiStatus.keybindings;
+            if (keybindings->controlKey.isKeyDown()) {
+                
+                if (keybindings->duplicateNode) {
                     dbg("duplicate node");
-                    auto tmpNode = uiStatus.selection.getSelectedNode();
-                    if (tmpNode && tmpNode->templateNode) {
-                        auto node = tmpNode->templateNode->instantiate();
-                        auto pos = ed::GetNodePosition(tmpNode->nodeId);
-                        auto size = ed::GetNodeSize(tmpNode->nodeId);
-                        ed::SetNodePosition(node->nodeId, ImVec2(pos.x, pos.y + size.y + 10));
-                        addNode(node);
+                    if (uiStatus.selection.selectedNodeOrLinks.size() == 1) {
+                        auto tmpNode = uiStatus.selection.getSelectedNode();
+                        if (tmpNode && tmpNode->templateNode) {
+                            auto node = tmpNode->clone();
+                            auto pos = ed::GetNodePosition(tmpNode->nodeId);
+                            auto size = ed::GetNodeSize(tmpNode->nodeId);
+                            auto nodeId = node->getNodeId();
+                            ed::SetNodePosition(node->nodeId, ImVec2(pos.x, pos.y + size.y + 10));
+                            uiAddNode(node);
+
+                            // change selected
+                            ed::SelectNode(nodeId);
+                        }
+                    } else {
+                        std::vector<SightNode*> nodes;
+                        std::vector<SightNodeConnection> connections;
+                        uiStatus.selection.getSelected(nodes, connections);
+
+                        if (!nodes.empty()) {
+                            std::vector<SightNode*> targetNodes;
+                            targetNodes.reserve(nodes.size());
+                            for (const auto& item : nodes) {
+                                targetNodes.push_back(item->clone(false));
+                            }
+                            regenerateId(targetNodes, connections, true);
+                            uiAddMultipleNodes(targetNodes, connections, openPopupPosition);
+                        }
+                    }
+                    
+                } else if (keybindings->paste) {
+                    // try paste node
+                    std::string_view str = ImGui::GetClipboardText();
+                    if (!str.empty()) {
+                        auto c = CopyText::parse(str);
+                        if (c.type == CopyTextType::Node) {
+                            SightNode* nodePointer = nullptr;
+                            c.loadAsNode(nodePointer);
+                            if (nodePointer) {
+                                // add node
+                                ed::SetNodePosition(nodePointer->getNodeId(), openPopupPosition);
+                                uiAddNode(nodePointer);     // this function will delete nodePointer
+                                nodePointer = nullptr;
+                            }
+                        } else if (c.type == CopyTextType::Multiple) {
+                            std::vector<SightNode*> nodes;
+                            std::vector<SightNodeConnection> connections;
+                            c.loadAsMultiple(nodes, connections);
+                            regenerateId(nodes, connections);
+                            uiAddMultipleNodes(nodes, connections, openPopupPosition);
+                        }
                     }
                 }
             }
-            if (uiStatus.keybindings->esc.isKeyDown()) {
+            if (keybindings->esc.isKeyDown()) {
                 if (g_ContextStatus->contextMenuCreateNodeOpen) {
                     g_ContextStatus->resetAfterCreateNode();
                 }
             }
 
             // right click
-            auto openPopupPosition = ImGui::GetMousePos();     // this line must be before  ed::Suspend();
             static ed::NodeId contextNodeId = 0;
             static ed::LinkId contextLinkId = 0;
             static ed::PinId contextPinId = 0;
 
             ed::Suspend();
-
             if (ed::ShowNodeContextMenu(&contextNodeId)) {
                 ImGui::OpenPopup(NODE_CONTEXT_MENU);
             } else if (ed::ShowPinContextMenu(&contextPinId)) {
@@ -851,8 +919,11 @@ namespace sight {
             ed::End();
 
             if (uiStatus.needInit)
-                ed::NavigateToContent(0.0f);
+                ed::NavigateToContent();
 
+            if (syncPositionFrom && autoSave) {
+                currentGraph()->save();
+            }
 
             return 0;
         }
@@ -868,9 +939,10 @@ namespace sight {
         ImGui::SetNextWindowSize(windowSize, ImGuiCond_Once);
 
         std::string windowTitle("Graph");
-        if (CURRENT_GRAPH) {
+        auto graph = currentGraph();
+        if (graph) {
             windowTitle += " - ";
-            windowTitle += CURRENT_GRAPH->getFilePath();
+            windowTitle += graph->getFilePath();
             windowTitle += "###Node Editor Graph";
         }
 
@@ -878,13 +950,37 @@ namespace sight {
                      ImGuiWindowFlags_NoCollapse |
                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
                          ImGuiWindowFlags_NoSavedSettings);
-        if (CURRENT_GRAPH) {
+        if (graph) {
             showNodes(uiStatus);
         }
 
         ImGui::End();
 
         return CODE_OK;
+    }
+
+    ImVec2 getNodePos(SightNode* node) {
+        return convert(node->position);
+    }
+
+    ImVec2 getNodePos(SightNode const& node) {
+        return convert(node.position);
+    }
+
+    void setNodePos(SightNode* node, ImVec2 pos) {
+        node->position = convert(pos);
+    }
+
+    void setNodePos(SightNode& node, ImVec2 pos) {
+        node.position = convert(pos);
+    }
+
+    ImVec2 convert(Vector2 v) {
+        return {v.x, v.y};
+    }
+
+    Vector2 convert(ImVec2 v) {
+        return { v.x, v.y };
     }
 
     int initNodeEditor(bool nodeStatusFlag) {
@@ -923,6 +1019,10 @@ namespace sight {
         sprintf(configFilePath, "%s.json", pathWithoutExt.data());
         config.SettingsFile = configFilePath;
         g_ContextStatus->context = ed::CreateEditor(&config);
+        
+        // ed::SetCurrentEditor(g_ContextStatus->context);
+        // ed::EnableShortcuts(false);
+        // ed::SetCurrentEditor(nullptr);
 
         return CODE_OK;
     }
@@ -1158,13 +1258,12 @@ namespace sight {
                 // dbg("it will create a new node.", this->name);
                 auto node = this->templateNode->instantiate();
                 auto nodeId = node->getNodeId();
+                node->position = convert(g_ContextStatus->nextNodePosition);
                 ed::SetNodePosition(nodeId, g_ContextStatus->nextNodePosition);
-                if (addNode(node) == CODE_OK) {
-                    recordUndo(UndoRecordType::Create, nodeId, g_ContextStatus->nextNodePosition);
-
+                if (uiAddNode(node) == CODE_OK) {
                     node = nullptr;
                     // check port
-                    auto graph = CURRENT_GRAPH;
+                    auto graph = currentGraph();
                     if (g_ContextStatus->portForCreateNode) {
                         node = graph->findNode(nodeId);
                         auto port = g_ContextStatus->portForCreateNode.get();
@@ -1198,6 +1297,80 @@ namespace sight {
         }
     }
 
+    int uiAddNode(SightNode* node, bool freeMemory) {
+
+        currentGraph()->addNode(*node);
+        recordUndo(UndoRecordType::Create, node->getNodeId(), convert(node->position));
+        if (freeMemory) {
+            delete node;
+        }
+        return CODE_OK;
+    }
+
+    int uiAddMultipleNodes(std::vector<SightNode*>& nodes, std::vector<SightNodeConnection> const& connections, ImVec2 startPos, bool freeMemory) {
+        if (!nodes.empty()) {
+            // position
+            // find left-most node.
+            SightNode* leftNode = nullptr;
+            for (auto& item : nodes) {
+                if (leftNode) {
+                    auto x = leftNode->position.x - item->position.x;
+                    auto y = leftNode->position.y - item->position.y;
+
+                    if (x > 0) {
+                        leftNode = item;
+                    }
+                } else {
+                    leftNode = item;
+                }
+            }
+
+            // add
+            auto leftNodePos = leftNode->position;
+            setNodePos(leftNode, startPos);
+            for (auto& item : nodes) {
+                if (item != leftNode) {
+                    // fix pos
+                    auto pos = startPos + convert(item->position - leftNodePos);
+                    setNodePos(item, pos);
+                }
+                ed::SetNodePosition(item->getNodeId(), getNodePos(item));
+                uiAddNode(item, freeMemory);
+            }
+            nodes.clear();
+        }
+        if (!connections.empty()) {
+            for (const auto& item : connections) {
+                // graph->addConnection(item);
+                // graph->createConnection(item.left, item.right, item.connectionId, item.priority);
+                uiAddConnection(item.left, item.right, item.connectionId, item.priority);
+            }
+        }
+
+        return CODE_OK;
+    }
+
+    int uiAddMultipleNodes(std::vector<SightNode*>& nodes, std::vector<SightNodeConnection*> const& connections, ImVec2 startPos, bool freeMemory) {
+        std::vector<SightNodeConnection> c;
+        if (!connections.empty()) {
+            c.reserve(connections.size());
+            for( const auto& item: connections){
+                c.push_back(*item);
+            }
+        }
+        return uiAddMultipleNodes(nodes, c, startPos, freeMemory);
+    }
+
+    int uiAddConnection(uint left, uint right, uint id, int priority) {
+        auto graph = currentGraph();
+        auto connectionId = graph->createConnection(left, right, id, priority);
+        if (connectionId > 0) {
+            auto connection = graph->findConnection(id);
+            onConnect(connection);
+            recordUndo(UndoRecordType::Create, connectionId);
+        }
+        return connectionId;
+    }
 
     bool isNodeEditorReady() {
         return g_ContextStatus->context;

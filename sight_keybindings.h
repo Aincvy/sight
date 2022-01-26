@@ -29,6 +29,9 @@ namespace sight {
         SightKeyWrapper esc;
         SightKeyWrapper undo;
         SightKeyWrapper redo;
+
+        SightKeyWrapper copy;
+        SightKeyWrapper paste;
     };
 
 

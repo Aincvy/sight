@@ -28,8 +28,6 @@
 #include "v8pp/convert.hpp"
 #include "v8pp/class.hpp"
 
-#include "yaml-cpp/yaml.h"
-
 
 // node editor status
 static sight::NodeEditorStatus* g_NodeEditorStatus;
@@ -68,13 +66,6 @@ namespace sight {
 
     uint nextNodeOrPortId() {
         return currentProject()->nextNodeOrPortId();
-    }
-
-    int addNode(SightNode *node) {
-
-        CURRENT_GRAPH->addNode(*node);
-        delete node;
-        return CODE_OK;
     }
 
     SightNodeGraph *currentGraph() {
@@ -224,20 +215,34 @@ namespace sight {
         return nullptr;
     }
 
-    SightNode *SightNode::clone() const{
+    SightNode *SightNode::clone(bool generateId) const{
         auto p = new SightNode();
         p->copyFrom(this, CopyFromType::Clone);
+        
+        if (generateId) {
+            auto nodeFunc = [](std::vector<SightNodePort> & list){
+                for(auto& item: list){
+                    item.id = nextNodeOrPortId();
+                }
+            };
+
+            p->nodeId = nextNodeOrPortId();
+            CALL_NODE_FUNC(p);
+        }
+
         return p;
     }
 
     void SightNode::copyFrom(const SightNode* node, CopyFromType copyFromType) {
         this->nodeId = node->nodeId;
         this->nodeName = node->nodeName;
+        this->position = node->position;
         this->templateNode = node->templateNode;
 
-        auto copyFunc = [copyFromType](std::vector<SightNodePort> const& src, std::vector<SightNodePort>& dst) {
+        auto copyFunc = [copyFromType, this](std::vector<SightNodePort> const& src, std::vector<SightNodePort>& dst) {
             for (const auto &item : src) {
                 dst.push_back(item);
+                dst.back().node = this;
 
                 if (copyFromType == CopyFromType::Instantiate) {
                     // init something
@@ -253,6 +258,7 @@ namespace sight {
         copyFunc(node->outputPorts, this->outputPorts);
         copyFunc(node->fields, this->fields);
 
+        updateChainPortPointer();
     }
 
     SightNodePortConnection SightNode::findConnectionByProcess() {
@@ -434,6 +440,10 @@ namespace sight {
         return nullptr;
     }
 
+    void SightNode::callEventOnInstantiate() {
+        templateNode->callEventOnInstantiate(this);
+    }
+
     SightJsNode::SightJsNode() {
 
     }
@@ -525,10 +535,7 @@ namespace sight {
         }
 
         if (callEvent) {
-            auto tmp = dynamic_cast<const SightJsNode*>(this);
-            if (tmp) {
-                tmp->onInstantiate(currentUIStatus()->isolate, p);
-            }
+            callEventOnInstantiate(p);
         }
         return p;
     }
@@ -666,6 +673,10 @@ namespace sight {
         return nodeStyle.initialized;
     }
 
+    void SightJsNode::callEventOnInstantiate(SightNode* p) const {
+        onInstantiate(currentUIStatus()->isolate, p);
+    }
+
     void SightNodeConnection::removeRefs(SightNodeGraph *graph) {
         if (!graph) {
             graph = CURRENT_GRAPH;
@@ -717,115 +728,8 @@ namespace sight {
         out << YAML::Value << YAML::BeginMap;
         for (const auto &node : nodes) {
             out << YAML::Key << node.nodeId;
-            out << YAML::Value;
-            out << YAML::BeginMap;
-            out << YAML::Key << "name" << YAML::Value << node.nodeName;
-            out << YAML::Key << "id" << YAML::Value << node.nodeId;
-
-            if (node.templateNode) {
-                auto address = findTemplateNode( &node);
-                if (address) {
-                    out << YAML::Key << "template" << YAML::Value << address->fullTemplateAddress;
-                }
-            }
-
-            auto writeFloatArray = [&out](float* p, int size) {
-                out << YAML::BeginSeq;
-                for( int i = 0; i < size; i++){
-                    out << p[i];
-                }
-                out << YAML::EndSeq;
-            };
-
-            auto portWork = [&out, &writeFloatArray](SightNodePort const& item) {
-                out << YAML::Key << item.id;
-                out << YAML::Value << YAML::BeginMap;
-                out << YAML::Key << "name" << YAML::Value << item.portName;
-                out << YAML::Key << "type" << YAML::Value << item.type;
-
-                auto type = item.getType();
-                out << YAML::Key << "value" << YAML::Value;
-                switch (type) {
-                case IntTypeFloat:
-                    out << item.value.u.f;
-                    break;
-                case IntTypeDouble:
-                    out << item.value.u.d;
-                    break;
-                case IntTypeInt:
-                case IntTypeLong:
-                    out << item.value.u.i;
-                    break;
-                case IntTypeString:
-                    out << item.value.u.string;
-                    break;
-                case IntTypeLargeString:
-                    out << item.value.u.largeString.pointer;
-                    break;
-                case IntTypeBool:
-                    out << item.value.u.b;
-                    break;
-                case IntTypeVector3:
-                    writeFloatArray((float*)item.value.u.vector3, 3);
-                    break;
-                case IntTypeChar:
-                    out << item.value.u.string[0];
-                    break;
-                case IntTypeVector4:
-                case IntTypeColor:
-                    writeFloatArray((float*)item.value.u.vector4, 4);
-                    break;
-                default:
-                {
-                    bool serializeGood = false;
-                    if (!isBuiltInType(type)) {
-                        //
-                        auto [typeInfo, find] = currentProject()->findTypeInfo(type);
-                        if (find) {
-                            switch (typeInfo.render.kind) {
-                            case TypeInfoRenderKind::ComboBox:
-                                out << item.value.u.i;
-                                serializeGood = true;
-                                break;
-                            case TypeInfoRenderKind::Default:
-                                break;
-                            }
-                        }
-                    }
-                    if (!serializeGood) {
-                        out << YAML::Null;
-                    }
-                    break;
-                }
-                }
-
-                out << YAML::EndMap;
-            };
-
-            // input and output
-            out << YAML::Key << "inputs";
-            out << YAML::Value << YAML::BeginMap;
-            for (const auto &item : node.inputPorts) {
-                portWork(item);
-            }
-            out << YAML::EndMap;
-
-            out << YAML::Key << "outputs";
-            out << YAML::Value << YAML::BeginMap;
-            for (const auto &item : node.outputPorts) {
-                portWork(item);
-            }
-            out << YAML::EndMap;
-
-            out << YAML::Key << "fields";
-            out << YAML::Value << YAML::BeginMap;
-            for (const auto &item : node.fields) {
-                portWork(item);
-            }
-            out << YAML::EndMap;
-
-            //
-            out << YAML::EndMap;
+            out << YAML::Value << node;
+            // out << node;
         }
         out << YAML::EndMap;
 
@@ -833,11 +737,7 @@ namespace sight {
         out << YAML::Key << "connections";
         out << YAML::Value << YAML::BeginMap;
         for (const auto &connection : connections) {
-            out << YAML::Key << connection.connectionId << YAML::Value << YAML::BeginMap;
-            out << YAML::Key << "left" << YAML::Value << connection.leftPortId();
-            out << YAML::Key << "right" << YAML::Value << connection.rightPortId();
-            out << YAML::Key << "priority" << YAML::Value << connection.priority;
-            out << YAML::EndMap;
+            out << YAML::Key << connection.connectionId << YAML::Value << connection;
         }
         out << YAML::EndMap;
 
@@ -869,178 +769,42 @@ namespace sight {
             auto nodeRoot = root["nodes"];
             dbg(nodeRoot.size());
 
-            auto readFloatArray = [](float* p, int size, YAML::Node const& valueNode) {
-                if (valueNode.IsSequence()) {
-                    for( int i = 0; i < size; i++){
-                        auto tmp = valueNode[i];
-                        if (tmp.IsDefined()) {
-                            p[i] = tmp.as<float>();
-                        }
-                    }
-                }
-            };
-
-            auto portWork = [&readFloatArray,this](YAML::detail::iterator_value const& item, NodePortType nodePortType, std::vector<SightNodePort> & list) {
-                auto id = item.first.as<uint>();
-                auto values = item.second;
-                auto portName = values["name"].as<std::string>();
-                auto typeNode = values["type"];
-                uint type = 0;
-                if (typeNode.IsDefined()) {
-                    type = typeNode.as<uint>();
-                }
-
-                SightNodePort* pointer = nullptr;
-                for(auto& item: list){
-                    if (item.portName == portName) {
-                        pointer = &item;
-                        break;
-                    }
-                }
-                if (!pointer) {
-                    // todo add node port to list 
-                    this->broken = true;
-                    dbg(portName, "not found");
-                    return CODE_FAIL;
-                }
-
-                auto & port = *pointer;
-                port.portName = portName;
-                port.id = id;
-                port.kind = nodePortType;
-                port.type = type;
-
-                auto valueNode = values["value"];
-                type = port.getType();    // update to real type.
-                if (valueNode.IsDefined()) {
-                    switch (type) {
-                    case IntTypeFloat:
-                        port.value.u.f = valueNode.as<float>();
-                        break;
-                    case IntTypeDouble:
-                        port.value.u.d = valueNode.as<double>();
-                        break;
-                    case IntTypeInt:
-                    case IntTypeLong:
-                        port.value.u.i = valueNode.as<int>();
-                        break;
-                    case IntTypeString:
-                        sprintf(port.value.u.string, "%s", valueNode.as<std::string>().c_str());
-                        break;
-                    case IntTypeLargeString:
-                    {
-                        std::string tmpString = valueNode.as<std::string>();
-                        port.value.stringCheck(tmpString.size());
-                        sprintf(port.value.u.largeString.pointer, "%s", tmpString.c_str());
-                        break;
-                    }
-                    case IntTypeBool:
-                        port.value.u.b = valueNode.as<bool>();
-                        break;
-                    case IntTypeProcess:
-                    case IntTypeButton:
-                    case IntTypeObject:
-                        // dbg("IntTypeProcess" , portName);
-                        break;
-                    case IntTypeChar:
-                        if (valueNode.IsDefined() && !valueNode.IsNull()) {
-                            port.value.u.string[0] = valueNode.as<char>();
-                        }
-                        break;
-                    case IntTypeVector3:
-                        readFloatArray(port.value.u.vector3, 3, valueNode);
-                        break;
-                    case IntTypeVector4:
-                    case IntTypeColor:
-                        readFloatArray(port.value.u.vector4, 4, valueNode);
-                        break;
-                    default:
-                    {
-                        if (!isBuiltInType(type)) {
-                            //
-                            auto [typeInfo, find] = currentProject()->findTypeInfo(type);
-                            if (find) {
-                                switch (typeInfo.render.kind) {
-                                case TypeInfoRenderKind::ComboBox:
-                                    port.value.u.i = valueNode.as<int>();
-                                    break;
-                                case TypeInfoRenderKind::Default:
-                                default:
-                                    dbg("no-render-function", type, getTypeName(type));
-                                    break;
-                                }
-                            }
-                        } else {
-                            dbg("type error, unHandled", type, getTypeName(type));
-                        }
-                    } break;
-                    }
-                }
-
-                port.oldValue = port.value;
-                return CODE_OK;
-            };
-
+            int loadNodeStatus = CODE_OK;
+            SightNode* sightNode = nullptr;
             for (const auto &nodeKeyPair : nodeRoot) {
                 auto yamlNode = nodeKeyPair.second;
+                // sightNode = nullptr;
+                loadNodeStatus = loadNodeData(yamlNode, sightNode);
+                if (loadNodeStatus != CODE_OK) {
+                    if (status == CODE_OK) {
+                        status = loadNodeStatus;
+                    }
 
-                auto templateNodeAddress = yamlNode["template"].as<std::string>("");
-                auto templateNode = g_NodeEditorStatus->findTemplateNode(templateNodeAddress.c_str());
-                if (!templateNode) {
-                    dbg(templateNodeAddress, " template not found.");
                     broken = true;
-                    status = 1;
-                    continue;
+                } 
+
+                if (sightNode) {
+                    sightNode->graph = this;
+                    addNode(*sightNode);
+                    delete sightNode;
+                    sightNode = nullptr;
                 }
-
-                auto nodePointer = templateNode->instantiate(false, false);
-                auto & sightNode = *nodePointer;
-                sightNode.nodeId = yamlNode["id"].as<int>();
-                sightNode.nodeName = yamlNode["name"].as<std::string>();
-
-                auto inputs = yamlNode["inputs"];
-                for (const auto &input : inputs) {
-                    portWork(input, NodePortType::Input, sightNode.inputPorts);
-                }
-
-                auto outputs = yamlNode["outputs"];
-                for (const auto &output : outputs) {
-                    portWork(output, NodePortType::Output, sightNode.outputPorts);
-                }
-
-                auto fields = yamlNode["fields"];
-                for (const auto &field : fields) {
-                    portWork(field, NodePortType::Field, sightNode.fields);
-                }
-
-                if (!templateNodeAddress.empty()) {
-                    if (!templateNode) {
-                        dbg(templateNodeAddress, " template not found.");
-                        broken = true;
-                        status = CODE_FAIL;
-                    } 
-                } else {
-                    dbg(sightNode.nodeName, "entity do not have templateNodeAddress, jump it.");
-                }
-
-                sightNode.graph = this;
-                addNode( sightNode);
-                delete nodePointer;
             }
 
             // connections
             auto connectionRoot = root["connections"];
+            SightNodeConnection tmpConnection;
             for (const auto &item : connectionRoot) {
                 auto connectionId = item.first.as<int>();
-                auto left = item.second["left"].as<int>();
-                auto right = item.second["right"].as<int>();
-                auto priority = 10;
-                auto priorityNode = item.second["priority"];
-                if (priorityNode.IsDefined()) {
-                    priority = priorityNode.as<int>();
-                }
-
-                createConnection(left, right, connectionId, priority);
+                // auto left = item.second["left"].as<int>();
+                // auto right = item.second["right"].as<int>();
+                // auto priority = 10;
+                // auto priorityNode = item.second["priority"];
+                // if (priorityNode.IsDefined()) {
+                //     priority = priorityNode.as<int>();
+                // }
+                item.second >> tmpConnection;
+                createConnection(tmpConnection.left, tmpConnection.right, connectionId, tmpConnection.priority);
             }
 
             this->editing = false;
@@ -1577,6 +1341,352 @@ namespace sight {
         return nullptr;
     }
 
+    YAML::Emitter& operator<< (YAML::Emitter& out, const Vector2& v) {
+        out << YAML::Flow << YAML::BeginSeq << v.x << v.y << YAML::EndSeq;
+        return out;
+    }
+
+    YAML::Emitter& operator<< (YAML::Emitter& out, const SightNode& node) {
+        out << YAML::BeginMap;
+        out << YAML::Key << "name" << YAML::Value << node.nodeName;
+        out << YAML::Key << "id" << YAML::Value << node.nodeId;
+        out << YAML::Key << "position" << YAML::Value << node.position;
+
+        if (node.templateNode) {
+            auto address = findTemplateNode(&node);
+            if (address) {
+                out << YAML::Key << "template" << YAML::Value << address->fullTemplateAddress;
+            }
+        }
+
+        auto writeFloatArray = [&out](float* p, int size) {
+            out << YAML::BeginSeq;
+            for (int i = 0; i < size; i++) {
+                out << p[i];
+            }
+            out << YAML::EndSeq;
+        };
+
+        auto portWork = [&out, &writeFloatArray](SightNodePort const& item) {
+            out << YAML::Key << item.id;
+            out << YAML::Value << YAML::BeginMap;
+            out << YAML::Key << "name" << YAML::Value << item.portName;
+            out << YAML::Key << "type" << YAML::Value << item.type;
+
+            auto type = item.getType();
+            out << YAML::Key << "value" << YAML::Value;
+            switch (type) {
+            case IntTypeFloat:
+                out << item.value.u.f;
+                break;
+            case IntTypeDouble:
+                out << item.value.u.d;
+                break;
+            case IntTypeInt:
+            case IntTypeLong:
+                out << item.value.u.i;
+                break;
+            case IntTypeString:
+                out << item.value.u.string;
+                break;
+            case IntTypeLargeString:
+                out << item.value.u.largeString.pointer;
+                break;
+            case IntTypeBool:
+                out << item.value.u.b;
+                break;
+            case IntTypeVector3:
+                writeFloatArray((float*)item.value.u.vector3, 3);
+                break;
+            case IntTypeChar:
+                out << item.value.u.string[0];
+                break;
+            case IntTypeVector4:
+            case IntTypeColor:
+                writeFloatArray((float*)item.value.u.vector4, 4);
+                break;
+            default:
+            {
+                bool serializeGood = false;
+                if (!isBuiltInType(type)) {
+                    //
+                    auto [typeInfo, find] = currentProject()->findTypeInfo(type);
+                    if (find) {
+                        switch (typeInfo.render.kind) {
+                        case TypeInfoRenderKind::ComboBox:
+                            out << item.value.u.i;
+                            serializeGood = true;
+                            break;
+                        case TypeInfoRenderKind::Default:
+                            break;
+                        }
+                    }
+                }
+                if (!serializeGood) {
+                    out << YAML::Null;
+                }
+                break;
+            }
+            }
+
+            out << YAML::EndMap;
+        };
+
+        // input and output
+        out << YAML::Key << "inputs";
+        out << YAML::Value << YAML::BeginMap;
+        for (const auto& item : node.inputPorts) {
+            portWork(item);
+        }
+        out << YAML::EndMap;
+
+        out << YAML::Key << "outputs";
+        out << YAML::Value << YAML::BeginMap;
+        for (const auto& item : node.outputPorts) {
+            portWork(item);
+        }
+        out << YAML::EndMap;
+
+        out << YAML::Key << "fields";
+        out << YAML::Value << YAML::BeginMap;
+        for (const auto& item : node.fields) {
+            portWork(item);
+        }
+        out << YAML::EndMap;   // end of fields
+
+        //
+        out << YAML::EndMap;   // end of node data.
+
+        return out;
+    }
+
+    YAML::Emitter& operator<< (YAML::Emitter& out, const SightNodeConnection& connection) {
+        out << YAML::BeginMap;
+        // out << YAML::Key << "id" << YAML::Value << connection.connectionId;
+        out << YAML::Key << "left" << YAML::Value << connection.leftPortId();
+        out << YAML::Key << "right" << YAML::Value << connection.rightPortId();
+        out << YAML::Key << "priority" << YAML::Value << connection.priority;
+        out << YAML::EndMap;
+        return out;
+    }
+
+    bool readFloatArray(float* p, int size, YAML::Node const& valueNode) {
+        if (valueNode.IsSequence()) {
+            for (int i = 0; i < size; i++) {
+                auto tmp = valueNode[i];
+                if (tmp.IsDefined()) {
+                    p[i] = tmp.as<float>();
+                }
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    bool operator>>(YAML::Node const& node, Vector2& v) {
+        return readFloatArray((float*)&v, 2, node);
+    }
+
+    bool operator>>(YAML::Node const&node, SightNodeConnection &connection) {
+        // auto nodeId = node["id"];
+        // if (nodeId.IsDefined()) {
+        //     connection.connectionId = nodeId.as<int>(0);
+        // }
+        connection.left = node["left"].as<int>(0);
+        connection.right = node["right"].as<int>(0);
+        auto priorityNode = node["priority"];
+        if (priorityNode.IsDefined()) {
+            connection.priority = priorityNode.as<int>(0);
+        }
+        return true;
+    }
+
+    int loadPortInfo(YAML::detail::iterator_value const& item, NodePortType nodePortType, std::vector<SightNodePort>& list, bool useOldId) {
+        auto id = item.first.as<uint>();
+        auto values = item.second;
+        auto portName = values["name"].as<std::string>();
+        auto typeNode = values["type"];
+        uint type = 0;
+        if (typeNode.IsDefined()) {
+            type = typeNode.as<uint>();
+        }
+
+        SightNodePort* pointer = nullptr;
+        for (auto& item : list) {
+            if (item.portName == portName) {
+                pointer = &item;
+                break;
+            }
+        }
+        if (!pointer) {
+            dbg(portName, "not found");
+            return CODE_FAIL;
+        }
+
+        auto& port = *pointer;
+        port.portName = portName;
+        if (useOldId) {
+            port.id = id;
+        }
+        port.kind = nodePortType;
+        port.type = type;
+
+        auto valueNode = values["value"];
+        type = port.getType();     // update to real type.
+        if (valueNode.IsDefined()) {
+            switch (type) {
+            case IntTypeFloat:
+                port.value.u.f = valueNode.as<float>();
+                break;
+            case IntTypeDouble:
+                port.value.u.d = valueNode.as<double>();
+                break;
+            case IntTypeInt:
+            case IntTypeLong:
+                port.value.u.i = valueNode.as<int>();
+                break;
+            case IntTypeString:
+                sprintf(port.value.u.string, "%s", valueNode.as<std::string>().c_str());
+                break;
+            case IntTypeLargeString:
+            {
+                std::string tmpString = valueNode.as<std::string>();
+                port.value.stringCheck(tmpString.size());
+                sprintf(port.value.u.largeString.pointer, "%s", tmpString.c_str());
+                break;
+            }
+            case IntTypeBool:
+                port.value.u.b = valueNode.as<bool>();
+                break;
+            case IntTypeProcess:
+            case IntTypeButton:
+            case IntTypeObject:
+                // dbg("IntTypeProcess" , portName);
+                break;
+            case IntTypeChar:
+                if (valueNode.IsDefined() && !valueNode.IsNull()) {
+                    port.value.u.string[0] = valueNode.as<char>();
+                }
+                break;
+            case IntTypeVector3:
+                readFloatArray(port.value.u.vector3, 3, valueNode);
+                break;
+            case IntTypeVector4:
+            case IntTypeColor:
+                readFloatArray(port.value.u.vector4, 4, valueNode);
+                break;
+            default:
+            {
+                if (!isBuiltInType(type)) {
+                    //
+                    auto [typeInfo, find] = currentProject()->findTypeInfo(type);
+                    if (find) {
+                        switch (typeInfo.render.kind) {
+                        case TypeInfoRenderKind::ComboBox:
+                            port.value.u.i = valueNode.as<int>();
+                            break;
+                        case TypeInfoRenderKind::Default:
+                        default:
+                            dbg("no-render-function", type, getTypeName(type));
+                            break;
+                        }
+                    }
+                } else {
+                    dbg("type error, unHandled", type, getTypeName(type));
+                }
+            } break;
+            }
+        }
+
+        port.oldValue = port.value;
+        return CODE_OK;
+    }
+
+    int loadNodeData(YAML::Node const& yamlNode, SightNode*& node, bool useOldId) {
+        auto yamlTemplateNode = yamlNode["template"];
+        if (!yamlTemplateNode.IsDefined()) {
+            return CODE_FAIL;
+        }
+        auto templateNodeAddress = yamlTemplateNode.as<std::string>("");
+        if (templateNodeAddress.empty()) {
+            return CODE_NO_TEMPLATE_ADDRESS;
+        }
+        auto templateNode = g_NodeEditorStatus->findTemplateNode(templateNodeAddress.c_str());
+        if (!templateNode) {
+            dbg(templateNodeAddress, " template not found.");
+            return CODE_TEMPLATE_ADDRESS_INVALID;
+        }
+
+        int status = CODE_OK;
+        auto nodePointer = useOldId ? templateNode->instantiate(false, false) : templateNode->instantiate(true, false);
+        auto& sightNode = *nodePointer;
+        if (useOldId) {
+            sightNode.nodeId = yamlNode["id"].as<int>();
+        }
+        sightNode.nodeName = yamlNode["name"].as<std::string>();
+
+        auto position = yamlNode["position"];
+        if (position.IsDefined()) {
+            position >> sightNode.position;
+        }
+
+        auto inputs = yamlNode["inputs"];
+        for (const auto& input : inputs) {
+            if (loadPortInfo(input, NodePortType::Input, sightNode.inputPorts, useOldId) != CODE_OK) {
+                status = CODE_GRAPH_BROKEN;   
+            }
+        }
+
+        auto outputs = yamlNode["outputs"];
+        for (const auto& output : outputs) {
+            if (loadPortInfo(output, NodePortType::Output, sightNode.outputPorts, useOldId) != CODE_OK) {
+                status = CODE_GRAPH_BROKEN;
+            }
+        }
+
+        auto fields = yamlNode["fields"];
+        for (const auto& field : fields) {
+            if (loadPortInfo(field, NodePortType::Field, sightNode.fields, useOldId) != CODE_OK) {
+                status = CODE_GRAPH_BROKEN;
+            }
+        }
+
+        node = nodePointer;
+        return status;
+    }
+
+    int regenerateId(std::vector<SightNode*>& nodes, std::vector<SightNodeConnection>& connections, bool genConId) {
+        auto nodeFunc = [&connections](std::vector<SightNodePort>& list) {
+            for (auto& item : list) {
+                auto oldId = item.id;
+                item.id = nextNodeOrPortId();
+
+                for (auto& c : connections) {
+                    if (c.left == oldId) {
+                        c.left = item.id;
+                    } else if (c.right == oldId) {
+                        c.right = item.id;
+                    }
+                }
+            }
+        };
+    
+        for (auto& item : nodes) {
+            item->nodeId = nextNodeOrPortId();
+
+            CALL_NODE_FUNC(item);
+        }
+
+        if (genConId) {
+            for(auto& item: connections){
+                item.connectionId = nextNodeOrPortId();
+            }
+        }
+
+        return CODE_OK;
+    }
+
     SightAnyThingData::SightAnyThingData() {
         this->node = nullptr;
     }
@@ -1965,6 +2075,14 @@ namespace sight {
 
     NodeEditorStatus::~NodeEditorStatus() {
         // todo free memory.
+    }
+
+    Vector2 operator-(Vector2 const& lhs, Vector2 const& rhs) {
+        return {lhs.x - rhs.x, lhs.y - rhs.y};
+    }
+
+    Vector2 operator+(Vector2 const& lhs, Vector2 const& rhs) {
+        return {lhs.x + rhs.x, lhs.y + rhs.y};
     }
 
     int initNodeStatus() {

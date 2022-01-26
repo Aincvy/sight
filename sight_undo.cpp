@@ -2,11 +2,14 @@
 
 #include "imgui_node_editor.h"
 #include "sight.h"
+#include "dbg.h"
+#include "sight_defines.h"
 #include "sight_nodes.h"
 #include "sight_ui_node_editor.h"
 
 #include <atomic>
 #include <cassert>
+#include <string>
 #include <vector>
 
 #define UNDO_LIST_COUNT 60
@@ -197,6 +200,147 @@ namespace sight {
         c.undo();
         redoList.push_back(c);
         undoList.pop_back();
+    }
+
+    int CopyText::loadAsNode(SightNode*& node) const {
+        return loadNodeData(this->data, node, false);
+    }
+
+    int CopyText::laodAsConnection(SightNodeConnection*& connection) {
+        return CODE_NOT_IMPLEMENTED;
+    }
+
+    int CopyText::loadAsMultiple(std::vector<SightNode*>& nodes, std::vector<SightNodeConnection>& connections) const {
+        if (data.size() <= 0) {
+            return CODE_FAIL;
+        }
+        assert(connections.empty());
+        assert(nodes.empty());
+
+        int status = CODE_OK;
+        auto dataNodes = data["nodes"];
+        if (dataNodes.IsDefined() && dataNodes.IsSequence()) {
+            for (const auto& item : dataNodes) {
+                SightNode* node = nullptr;
+                int flag = loadNodeData(item, node);
+                if (status == CODE_OK && flag != CODE_OK) {
+                    status = flag;
+                }
+                if (node) {
+                    nodes.push_back(node);
+                }
+            }
+        }
+        auto dataConnections = data["connections"];
+        if (dataConnections.IsDefined() && dataConnections.IsSequence()) {
+            for( const auto& item: dataConnections){
+                SightNodeConnection c;
+                if (item >> c) {
+                    c.connectionId = nextNodeOrPortId();
+                    connections.push_back(c);
+                }
+            }
+        }
+
+        return status;
+    }
+
+    void CopyText::addHeader(YAML::Emitter& out, CopyTextType type) {
+        out << YAML::Key << whoAmI << YAML::Value << sightIsCopyText;
+        out << YAML::Key << stringType << YAML::Value << copyTextTypeString(type);
+    }
+
+    const char* CopyText::copyTextTypeString(CopyTextType type) {
+        switch (type) {
+        case CopyTextType::None:
+            break;
+        case CopyTextType::Node:
+            return "Node";
+        case CopyTextType::Connection:
+            return "Connection";
+        case CopyTextType::Multiple:
+            return "Multiple";
+        }
+        return "None";
+    }
+
+    CopyTextType CopyText::copyTextTypeString(std::string_view str) {
+        if (str == "Node") {
+            return CopyTextType::Node;
+        } else if (str == "Connection") {
+            return CopyTextType::Connection;
+        } else if (str == "Multiple") {
+            return CopyTextType::Multiple;
+        }
+        return CopyTextType::None;
+    }
+
+    std::string CopyText::from(SightNode const& node) {
+        YAML::Emitter out;
+        out << YAML::BeginMap;
+        addHeader(out, CopyTextType::Node);
+
+        out << YAML::Key << stringData << YAML::Value << node;
+        out << YAML::EndMap;
+        return out.c_str();
+    }
+
+    std::string CopyText::from(SightNodeConnection const& connection) {
+        return {};
+    }
+
+    std::string CopyText::from(std::vector<SightNode*> const& nodes, std::vector<SightNodeConnection> const& connections) {
+        YAML::Emitter out;
+        out << YAML::BeginMap;
+        addHeader(out, CopyTextType::Multiple);
+
+        out << YAML::Key << stringData << YAML::Value << YAML::BeginMap;
+        // nodes
+        out << YAML::Key << "nodes" << YAML::Value << YAML::BeginSeq;
+        for( const auto& item: nodes){
+            out << *item;
+        }
+        out << YAML::EndSeq;
+
+        // connections
+        out << YAML::Key << "connections" << YAML::Value << YAML::BeginSeq;
+        for( const auto& item: connections){
+            out << item;
+        }
+        out << YAML::EndSeq;
+
+        out << YAML::EndMap;
+        return out.c_str();
+    }
+
+    CopyText CopyText::parse(std::string_view str) {
+        try {
+            auto nodeRoot = YAML::Load(str.data());
+            if (nodeRoot.size() == 0) {
+                return {};
+            }
+            auto n = nodeRoot[whoAmI];
+            if (!n.IsDefined() || n.as<std::string>() != sightIsCopyText) {
+                return {};
+            }
+
+            
+            auto type = copyTextTypeString(nodeRoot[stringType].as<std::string>());
+            if (type == CopyTextType::None) {
+                return {};
+            }
+
+            return {
+                type,
+                nodeRoot[stringData]
+            };
+        }catch(YAML::ParserException const& e){
+            dbg(e.what());
+        }catch(YAML::BadSubscript const& e){
+            dbg(e.what());
+        }
+        
+        return {};
     }
 
 }

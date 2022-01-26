@@ -202,6 +202,8 @@ namespace sight {
          */
         SightNodeConnection* getSelectedConnection() const;
 
+        int getSelected(std::vector<SightNode*>& nodes, std::vector<SightNodeConnection>& connections) const;
+
         friend void onProjectAndUILoadSuccess(Project* project);
     };
 
