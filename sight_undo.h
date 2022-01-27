@@ -59,7 +59,13 @@ namespace sight {
 
     };
 
-    int getRuntimeId();
+    enum class StartOrStop {
+        Normal,
+        Start,
+        Stop,
+    };
+
+    int getRuntimeId(StartOrStop type = StartOrStop::Normal);
 
     int initUndo();
     int recordUndo(UndoRecordType recordType, uint anyThingId);

@@ -667,21 +667,17 @@ namespace sight {
             if (ImGui::Button("Parse")) {
                 dbg("Not impl");
             }
-            ImGui::SameLine();
-            if (ImGui::Button("Save")) {
-                graph->save();
+            if (!sightSettings->autoSave) {
+                ImGui::SameLine();
+                if (ImGui::Button("Save")) {
+                    graph->save();
+                }
             }
             ImGui::SameLine();
             ImGui::Checkbox("Auto Save", &(sightSettings->autoSave));
             if (graph->isBroken()) {
                 ImGui::TextColored(uiStatus.uiColors->errorText, "Graph Broken!");
             }
-            // ImGui::SameLine();
-            // if (ImGui::Button("VerifyId")) {
-            //     if (graph->verifyId() != CODE_OK) {
-            //         dbg("has error id");
-            //     }
-            // }
             ImGui::Separator();
 
             // Start interaction with editor.
@@ -861,6 +857,10 @@ namespace sight {
                                 targetNodes.push_back(item->clone(false));
                             }
                             regenerateId(targetNodes, connections, true);
+                            ed::ClearSelection();
+                            for (auto& item : targetNodes) {
+                                ed::SelectNode(item->nodeId, true);
+                            }
                             uiAddMultipleNodes(targetNodes, connections, openPopupPosition);
                         }
                     }
@@ -1316,7 +1316,8 @@ namespace sight {
         return CODE_OK;
     }
 
-    int uiAddMultipleNodes(std::vector<SightNode*>& nodes, std::vector<SightNodeConnection> const& connections, ImVec2 startPos, bool freeMemory) {
+    int uiAddMultipleNodes(std::vector<SightNode*>& nodes, std::vector<SightNodeConnection> const& connections, ImVec2 startPos, bool freeMemory, bool selectNode) {
+        getRuntimeId(StartOrStop::Start);
         if (!nodes.empty()) {
             // position
             // find left-most node.
@@ -1334,6 +1335,10 @@ namespace sight {
                 }
             }
 
+            if (selectNode) {
+                ed::ClearSelection();
+            }
+
             // add
             auto leftNodePos = leftNode->position;
             setNodePos(leftNode, startPos);
@@ -1343,10 +1348,16 @@ namespace sight {
                     auto pos = startPos + convert(item->position - leftNodePos);
                     setNodePos(item, pos);
                 }
-                ed::SetNodePosition(item->getNodeId(), getNodePos(item));
+                auto nodeId = item->getNodeId();
+                ed::SetNodePosition(nodeId, getNodePos(item));
                 uiAddNode(item, freeMemory);
+                if (selectNode) {
+                    ed::SelectNode(nodeId, true);
+                }
             }
-            nodes.clear();
+            if (freeMemory) {
+                nodes.clear();
+            }
         }
         if (!connections.empty()) {
             for (const auto& item : connections) {
@@ -1355,11 +1366,11 @@ namespace sight {
                 uiAddConnection(item.left, item.right, item.connectionId, item.priority);
             }
         }
-
+        getRuntimeId(StartOrStop::Stop);
         return CODE_OK;
     }
 
-    int uiAddMultipleNodes(std::vector<SightNode*>& nodes, std::vector<SightNodeConnection*> const& connections, ImVec2 startPos, bool freeMemory) {
+    int uiAddMultipleNodes(std::vector<SightNode*>& nodes, std::vector<SightNodeConnection*> const& connections, ImVec2 startPos, bool freeMemory, bool selectNode) {
         std::vector<SightNodeConnection> c;
         if (!connections.empty()) {
             c.reserve(connections.size());
@@ -1367,7 +1378,7 @@ namespace sight {
                 c.push_back(*item);
             }
         }
-        return uiAddMultipleNodes(nodes, c, startPos, freeMemory);
+        return uiAddMultipleNodes(nodes, c, startPos, freeMemory, selectNode);
     }
 
     int uiAddConnection(uint left, uint right, uint id, int priority) {

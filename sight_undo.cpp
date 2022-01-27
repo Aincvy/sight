@@ -10,6 +10,7 @@
 #include <atomic>
 #include <cassert>
 #include <string>
+#include <sys/termios.h>
 #include <vector>
 
 #define UNDO_LIST_COUNT 60
@@ -123,8 +124,20 @@ namespace sight {
         }
     }
 
-    int getRuntimeId() {
+    int getRuntimeId(StartOrStop type) {
         static std::atomic_int runtimeId = 1000;
+        static int recordId = -1;
+
+        if (type == StartOrStop::Start) {
+            assert(recordId < 0);
+            recordId = runtimeId++;
+        } else if (type == StartOrStop::Stop) {
+            recordId = -1;
+        }
+
+        if (recordId > 0) {
+            return recordId;
+        }
         return runtimeId++;
     }
 
@@ -181,10 +194,17 @@ namespace sight {
             return;
         }
 
-        auto & c = redoList.back();
-        c.redo();
-        redoList.pop_back();
-        undoList.push_back(c);
+        auto redoId = redoList.back().id;
+        while (!redoList.empty()) {
+            auto& c = redoList.back();
+            if (c.id != redoId) {
+                break;
+            }
+            c.redo();
+
+            undoList.push_back(c);
+            redoList.pop_back();
+        }
     }
 
     bool isUndoEnable() {
@@ -195,11 +215,18 @@ namespace sight {
         if (undoList.empty()) {
             return;
         }
+        
+        int undoId = undoList.back().id;
+        while (!undoList.empty()) {
+            auto& c = undoList.back();
+            if (c.id != undoId) {
+                break;
+            }
+            c.undo();
 
-        auto & c = undoList.back();
-        c.undo();
-        redoList.push_back(c);
-        undoList.pop_back();
+            redoList.push_back(c);
+            undoList.pop_back();
+        }
     }
 
     int CopyText::loadAsNode(SightNode*& node) const {

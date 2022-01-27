@@ -2,6 +2,7 @@
 // Created by Aincvy(aincvy@gmail.com) on 2021/7/20.
 //
 
+#include <cassert>
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
@@ -938,6 +939,8 @@ namespace sight {
         if (!right) {
             right = findPort(connection.rightPortId());
         }
+        assert(left);
+        assert(right);
 
         left->connections.push_back(p);
         left->sortConnections();
