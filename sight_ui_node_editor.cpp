@@ -799,12 +799,13 @@ namespace sight {
                     // If you agree that link can be deleted, accept deletion.
                     if (ed::AcceptDeletedItem()) {
                         // Then remove link from your data.
-                        auto connectionId = static_cast<int>(deletedLinkId.Get());
-                        auto connection = currentGraph()->findConnection(connectionId);
-                        OnDisconnect(connection);
+                        // auto connectionId = static_cast<int>(deletedLinkId.Get());
+                        // auto connection = currentGraph()->findConnection(connectionId);
+                        // OnDisconnect(connection);
 
-                        recordUndo(UndoRecordType::Delete, connectionId);
-                        graph->delConnection(connectionId, true, &(lastUndoCommand()->connectionData));
+                        // recordUndo(UndoRecordType::Delete, connectionId);
+                        // graph->delConnection(connectionId, true, &(lastUndoCommand()->connectionData));
+                        uiDelConnection(deletedLinkId.Get());
                     }
 
                     // You may reject link deletion by calling:
@@ -816,9 +817,9 @@ namespace sight {
                     // ask for node delete.
                     if (ed::AcceptDeletedItem()) {
 
-                        recordUndo(UndoRecordType::Delete, 0, ed::GetNodePosition(deletedNodeId));
-                        graph->delNode(static_cast<int>(deletedNodeId.Get()), &(lastUndoCommand()->nodeData));
-                        // lastUndoCommand()->position = ed::GetNodePosition(deletedNodeId);
+                        // recordUndo(UndoRecordType::Delete, 0, ed::GetNodePosition(deletedNodeId));
+                        // graph->delNode(static_cast<int>(deletedNodeId.Get()), &(lastUndoCommand()->nodeData));
+                        uiDelNode(deletedNodeId.Get());
                     }
                 }
             }
@@ -885,6 +886,19 @@ namespace sight {
                             c.loadAsMultiple(nodes, connections);
                             regenerateId(nodes, connections);
                             uiAddMultipleNodes(nodes, connections, openPopupPosition);
+                        }
+                    }
+                } else if (keybindings->_delete) {
+                    // delete
+                    dbg("delete");
+                    auto& selected = uiStatus.selection.selectedNodeOrLinks;
+                    if (selected.size() == 1) {
+                        auto id = *selected.begin();
+                        auto thing = graph->findSightAnyThing(id);
+                        if (thing.type == SightAnyThingType::Node) {
+                            ed::DeleteNode(id);
+                        } else if (thing.type == SightAnyThingType::Connection) {
+                            ed::DeleteLink(id);
                         }
                     }
                 }
@@ -1390,6 +1404,22 @@ namespace sight {
             recordUndo(UndoRecordType::Create, connectionId);
         }
         return connectionId;
+    }
+
+    int uiDelNode(uint id) {
+        recordUndo(UndoRecordType::Delete, 0, ed::GetNodePosition(id));
+        int status = currentGraph()->delNode(id, &(lastUndoCommand()->nodeData));
+        assert(status == CODE_OK);
+        return CODE_OK;
+    }
+
+    int uiDelConnection(uint connectionId) {
+        auto connection = currentGraph()->findConnection(connectionId);
+        OnDisconnect(connection);
+
+        recordUndo(UndoRecordType::Delete, connectionId);
+        currentGraph()->delConnection(connectionId, true, &(lastUndoCommand()->connectionData));
+        return CODE_OK;
     }
 
     void uiChangeGraph(const char* path) {

@@ -67,6 +67,7 @@ namespace sight {
         CODE_TEMPLATE_ADDRESS_INVALID,
         CODE_NO_TEMPLATE_ADDRESS,
         CODE_GRAPH_BROKEN,
+        CODE_NODE_HAS_CONNECTIONS,
     };
 
     /**

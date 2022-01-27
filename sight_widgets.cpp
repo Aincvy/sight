@@ -146,6 +146,7 @@ namespace sight {
 
         // others
         keyMap["esc"] = keyArray.add(SightKey(GLFW_KEY_ESCAPE));
+        keyMap["backspace"] = keyArray.add(SightKey(GLFW_KEY_BACKSPACE));
     }
 
 #elif _WIN32

@@ -25,6 +25,7 @@
 #include "IconsMaterialDesign.h"
 
 #include <algorithm>
+#include <cassert>
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
@@ -416,25 +417,27 @@ namespace sight {
                     ImGui::SameLine();
                 
                     auto nodeId = node.nodeId;
-                    auto findResult = std::find(selection.selectedNodeOrLinks.begin(), selection.selectedNodeOrLinks.end(), nodeId);
-                    bool isSelected = findResult != selection.selectedNodeOrLinks.end();
+                    bool isSelected = selection.selectedNodeOrLinks.contains(nodeId);
                     if (Selectable(static_cast<int>(nodeId), node.nodeName.c_str(), isSelected)) {
                         auto pointer = graph->findNode(nodeId);
-                        if (!pointer) {
-                            dbg("error" , nodeId);
-                        } else {
-                            bool anySelect = !selection.selectedNodeOrLinks.empty();
-                            bool appendNode = false;
-                            if (anySelect) {
-                                if (!g_UIStatus->io->KeyCtrl) {
-                                    // not control
-                                    selection.selectedNodeOrLinks.clear();
-                                    ed::ClearSelection();
-                                }  else {
-                                    appendNode = true;
-                                }
+                        assert(pointer);
+
+                        bool anySelect = !selection.selectedNodeOrLinks.empty();
+                        bool appendNode = false;
+                        if (anySelect) {
+                            if (!g_UIStatus->keybindings->controlKey.isKeyDown()) {
+                                // not control
+                                selection.selectedNodeOrLinks.clear();
+                                ed::ClearSelection();
+                            } else {
+                                appendNode = true;
                             }
-                            
+                        }
+                        if (isSelected && appendNode) {
+                            // deselect 
+                            selection.selectedNodeOrLinks.erase(nodeId);
+                            ed::DeselectNode(nodeId);
+                        } else {
                             selection.selectedNodeOrLinks.insert(nodeId);
                             sprintf(g_UIStatus->buffer.inspectorNodeName, "%s", node.nodeName.c_str());
 

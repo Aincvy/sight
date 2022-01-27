@@ -128,6 +128,9 @@ namespace sight {
         if (!g) {
             return -1;
         }
+        if (connections.empty()) {
+            return 0;
+        }
 
         std::vector<int> ids;
         std::transform(connections.begin(), connections.end(), std::back_inserter(ids), [](SightNodeConnection* c) {
@@ -1127,6 +1130,19 @@ namespace sight {
         auto result = std::find_if(nodes.begin(), nodes.end(), [id](const SightNode& n){ return n.nodeId == id; });
         if (result == nodes.end()) {
             return CODE_FAIL;
+        }
+
+        // check connections
+        auto hasConnections = [](std::vector<SightNodePort>& list){
+            for(auto& item: list){
+                if (item.isConnect()) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        if (hasConnections(result->fields) || hasConnections(result->inputPorts) || hasConnections(result->outputPorts)) {
+            return CODE_NODE_HAS_CONNECTIONS;
         }
 
         idMap.erase(id);

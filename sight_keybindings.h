@@ -27,6 +27,7 @@ namespace sight {
         SightKeyWrapper duplicateNode;
 
         SightKeyWrapper esc;
+        SightKeyWrapper _delete;
         SightKeyWrapper undo;
         SightKeyWrapper redo;
 

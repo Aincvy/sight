@@ -44,8 +44,7 @@ namespace sight {
                 wrapper = pointer;
 
                 if (keyName == "controlKey") {
-                    // todo the symbol cannot be shown now
-                    // I need change the default font.
+                    // 
                     auto temp = str;
                     lowerCase(temp);
                     if (temp == "super" || temp == "cmd" || temp == "win") {
@@ -77,9 +76,6 @@ namespace sight {
             return true;
         };
 
-        // if (func("controlKey", keybindingds->controlKey)) {
-        //     return keybindingds;
-        // }
         CHECK_RETURN("controlKey", keybindingds->controlKey);
         func("prefixCommand", keybindingds->prefixCommand);
         CHECK_RETURN("saveFile", keybindingds->saveFile);
@@ -90,6 +86,7 @@ namespace sight {
 
         CHECK_RETURN("copy", keybindingds->copy);
         CHECK_RETURN("paste", keybindingds->paste);
+        CHECK_RETURN("delete", keybindingds->_delete);
 
         keybindingds->esc = getFromKeyMap("esc");
         return keybindingds;

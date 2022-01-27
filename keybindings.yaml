@@ -19,3 +19,5 @@ redo: 'y'
 
 copy: 'c'
 paste: 'v'
+
+delete: backspace

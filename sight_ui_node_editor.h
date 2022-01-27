@@ -86,6 +86,22 @@ namespace sight {
 
     /**
      * @brief 
+     * This function record an undo-operation.
+     * @param id 
+     * @return int 
+     */
+    int uiDelNode(uint id);
+
+    /**
+     * @brief 
+     * This function record an undo-operation.
+     * @param id 
+     * @return int 
+     */
+    int uiDelConnection(uint id);
+
+    /**
+     * @brief 
      * 
      * @return true 
      * @return false 
