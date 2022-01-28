@@ -5,6 +5,8 @@
 #include "sight_util.h"
 #include <string>
 #include <sys/types.h>
+#include <vector>
+
 
 namespace sight {
 
@@ -88,6 +90,45 @@ namespace sight {
         const char* tipsText() const;
         std::string const& getTips() const;
         void setTips(std::string tips);
+    };
+
+    /**
+     * @brief Toast widget.
+     * 
+     */
+    struct ToastElement{
+        uint id = 0;
+        // cache string for imgui window title.
+        std::string windowTitle;
+        // content title.
+        std::string title;
+        // target time, -1 = do not disappear.
+        float disappearTime = 0;
+        std::string content;
+        bool close = false;
+
+        ToastElement() = default;
+        ToastElement(ToastElement const&) = default;
+        ~ToastElement() = default;
+        ToastElement(uint id, std::string title, std::string content, float disappearTime);
+
+        void render(ImVec2 const& pos, ImVec2 const& size);
+        ImVec2 calcRecommendSize() const;
+
+        bool isClosed() const;
+        void closeToast();
+    };
+
+    /**
+     * @brief A controller 
+     * 
+     */
+    struct ToastController {
+        std::vector<ToastElement> elements;
+
+        bool toast(std::string title, std::string content, float showTime = 5);
+
+        void render();
     };
 
     /**

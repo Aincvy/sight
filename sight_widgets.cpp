@@ -1,9 +1,11 @@
 #include "sight_widgets.h"
-#include "dbg.h"
+#include "IconsMaterialDesign.h"
 #include "nfd.h"
 #include "sight.h"
+#include "dbg.h"
 #include "sight_defines.h"
 #include "sight_memory.h"
+#include "sight_undo.h"
 #include "sight_util.h"
 
 #include "imgui.h"
@@ -15,6 +17,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <string>
+#include <utility>
 #include <vector>
 #include <random>
 
@@ -479,6 +482,79 @@ namespace sight {
             return nullptr;
         }
         return this->getTips().c_str();
+    }
+
+    ToastElement::ToastElement(uint id, std::string title, std::string content, float disappearTime)
+        : id(id)
+        , title(std::move(title))
+        , disappearTime(disappearTime)
+        , content(std::move(content)) {
+            // window title
+            windowTitle = "##toast-";
+            absl::StrAppend(&windowTitle, id);
+            dbg(windowTitle.c_str());
+    }
+
+    void ToastElement::render(ImVec2 const& pos, ImVec2 const& size) {
+        ImGui::SetNextWindowPos(pos);
+        ImGui::SetNextWindowSize(size);
+        if (ImGui::Begin(windowTitle.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove)) {
+            if (!title.empty()) {
+                ImGui::Text("%s", title.c_str());
+                ImGui::SameLine();
+            }
+            if (ImGui::Button(ICON_MD_CLOSE)) {
+                closeToast();
+            }
+            if (!content.empty()) {
+                ImGui::TextWrapped("%s", content.c_str());
+            }
+        }
+        ImGui::End();
+    }
+
+    ImVec2 ToastElement::calcRecommendSize() const {
+        constexpr int width = 280;
+        const int height = ImGui::GetFrameHeight();
+        return { width, 3.0f * height };
+    }
+
+    bool ToastElement::isClosed() const {
+        return close || (disappearTime > 0 && ImGui::GetTime() > disappearTime);
+    }
+
+    void ToastElement::closeToast() {
+        close = true;
+    }
+
+    bool ToastController::toast(std::string title, std::string content, float showTime) {
+        auto now = ImGui::GetTime();
+        elements.emplace_back(getRuntimeId(), title, content, showTime > 0 ? now + showTime : showTime);
+        return true;
+    }
+
+    void ToastController::render() {
+        // auto now = ImGui::GetTime();
+        elements.erase(std::remove_if(elements.begin(), elements.end(), [](ToastElement const& e){ return e.isClosed(); }), elements.end());
+        
+        // do position. 
+        constexpr int rightSpacing = 25;
+        constexpr int bottomSpacing = 25;
+        
+        auto displaySize = ImGui::GetIO().DisplaySize;
+        const auto windowWidth = displaySize.x;
+        const auto windowHeight = displaySize.y;
+        int x = windowWidth - 25;
+        int y = windowHeight - bottomSpacing;
+        for(auto& item: elements){
+            auto size = item.calcRecommendSize();
+            y -= size.y;
+            item.render(ImVec2(x - size.x, y), size);
+
+            // x += size.x;
+            y -= bottomSpacing;
+        }
+
     }
 
 }

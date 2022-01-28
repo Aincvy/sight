@@ -324,9 +324,6 @@ namespace sight {
 
         void showDemoWindow(bool needInit){
             ImGui::Begin("Test Window", &g_UIStatus->windowStatus.testWindow);
-            ImGui::Text("this is first line.");
-            ImGui::Text(u8"中文");
-
             static const char* a[] = {
                 "A",
                 "B",
@@ -347,11 +344,6 @@ namespace sight {
             ImGui::Button(ICON_MD_SEARCH " Search");
             ImGui::Text(ICON_MD_REPEAT " Repeat");
             ImGui::Button(ICON_MD_REPEAT_ONE " 重复");
- 
-            static bool toggle = false;
-            ImGui::Text("Toggle");
-            ImGui::SameLine();
-            ToggleButton("Toggle", &toggle);
 
             const ImU32 col = ImGui::GetColorU32(ImGuiCol_ButtonHovered);
             const ImU32 bg = ImGui::GetColorU32(ImGuiCol_Button);
@@ -361,7 +353,14 @@ namespace sight {
 
             ImGui::LoadingIndicatorCircle("circle", 20.f, ImColor(col), ImColor(bg), 12, 6);
 
+            static char c = '1';
+            if (ImGui::Button("Toast")) {
+                std::string title = "Toast";
+                title += (c++);
+                g_UIStatus->toastController.toast(title, "Content");
+            }
             ImGui::End();
+
         }
 
         void updateSelectedNodeFromED(){
@@ -1120,6 +1119,28 @@ namespace sight {
         
     }
 
+    void showStatusBar(){
+        //
+        ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_MenuBar;
+        float height = ImGui::GetFrameHeight();
+
+        if (ImGui::BeginViewportSideBar("##MainStatusBar", NULL, ImGuiDir_Down, height, window_flags)) {
+            if (ImGui::BeginMenuBar()) {
+                ImGui::Text("Status bar is testing!!! ");
+                ImGui::Text(ICON_MD_INFO "55");
+                ImGui::PushStyleColor(ImGuiCol_Button, ImColor().Value);
+                if (ImGui::Button(ICON_MD_PLAY_ARROW)) {
+                    dbg("build");
+                }
+                ImGui::PopStyleColor();
+
+                ImGui::EndMenuBar();
+                // ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+            }
+        }
+        ImGui::End();
+    }
+
     void mainWindowFrame(UIStatus & uiStatus) {
         // HierarchyWindow and InspectorWindow will use node editor data.
         nodeEditorFrameBegin();
@@ -1152,6 +1173,9 @@ namespace sight {
         }
 
         nodeEditorFrameEnd();
+
+        uiStatus.toastController.render();
+        showStatusBar();
 
         if (uiStatus.windowStatus.layoutReset) {
             uiStatus.windowStatus.layoutReset = false;

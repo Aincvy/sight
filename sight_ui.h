@@ -134,7 +134,7 @@ namespace sight {
     struct UIWindowStatus {
         bool nodeGraph = false;
         bool createEntity = false;
-        bool testWindow = false;
+        bool testWindow = true;
         bool aboutWindow = false;
         bool projectSettingsWindow = false;
         bool entityListWindow = false;
@@ -255,6 +255,7 @@ namespace sight {
         struct ModalAskData modalAskData;
         struct ModalSaveData modalSaveData;
         struct ModalAlertData modalAlertData;
+        struct ToastController toastController;
 
         struct LanguageKeys* languageKeys = nullptr;
         struct UIColors* uiColors = nullptr;

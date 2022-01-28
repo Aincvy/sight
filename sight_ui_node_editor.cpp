@@ -971,7 +971,7 @@ namespace sight {
         ImGui::Begin(windowTitle.c_str(), nullptr,
                      ImGuiWindowFlags_NoCollapse |
                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
-                         ImGuiWindowFlags_NoSavedSettings);
+                         ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus);
         if (graph) {
             showNodes(uiStatus);
         }
