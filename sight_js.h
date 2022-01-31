@@ -226,6 +226,8 @@ namespace sight{
 
     void bindNodeTypes(v8::Isolate* isolate, const v8::Local<v8::Context>& context, v8pp::module& module);
 
+    void bindUIThreadFunctions(const v8::Local<v8::Context>& context, v8pp::module& module);
+
     v8::Isolate* getJsIsolate();
 
     v8::Local<v8::Value> getPortValue(v8::Isolate* isolate, int type, SightNodeValue const& value);

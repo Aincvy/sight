@@ -583,10 +583,24 @@ namespace sight {
                 ImGui::SetNextWindowPos(ImVec2(0,605));
                 ImGui::SetNextWindowSize(ImVec2(300, 200));
             }
-            
-            ImGui::Begin(WINDOW_LANGUAGE_KEYS.project);
-            showProjectFolder(currentProject()->getFileCache());
 
+            if (ImGui::Begin(WINDOW_LANGUAGE_KEYS.project)) {
+                showProjectFolder(currentProject()->getFileCache());    
+            }
+
+            ImGui::End();
+        }
+
+        void showGenerateResultWindow(){
+
+            if (ImGui::Begin(WINDOW_LANGUAGE_KEYS.generateResult, &g_UIStatus->windowStatus.generateResultWindow)) {
+                auto & data =g_UIStatus->generateResultData;
+                ImGui::Text("%s", data.source.c_str());
+                ImGui::InputTextMultiline("##text", data.text.data(), data.text.size(), ImVec2(), ImGuiInputTextFlags_ReadOnly);
+                if (ImGui::Button(ICON_MD_CONTENT_COPY)) {
+                    ImGui::SetClipboardText(data.text.c_str());
+                }
+            }
             ImGui::End();
         }
 
@@ -692,7 +706,7 @@ namespace sight {
                 ImGui::Dummy(ImVec2(0,3));
                 ImGui::Separator();
                 // preview
-                ImGui::Text("%s", COMMON_LANGUAGE_KEYS.preview);
+                ImGui::Text("%s (%s)", COMMON_LANGUAGE_KEYS.preview, COMMON_LANGUAGE_KEYS.readonly);
                 ImGui::PushStyleColor(ImGuiCol_Text, g_UIStatus->uiColors->readonlyText);
                 ImGui::InputTextMultiline("##preview", buf, NAME_BUF_SIZE, ImVec2(0,0), ImGuiInputTextFlags_ReadOnly);
                 ImGui::PopStyleColor();
@@ -752,6 +766,47 @@ namespace sight {
                     // In edit mode
                     ImGui::SameLine();
                     ImGui::Text("Edit Mode");
+                }
+
+                auto& entityOperations = g_UIStatus->entityOperations;
+                const auto& operationNames = entityOperations.names;
+                if (!operationNames.empty()) {
+                    const auto width = ImGui::GetWindowWidth();
+                    constexpr const auto comboWidth = 90;
+                    const char* comboLabel = "##Operations";
+                    const auto comboLabelWidth = ImGui::CalcTextSize(comboLabel).x;
+                    const char* generateStr = "Generate";
+                    const auto generateWidth = ImGui::CalcTextSize(generateStr).x + 15;
+                    auto selectedOperationName = operationNames[entityOperations.selected].c_str();
+
+                    ImGui::SameLine(width - generateWidth);
+                    if (ImGui::Button(generateStr)) {
+                        // call generate
+                        dbg(generateStr);
+                        SightEntity sightEntity;
+                        convert(sightEntity, createEntityData);
+                        auto& o = entityOperations.map[selectedOperationName];
+                        std::string text = o.function.getString(currentUIStatus()->isolate, &sightEntity);
+                        openGenerateResultWindow(generateStr, text);    // todo more info about source
+                    }
+                    ImGui::SameLine(width - comboWidth - generateWidth - 5);
+                    ImGui::SetNextItemWidth(comboWidth);
+                    if (ImGui::BeginCombo(comboLabel, selectedOperationName)) {
+                        int tmpIndex = 0;
+                        for (const auto& item : operationNames) {
+                            bool isSelected = tmpIndex == entityOperations.selected;
+                            if (ImGui::Selectable(item.c_str(), isSelected)) {
+                                entityOperations.selected = tmpIndex;
+                            }
+
+                            if (isSelected) {
+                                ImGui::SetItemDefaultFocus();
+                            }
+                        }
+                        ImGui::EndCombo();
+                    }
+                    helpMarker(entityOperations.map[selectedOperationName].description.c_str());
+
                 }
                 ImGui::End();
             }
@@ -1180,6 +1235,9 @@ namespace sight {
         if (windowStatus.entityListWindow) {
             showEntityListWindow();
         }
+        if (windowStatus.generateResultWindow) {
+            showGenerateResultWindow();
+        }
 
         nodeEditorFrameEnd();
 
@@ -1350,6 +1408,7 @@ namespace sight {
         bindBaseFunctions(isolate, context, module);
         bindTinyData(isolate, context);
         bindNodeTypes(isolate, context, module);
+        bindUIThreadFunctions(context, module);
         context->Global()->Set(context, v8pp::to_v8(isolate, "sight"), module.new_instance()).ToChecked();
 
         uint progress = 0;
@@ -1568,6 +1627,7 @@ namespace sight {
         destroyNodeEditor(true, true);
         glfwTerminate();
 
+        g_UIStatus->entityOperations.reset();
         g_UIStatus->v8GlobalContext.Reset();
         delete g_UIStatus->arrayBufferAllocator;
         g_UIStatus->arrayBufferAllocator = nullptr;
@@ -1729,6 +1789,17 @@ namespace sight {
         data.content = content;
 
         g_UIStatus->windowStatus.popupAlertModal = true;
+    }
+
+    void openGenerateResultWindow(std::string const& source, std::string const& text) {
+        auto &data = g_UIStatus->generateResultData;
+        data.source = source;
+        data.text = text;
+        if (g_UIStatus->windowStatus.generateResultWindow) {
+            ImGui::SetWindowFocus(WINDOW_LANGUAGE_KEYS.generateResult);
+        } else {
+            g_UIStatus->windowStatus.generateResultWindow = true;
+        }
     }
 
 
@@ -2073,6 +2144,22 @@ namespace sight {
         }
 
         return CODE_OK;
+    }
+
+    bool EntityOperations::addOperation(const char* name, const char* desc, ScriptFunctionWrapper::Function const& f) {
+        auto [iter, succ] = map.try_emplace(name, name, desc, f);
+        if (!succ) {
+            return false;
+        }
+        
+        names.push_back(name);
+        return true;
+    }
+
+    void EntityOperations::reset() {
+        this->map.clear();
+        this->names.clear();
+        this->selected = 0;
     }
 
 }

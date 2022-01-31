@@ -17,6 +17,7 @@
 #include <sys/types.h>
 #include <v8.h>
 #include <string_view>
+#include <vector>
 
 
 namespace sight {
@@ -139,6 +140,7 @@ namespace sight {
         bool aboutWindow = false;
         bool projectSettingsWindow = false;
         bool entityListWindow = false;
+        bool generateResultWindow = false;
 
         bool layoutReset = false;
 
@@ -244,6 +246,21 @@ namespace sight {
         std::function<void(SaveOperationResult)> callback;
     };
 
+    struct EntityOperations{
+        absl::flat_hash_map<std::string, CommonOperation> map;
+        std::vector<std::string> names;
+        int selected = 0;
+
+        bool addOperation(const char* name, const char* desc, ScriptFunctionWrapper::Function const& f);
+
+        void reset();
+    };
+
+    struct GenerateResultData{
+        std::string source;
+        std::string text;
+    };
+
     struct UIStatus {
         bool needInit = false;
         ImGuiIO* io;
@@ -257,13 +274,15 @@ namespace sight {
         struct ModalSaveData modalSaveData;
         struct ModalAlertData modalAlertData;
         struct ToastController toastController;
+        struct GenerateResultData generateResultData;
 
         struct LanguageKeys* languageKeys = nullptr;
         struct UIColors* uiColors = nullptr;
         struct KeyBindings* keybindings = nullptr;
 
         // others
-        absl::flat_hash_map<std::string, CommonOperation> entityOperations;
+        // absl::flat_hash_map<std::string, CommonOperation> entityOperations;
+        struct EntityOperations entityOperations;
 
         // for execute js code in ui thread.
         v8::Isolate* isolate = nullptr;
@@ -364,5 +383,7 @@ namespace sight {
     void openAskModal(std::string_view title, std::string_view content, std::function<void(bool)> callback);
 
     void openAlertModal(std::string_view title = "Alert!", std::string_view content = "");
+
+    void openGenerateResultWindow(std::string const& source, std::string const& text);
 
 }

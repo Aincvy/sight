@@ -1,3 +1,2 @@
-let a = include('abc.js');
+include('abc.js');
 
-print(a);

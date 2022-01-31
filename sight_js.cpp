@@ -1525,8 +1525,8 @@ namespace sight {
         v8pp::module initTypes(isolate);
 
         initTypes.set_const("JS", MODULE_INIT_JS);
-        initTypes.set_const( "UI", MODULE_INIT_UI);
-        initTypes.set_const( "js", MODULE_INIT_JS);
+        initTypes.set_const("UI", MODULE_INIT_UI);
+        initTypes.set_const("js", MODULE_INIT_JS);
         initTypes.set_const("ui", MODULE_INIT_UI);
         module.set_const("InitType", initTypes);
 
@@ -1599,6 +1599,35 @@ namespace sight {
             .set("findNodeWithFilter", &SightNodeGraphWrapper::findNodeWithFilter)
             ;
         module.set("SightNodeGraphWrapper", nodeGraphWrapperClass);
+    }
+
+    void bindUIThreadFunctions(const v8::Local<v8::Context>& context, v8pp::module& module) {
+        auto isolate = currentUIStatus()->isolate;
+        v8pp::module entityModule(isolate);
+        auto addEntityOperation = [](const char* name, const char* desc, Local<Function> f) {
+            auto uiStatus = currentUIStatus();
+            auto& map = uiStatus->entityOperations;
+            return map.addOperation(name, desc, PersistentFunction(uiStatus->isolate, f));
+        };
+        entityModule.set("addOperation", addEntityOperation);
+        module.set("entity", entityModule);
+
+        v8pp::class_<SightEntityField> entityFieldClass(isolate);
+        entityFieldClass.ctor<>()
+            .set("name", &SightEntityField::name)
+            .set("type", &SightEntityField::type)
+            .set("defaultValue", &SightEntityField::defaultValue);
+        entityFieldClass.auto_wrap_objects(true);
+        module.set("entityFieldClass", entityFieldClass);
+
+        v8pp::class_<SightEntity> entityClass(isolate);
+        entityClass.ctor<>()
+            .set("simpleName", v8pp::property(&SightEntity::getSimpleName))
+            .set("name", &SightEntity::name)
+            .set("templateAddress", &SightEntity::templateAddress)
+            .set("fields", &SightEntity::fields);
+        module.set("entityClass", entityClass);
+
     }
 
     v8::Isolate* getJsIsolate() {
@@ -2266,13 +2295,6 @@ namespace sight {
         }
 
         // active the next.
-        // auto connection = node->findConnectionByProcess();
-        // if (!connection.bad()) {
-        //     parsingLink.link.push_back(connection.target->node);
-        // } else {
-        //     dbg("bad connection", node->nodeName);
-        // }
-
         auto port = node->findPortByProcess();
         if (port) {
             auto g = node->graph;
@@ -2285,9 +2307,6 @@ namespace sight {
                     auto& item = *iter;
                     data.addNewLink(SightNodePortConnection(g, item, node).target->node);
                 }
-                // for (auto& item : port->connections) {
-                //     data.addNewLink(SightNodePortConnection(g, item, node).target->node);
-                // }
             }
         }
     }

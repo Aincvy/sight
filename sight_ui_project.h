@@ -9,6 +9,14 @@
 namespace sight {
 
     /**
+     * @brief 
+     * 
+     * @param entity 
+     * @param createEntityData 
+     */
+    void convert(SightEntity& entity, const UICreateEntity& createEntityData);
+
+    /**
      *
      * @param createEntityData
      * @return 

@@ -19,6 +19,7 @@
 #include "sight_memory.h"
 
 #include "v8.h"
+#include "v8pp/convert.hpp"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 
@@ -433,10 +434,25 @@ namespace sight {
         ScriptFunctionWrapper(std::string const& code);
 
         void compile(Isolate* isolate);
+        
+        template<class... Args>
+        std::string getString(Isolate* isolate, Args const&... args) {
+            auto result = operator()(isolate, args...);
+            if (result.IsEmpty()) {
+                return {};
+            }
+
+            auto v = result.ToLocalChecked();
+            if (IS_V8_STRING(v)) {
+                return v8pp::from_v8<std::string>(isolate, v);
+            }
+            return {};
+        }
 
         void operator()(Isolate* isolate, SightNode* node) const;
         void operator()(Isolate* isolate, SightNodePort* thisNodePort, JsEventType eventType = JsEventType::Default, void* pointer = nullptr) const;
         v8::MaybeLocal<v8::Value> operator()(Isolate* isolate, SightNode* node, v8::Local<v8::Value> arg1, v8::Local<v8::Value> arg2) const;
+        v8::MaybeLocal<v8::Value> operator()(Isolate* isolate, SightEntity* entity) const;
 
         operator bool() const;
 
@@ -455,6 +471,10 @@ namespace sight {
         std::string name;
         std::string description;
         ScriptFunctionWrapper function;
+
+        CommonOperation() = default;
+        ~CommonOperation() = default;
+        CommonOperation(std::string name, std::string description, ScriptFunctionWrapper::Function const& f);
     };
 
     /**

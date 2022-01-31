@@ -28,6 +28,7 @@
 #include "sight_project.h"
 #include "sight_ui.h"
 
+#include "v8pp/call_v8.hpp"
 #include "v8pp/convert.hpp"
 #include "v8pp/class.hpp"
 
@@ -2076,6 +2077,13 @@ namespace sight {
         return result;
     }
 
+    v8::MaybeLocal<v8::Value> ScriptFunctionWrapper::operator()(Isolate* isolate, SightEntity* entity) const {
+        auto obj = v8pp::class_<SightEntity>::reference_external(isolate, entity);
+        auto result = v8pp::call_v8(isolate, function.Get(isolate), v8::Object::New(isolate), obj);
+        v8pp::class_<SightEntity>::unreference_external(isolate, entity);
+        return result;
+    }
+
     ScriptFunctionWrapper::operator bool() const {
         return !function.IsEmpty() || !sourceCode.empty();
     }
@@ -2240,4 +2248,14 @@ namespace sight {
         g_NodeEditorStatus = nullptr;
         return CODE_OK;
     }
+
+    CommonOperation::CommonOperation(std::string name, std::string description, ScriptFunctionWrapper::Function const& f)
+        : name(std::move(name)),
+          description(std::move(description)),
+          function(f)
+    {
+        
+    }
+
+
 }

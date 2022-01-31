@@ -21,6 +21,7 @@ namespace sight {
         char project[SHORT_KEYS_BUF_SIZE] = "Project";
         char about[SHORT_KEYS_BUF_SIZE] = "About";
         char projectSettings[MOST_KEYS_BUF_SIZE] = "ProjectSettings";
+        char generateResult[MOST_KEYS_BUF_SIZE] = "GenerateResult";
     };
 
     struct LanguageCommonKeys {

@@ -4,19 +4,20 @@
 namespace sight {
 
     namespace {
-        void convert(SightEntity& entity, const UICreateEntity& createEntityData) {
-            entity.name = createEntityData.name;
-            entity.templateAddress = createEntityData.templateAddress;
+    }
 
-            auto c = createEntityData.first;
-            while (c) {
-                entity.fields.emplace_back(c->name, c->type, c->defaultValue);
+    void convert(SightEntity& entity, const UICreateEntity& createEntityData) {
+        entity.name = createEntityData.name;
+        entity.templateAddress = createEntityData.templateAddress;
 
-                c = c->next;
-            }
+        auto c = createEntityData.first;
+        while (c) {
+            entity.fields.emplace_back(c->name, c->type, c->defaultValue);
 
-            entity.fixTemplateAddress();
+            c = c->next;
         }
+
+        entity.fixTemplateAddress();
     }
 
     int addEntity(const UICreateEntity& createEntityData) {
