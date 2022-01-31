@@ -26,6 +26,7 @@
 #include "sight_address.h"
 #include "sight_util.h"
 #include "sight_project.h"
+#include "sight_ui.h"
 
 #include "v8pp/convert.hpp"
 #include "v8pp/class.hpp"

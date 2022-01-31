@@ -13,9 +13,9 @@
 
 #include "yaml-cpp/yaml.h"
 
+#include "sight_colors.h"
 #include "sight_defines.h"
 #include "sight_project.h"
-#include "sight_ui.h"
 #include "sight_memory.h"
 
 #include "v8.h"
@@ -449,6 +449,12 @@ namespace sight {
          * @return false function not ready
          */
         bool checkFunction(Isolate* isolate) const;
+    };
+
+    struct CommonOperation{
+        std::string name;
+        std::string description;
+        ScriptFunctionWrapper function;
     };
 
     /**

@@ -21,3 +21,4 @@ imgui.ini
 sight.yaml
 
 project/*
+plugins/rws-plugin

@@ -380,13 +380,22 @@ namespace sight {
                 selectedNodes.resize(c);
                 selectedLinks.resize(d);
 
+                uint lastNodeId = 0;
                 for (const auto& item : selectedNodes) {
-                    selection.selectedNodeOrLinks.insert(static_cast<uint>(item.Get()));
+                    lastNodeId = static_cast<uint>(item.Get());
+                    selection.selectedNodeOrLinks.insert(lastNodeId);
                 }
                 for (const auto& item : selectedLinks) {
                     selection.selectedNodeOrLinks.insert(static_cast<uint>(item.Get()));
                 }
 
+                // update node name buffer.
+                if (selectedNodes.size() == 1) {
+                    auto n = currentGraph()->findNode(lastNodeId);
+                    if (n) {
+                        sprintf(g_UIStatus->buffer.inspectorNodeName, "%s", n->nodeName.c_str());
+                    }
+                }
             } else {
                 selection.selectedNodeOrLinks.clear();
             }
@@ -601,13 +610,13 @@ namespace sight {
 
                 ImGui::Separator();
                 // first line buttons
-                if (ImGui::Button("+")) {
+                if (ImGui::Button(ICON_MD_ADD)) {
                     createEntityData.resetFieldsStatus(true, true);
                     createEntityData.addField();
                     createEntityData.lastField()->editing = true;
                 }
                 ImGui::SameLine();
-                if (ImGui::Button("-")) {
+                if (ImGui::Button(ICON_MD_REMOVE)) {
                     createEntityData.deleteSelected();
                     createEntityData.resetFieldsStatus(true, true);
                 }
@@ -620,7 +629,7 @@ namespace sight {
                     createEntityData.moveItemDown();
                 }
                 ImGui::SameLine();
-                if (ImGui::Button("c")) {
+                if (ImGui::Button(ICON_MD_EDIT_OFF)) {
                     createEntityData.resetFieldsStatus(true, true);
                 }
 
@@ -1284,10 +1293,10 @@ namespace sight {
         ImGui::CreateContext();
         ImGuiIO& io = ImGui::GetIO(); (void)io;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-        //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
 
         // Setup Dear ImGui style
-        ImGui::StyleColorsDark();
+        // ImGui::StyleColorsDark();
 
         // Setup Platform/Renderer backends
         ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -1483,7 +1492,6 @@ namespace sight {
         static const ImWchar icon_ranges[] = { ICON_MIN_MD, ICON_MAX_MD, 0 };
         config.GlyphOffset.y += 5.5f;
         auto iconFontPointer = io.Fonts->AddFontFromFileTTF((resourceFolder + "font/MaterialIconsOutlined-Regular.otf").c_str(), 18.0f, &config, icon_ranges);
-
 
         io.Fonts->Build();
 

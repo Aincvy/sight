@@ -546,7 +546,9 @@ namespace sight {
         const auto windowHeight = displaySize.y;
         int x = windowWidth - 25;
         int y = windowHeight - bottomSpacing;
-        for(auto& item: elements){
+        for (auto iter = elements.rbegin(); iter != elements.rend(); iter++) {
+            auto& item = *iter;
+
             auto size = item.calcRecommendSize();
             y -= size.y;
             item.render(ImVec2(x - size.x, y), size);
@@ -554,7 +556,7 @@ namespace sight {
             // x += size.x;
             y -= bottomSpacing;
         }
-
+        
     }
 
 }

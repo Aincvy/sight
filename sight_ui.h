@@ -8,8 +8,10 @@
 #include "sight_widgets.h"
 #include "sight_language.h"
 #include "sight_project.h"
+#include "sight_nodes.h"
 
 #include "absl/container/btree_set.h"
+#include "absl/container/flat_hash_map.h"
 #include <functional>
 #include <string>
 #include <sys/types.h>
@@ -75,7 +77,6 @@ namespace sight {
      * cache for create entity window.
      */
     struct UICreateEntity {
-        // char editTemplateAddress[NAME_BUF_SIZE] = { 0 };
         bool edit = false;
         SightEntity editingEntity{};
         char name[NAME_BUF_SIZE] = {0};
@@ -134,7 +135,7 @@ namespace sight {
     struct UIWindowStatus {
         bool nodeGraph = false;
         bool createEntity = false;
-        bool testWindow = true;
+        bool testWindow = false;
         bool aboutWindow = false;
         bool projectSettingsWindow = false;
         bool entityListWindow = false;
@@ -261,11 +262,15 @@ namespace sight {
         struct UIColors* uiColors = nullptr;
         struct KeyBindings* keybindings = nullptr;
 
+        // others
+        absl::flat_hash_map<std::string, CommonOperation> entityOperations;
+
         // for execute js code in ui thread.
         v8::Isolate* isolate = nullptr;
         v8::ArrayBuffer::Allocator* arrayBufferAllocator = nullptr;
         v8::Persistent<v8::Context, v8::CopyablePersistentTraits<v8::Context>> v8GlobalContext{};
 
+        // async message
         uv_loop_t* uvLoop = nullptr;
         uv_async_t* uvAsync = nullptr;
 
