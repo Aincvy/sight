@@ -808,8 +808,8 @@ namespace sight {
                     helpMarker(entityOperations.map[selectedOperationName].description.c_str());
 
                 }
-                ImGui::End();
             }
+            ImGui::End();
         }
 
         void showEntityListWindow(){
@@ -841,9 +841,7 @@ namespace sight {
                     ImGui::SameLine();
                     ImGui::Text("%18s", name.c_str());
                     ImGui::SameLine();
-                    // ImGui::SetNextItemWidth(float item_width)
-                    // maybe use google icon fonts will be better.
-                    std::string editButtonLabel{"Edit##edit-"};
+                    std::string editButtonLabel{ICON_MD_EDIT "##edit-"};
                     editButtonLabel += name;
                     if (ImGui::Button(editButtonLabel.c_str())) {
                         // edit
@@ -855,7 +853,7 @@ namespace sight {
                         activeWindowCreateEntity();
                     }
                     ImGui::SameLine();
-                    std::string delButtonLabel{ "Del##del-" };
+                    std::string delButtonLabel{ICON_MD_DELETE "##del-" };
                     delButtonLabel += name;
                     if (ImGui::Button(delButtonLabel.c_str())) {
                         delFullName = name;
@@ -878,8 +876,8 @@ namespace sight {
                         });
                     }
                 }
-                ImGui::End();
             }
+            ImGui::End();
         }
 
         void showAboutWindow(){
@@ -2146,12 +2144,19 @@ namespace sight {
         return CODE_OK;
     }
 
-    bool EntityOperations::addOperation(const char* name, const char* desc, ScriptFunctionWrapper::Function const& f) {
+    bool EntityOperations::addOperation(const char* name, const char* desc, ScriptFunctionWrapper::Function const& f, bool replace) {
+        if (replace) {
+            auto old = map.find(name);
+            if (old != map.end()) {
+                map.erase(old);
+            }
+        }
+
         auto [iter, succ] = map.try_emplace(name, name, desc, f);
         if (!succ) {
             return false;
         }
-        
+
         names.push_back(name);
         return true;
     }

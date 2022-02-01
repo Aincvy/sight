@@ -3,28 +3,11 @@
 // the module object is shared with other files inside this plugin, except `exports-ui.js`
 // mjs file wil do not load.
 
+include('exports-common.js', module);
+print(typeof module.exportCommon);
+
+
 let globals = module.globals;
-
-// Not supported.
-// import mjs from './test.mjs'
-// print(mjs.number);
-// mjs.testMjs();
-
-/**
- * 
- * @param {*} type 0 = js, 1 = ui.
- */
-module.onInit = function(type){
-    print(type);
-
-}
-
-Array.prototype.remove = function (element) {
-    let index = this.indexOf(element);
-    if (index > 0) {
-        this.splice(index, 1);
-    }
-}
 
 //  built-in functions power-up
 globals.detectId = function(obj) {

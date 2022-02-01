@@ -51,18 +51,27 @@ namespace sight {
         const char* getPath() const;
         const char* getVersion() const;
         const char* getAuthor() const;
+        const char* getUrl() const;
 
         int reload();
 
         PluginStatus getPluginStatus() const;
         const char* getPluginStatusString() const;
 
+        bool isDisabled() const;
+        bool isReloadAble() const;        
+
     private:
         std::string name;
         std::string path;
         std::string version;
         std::string author;
+        std::string url;
+        bool reloadAble = true;
         bool disabled = false;
+        std::vector<std::string> loadFiles;
+        std::vector<std::string> depends;
+
         // every plugin share one module.
         V8ObjectType module = {};
         PluginStatus status = PluginStatus::WaitLoad;

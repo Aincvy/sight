@@ -60,6 +60,7 @@ namespace sight {
         CODE_PLUGIN_NO_DESCRIPTION,
         CODE_PLUGIN_FILE_ERROR,
         CODE_PLUGIN_DISABLED,
+        CODE_PLUGIN_NO_RELOAD,                    // not reload-able
 
         CODE_SCRIPT_NO_RESULT = 250,
 

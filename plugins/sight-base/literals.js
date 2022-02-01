@@ -658,3 +658,5 @@ addTemplateNode({
     },
 
 });
+
+print('load over!');

@@ -627,13 +627,13 @@ namespace sight {
             rValue.Set(v8pp::to_v8(isolate, array.begin(), array.end()));
         }
 
-        Local<Value> v8Include(std::string path) {
+        Local<Value> v8Include(std::string path, Local<Object> module, int frameOffset = 0) {
             auto isolate = Isolate::GetCurrent();
 
             if (!startsWith(path, "/")) {
                 // Relative path
-                auto frame = v8::StackTrace::CurrentStackTrace(isolate, 1, v8::StackTrace::kScriptName)
-                                 ->GetFrame(isolate, 0);
+                auto frame = v8::StackTrace::CurrentStackTrace(isolate, 1 + frameOffset, v8::StackTrace::kScriptName)
+                                 ->GetFrame(isolate, 0 + frameOffset);
                 if (frame.IsEmpty()) {
                     return v8::Undefined(isolate);
                 }
@@ -653,7 +653,7 @@ namespace sight {
             
             // run script
             Local<Value> result;
-            if (runJsFile(isolate, path.c_str(), nullptr, &result) == CODE_OK) {
+            if (runJsFile(isolate, path.c_str(), nullptr, module, &result) == CODE_OK) {
                 return result;
             }
             return v8::Undefined(isolate);
@@ -1519,7 +1519,11 @@ namespace sight {
         global->Set(context, v8pp::to_v8(isolate, "print"), printFunc).ToChecked();
         auto tellFunc = v8pp::wrap_function(isolate, "tell", &v8Tell);
         global->Set(context, v8pp::to_v8(isolate, "tell"), tellFunc).ToChecked();
-        global->Set(context, v8pp::to_v8(isolate, "include"), v8pp::wrap_function(isolate, "include", &v8Include)).ToChecked();
+        global->Set(context, v8pp::to_v8(isolate, "v8Include"), v8pp::wrap_function(isolate, "v8Include", &v8Include)).ToChecked();
+        auto includeFunc = [](const char* path, Local<Object> module) {
+            return v8Include(path, module);
+        };
+        global->Set(context, v8pp::to_v8(isolate, "include"), v8pp::wrap_function(isolate, "include", includeFunc)).ToChecked();
 
         // auto initTypes = Object::New(isolate);
         v8pp::module initTypes(isolate);
@@ -1890,7 +1894,7 @@ namespace sight {
         Local<Object> context_extensions[0];
         MaybeLocal<Function> mayFunction;
 
-        if (module.IsEmpty()) {
+        if (module.IsEmpty() || module->IsNullOrUndefined()) {
             mayFunction = v8::ScriptCompiler::CompileFunctionInContext(context, &source, 0, nullptr, 0, context_extensions);
         } else {
             v8::Local<v8::String> paramModule = v8::String::NewFromUtf8(isolate, "module").ToLocalChecked();
@@ -1917,7 +1921,7 @@ namespace sight {
         Local<Object> recv = Object::New(isolate);
         MaybeLocal<Value> result;
 
-        if (module.IsEmpty()) {
+        if (module.IsEmpty() || module->IsNullOrUndefined()) {
             result = function->Call(context, recv, 0, nullptr);
         } else {
             auto mayExports = module->Get(context, v8pp::to_v8(isolate, "exports"));
@@ -2609,9 +2613,9 @@ namespace sight {
             auto value = object->Get(context, key).ToLocalChecked();
             std::string keyString = v8pp::from_v8<std::string>(isolate, key);
 
-            if (value->IsFunction()) {
-                // only register function
-                if (outFunctionCode) {
+            if (value->IsFunction() || value->IsObject()) {
+                // only register function, object
+                if (value->IsFunction() && outFunctionCode) {
                     // out code
                     auto function = value.As<Function>();
                     outFunctionCode->insert({ keyString, functionProtoToString(isolate, context, function) });

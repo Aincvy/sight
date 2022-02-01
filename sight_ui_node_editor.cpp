@@ -653,7 +653,7 @@ namespace sight {
                 syncPositionTo = true;
             } else if (now - g_ContextStatus->lastSyncPositionTime >= 5) {
                 g_ContextStatus->lastSyncPositionTime = now;
-                dbg("try sync node position");
+
                 syncPositionFrom = true;
             }
 
@@ -676,6 +676,7 @@ namespace sight {
             ImGui::SameLine();
             ImGui::Checkbox("Auto Save", &(sightSettings->autoSave));
             if (graph->isBroken()) {
+                ImGui::SameLine();
                 ImGui::TextColored(uiStatus.uiColors->errorText, "Graph Broken!");
             }
             ImGui::Separator();

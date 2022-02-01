@@ -1,2 +1,2 @@
-include('abc.js');
+execute('abc.js');
 

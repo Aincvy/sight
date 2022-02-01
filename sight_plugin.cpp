@@ -6,12 +6,14 @@
 #include "dbg.h"
 #include "sight.h"
 #include "filesystem"
+#include "sight_defines.h"
 #include "sight_ui.h"
 #include "sight_util.h"
 #include "sight_js.h"
 
 #include "v8pp/convert.hpp"
 #include "v8pp/call_v8.hpp"
+#include "v8pp/object.hpp"
 #include <algorithm>
 #include <cstring>
 #include <iterator>
@@ -23,7 +25,8 @@
 
 namespace sight {
 
-    using directory_iterator = std::filesystem::directory_iterator;
+    namespace fs = std::filesystem;
+    using directory_iterator = fs::directory_iterator;
 
     namespace {
         PluginManager* g_pluginManager = new PluginManager();
@@ -48,8 +51,29 @@ namespace sight {
     int PluginManager::loadPlugins() {
         dbg("load plugins");
         loadedPluginCount = 0;
-        
+
+        auto afterPluginLoadSuccess = [this](Plugin* plugin) {
+            plugin->debugBrieflyInfo();
+            flushJsNodeCache();
+            this->pluginMap[plugin->getName()] = plugin;
+            if (plugin->getPluginStatus() == PluginStatus::Loaded) {
+                ++loadedPluginCount;
+            }
+        };
+
+        // load sight-base first.
+        fs::path sightBasePath{ "./plugins/sight-base" };
+        if (fs::exists(sightBasePath)) {
+            auto plugin = new Plugin(this, sightBasePath.string());
+            plugin->load();
+            afterPluginLoadSuccess(plugin);
+        }
+
         for (auto it = directory_iterator {"./plugins"}; it != directory_iterator {}; ++it) {
+            if (fs::equivalent(sightBasePath, it->path())) {
+                continue;
+            }
+
             auto plugin = new Plugin(this, it->path().string());
             int i;
             if ((i = plugin->load()) != CODE_OK) {
@@ -58,15 +82,14 @@ namespace sight {
                 }
                 goto loadFailed;
             }
-            
-            plugin->debugBrieflyInfo();
-            flushJsNodeCache();
-            this->pluginMap[plugin->getName()] = plugin;
-            if (plugin->getPluginStatus() == PluginStatus::Loaded) {
-                ++loadedPluginCount;
+            if (pluginMap.contains(plugin->getName())) {
+                dbg("maybe name repeat", plugin->getName());
+                goto loadFailed;
             }
-
+            
+            afterPluginLoadSuccess(plugin);
             continue;
+            
             loadFailed:
             clearJsNodeCache();
             delete plugin;
@@ -198,45 +221,42 @@ namespace sight {
         if (this->disabled) {
             dbg("plugin disabled", this->name);
             status = PluginStatus::Disabled;
-            return CODE_OK;
+            return CODE_PLUGIN_DISABLED;
         }
 
-        // load other files.
-        auto module = v8::Object::New(isolate);
-        directory_iterator begin{ this->path}, end{};
-        for (auto it = begin; it != end ; ++it) {
-            if (!it->is_regular_file()) {
+        // load files.
+        auto module = this->module.IsEmpty() ? v8::Object::New(isolate) : this->module.Get(isolate);
+        fs::path rootPath = this->path;
+        for( const auto& item: loadFiles){
+            fs::path path = rootPath / item;
+            if (!fs::exists(path)) {
                 continue;
             }
 
-            if (!it->path().has_extension() || it->path().extension() != ".js"){
-                continue;
-            }
-            auto filename = it->path().filename();
-            if (filename == FILE_NAME_PACKAGE) {
-                continue;
-            }
-
-            auto fullPath = std::filesystem::canonical(it->path());
-            if (filename == FILE_NAME_EXPORTS_UI) {
-                addUICommand(UICommandType::RunScriptFile, strdup(fullPath.c_str()), 0 ,true);
-                continue;
-            }
-
+            auto fullPath = std::filesystem::canonical(path);
             auto code = runJsFile(isolate, fullPath.c_str(), nullptr, module);
-            if (code != 0) {
+            if (code != CODE_OK) {
                 dbg("js run failed", fullPath.c_str());
                 return CODE_PLUGIN_FILE_ERROR;
             }
         }
 
-        this->module = V8ObjectType(isolate, module);
+        // check exports-ui.js file
+        auto exportsUIPath = rootPath / "exports-ui.js";
+        if (fs::exists(exportsUIPath)) {
+            auto fullPath = std::filesystem::canonical(exportsUIPath);
+            addUICommand(UICommandType::RunScriptFile, strdup(fullPath.c_str()), 0, true);
+        }
+
+        if (this->module.IsEmpty()) {
+            this->module = V8ObjectType(isolate, module);
+        }
         // register global functions
         registerGlobals(module->Get(context, v8pp::to_v8(isolate, "globals")).ToLocalChecked());
-        auto onInit = module->Get(context, v8pp::to_v8(isolate, "onInit")).ToLocalChecked();
-        if (onInit->IsFunction()) {
-            v8pp::call_v8(isolate, onInit.As<v8::Function>(), v8::Object::New(isolate), MODULE_INIT_JS);
-        }
+        // auto onInit = module->Get(context, v8pp::to_v8(isolate, "onInit")).ToLocalChecked();
+        // if (onInit->IsFunction()) {
+        //     v8pp::call_v8(isolate, onInit.As<v8::Function>(), v8::Object::New(isolate), MODULE_INIT_JS);
+        // }
 
         status = PluginStatus::Loaded;
         return CODE_OK;
@@ -257,7 +277,7 @@ namespace sight {
             return loadFromFile();
         }
 
-        return CODE_OK;
+        return CODE_PLUGIN_NO_PKG_FILE;
     }
 
     PluginManager *Plugin::getPluginManager() {
@@ -270,16 +290,31 @@ namespace sight {
 
     void Plugin::readBaseInfoFromJsObject(v8::Local<v8::Object> object) {
         // js code example
-//        return {
-//                name: 'aa',
-//                version: '1.0',
-//                author: 'xxx',
-//        };
+        // this.info = {
+        //     name: 'dot-plugin',
+        //     version: '-',
+        //     author: '-',
+        //     url: 'https://github.com/olado/doT/tree/v2',
+        //     reloadAble: false,
+        //     disabled: false,
+        //     loadFiles: [],     // extra load files; only load `main.js`, `exports.js` by default.
+        //     depends: [],
+        // };
 
         auto isolate = this->pluginManager->getIsolate();
         auto context = isolate->GetCurrentContext();
-        auto keys = object->GetOwnPropertyNames(context).ToLocalChecked();
 
+        auto loadStringArray = [isolate](std::vector<std::string>& list, v8::Local<v8::Value> valueObject) {
+            if (IS_V8_STRING(valueObject)) {
+                list.clear();
+                list.push_back(v8pp::from_v8<std::string>(isolate, valueObject));
+            } else if (valueObject->IsArray()) {
+                // expect array of strings.
+                list = v8pp::from_v8<std::vector<std::string>>(isolate, valueObject);
+            }
+        };
+
+        auto keys = object->GetOwnPropertyNames(context).ToLocalChecked();
         for (int i = 0; i < keys->Length(); ++i) {
             auto keyObject = keys->Get(context, i).ToLocalChecked();
             auto valueObject = object->Get(context, keyObject).ToLocalChecked();
@@ -298,12 +333,25 @@ namespace sight {
                 if (IS_V8_STRING(valueObject)) {
                     this->author = v8pp::from_v8<std::string>(isolate, valueObject);
                 }
+            } else if (key == "url") {
+                if (IS_V8_STRING(valueObject)) {
+                    this->url = v8pp::from_v8<std::string>(isolate, valueObject);
+                }
+            } else if (key == "reloadAble") {
+                if (valueObject->IsBoolean()) {
+                    this->reloadAble = v8pp::from_v8<bool>(isolate, valueObject);
+                }
             } else if (key == "disabled") {
                 if (valueObject->IsBoolean()) {
                     this->disabled = v8pp::from_v8<bool>(isolate, valueObject);
                 }
+            } else if (key == "loadFiles") {
+                loadStringArray(loadFiles, valueObject);
+                loadFiles.push_back("main.js");
+                loadFiles.push_back("exports.js");
+            } else if (key == "depends") {
+                loadStringArray(depends, valueObject);
             }
-
         }
 
     }
@@ -325,7 +373,22 @@ namespace sight {
     }
 
     int Plugin::reload() {
-        return load();
+        if (!reloadAble) {
+            return CODE_PLUGIN_NO_RELOAD;
+        }
+        auto isolate = pluginManager->getIsolate();
+        auto reloading = v8pp::to_v8(isolate, "reloading");
+        auto context = isolate->GetCurrentContext();
+        auto object = module.Get(isolate);
+        object->Set(context, reloading, v8::Boolean::New(isolate, true)).ToChecked();
+        int code = load();
+        object->Delete(context, reloading).ToChecked();
+
+        return code;
+    }
+
+    const char* Plugin::getUrl() const {
+        return url.c_str();
     }
 
     PluginStatus Plugin::getPluginStatus() const {
@@ -335,6 +398,14 @@ namespace sight {
     const char* Plugin::getPluginStatusString() const {
         static const char* array[] = { "WaitLoad", "Loading", "Loaded", "Disabled" };
         return array[static_cast<int>(this->status)];
+    }
+
+    bool Plugin::isDisabled() const {
+        return this->disabled;
+    }
+
+    bool Plugin::isReloadAble() const {
+        return this->reloadAble;
     }
 
     PluginManager *pluginManager() {

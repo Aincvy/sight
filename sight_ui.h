@@ -251,7 +251,7 @@ namespace sight {
         std::vector<std::string> names;
         int selected = 0;
 
-        bool addOperation(const char* name, const char* desc, ScriptFunctionWrapper::Function const& f);
+        bool addOperation(const char* name, const char* desc, ScriptFunctionWrapper::Function const& f, bool replace = true);
 
         void reset();
     };
