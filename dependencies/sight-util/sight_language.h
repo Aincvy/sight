@@ -16,6 +16,8 @@ namespace sight {
 
     struct LanguageWindowNames {
         char createEntity[MOST_KEYS_BUF_SIZE] = "CreateEntity";
+        char entityList[MOST_KEYS_BUF_SIZE] = "EntityList";
+        char entityInfo[MOST_KEYS_BUF_SIZE] = "EntityInfo";
         char hierarchy[MOST_KEYS_BUF_SIZE] = "Hierarchy";
         char inspector[MOST_KEYS_BUF_SIZE] = "Inspector";
         char project[SHORT_KEYS_BUF_SIZE] = "Project";

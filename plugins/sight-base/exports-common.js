@@ -72,20 +72,16 @@ globals.loopIf = function (array, f) {
 }
 
 // 
-globals.require = function require(path, module = null){
-    let moduleFlag = false;
+globals.require = function require(path, module = null, extraData = null){
     if(!module) {
-        moduleFlag = true;
-        module = { exports: {} };
+        module = { exports: {}, globals: {} };
     }
-    let returns = v8Include(path, module, 1);
 
-    if(moduleFlag){
-        module.returns = returns;
-        return module;
-    } else {
-        return returns;
+    let returns = v8Include(path, module, 1);
+    if (extraData) {
+        extraData.returns = returns;
     }
+    return module.exports;
 };
 
 globals.execute = function execute(path = ''){

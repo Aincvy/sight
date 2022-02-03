@@ -391,6 +391,10 @@ namespace sight {
         return url.c_str();
     }
 
+    bool Plugin::isUrlEmpty() const {
+        return url.empty();
+    }
+
     PluginStatus Plugin::getPluginStatus() const {
         return status;
     }

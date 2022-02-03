@@ -166,6 +166,8 @@ namespace sight {
         int effect() const;
         
         std::string getSimpleName() const;
+        // namespace name is same.
+        std::string getPackageName() const;
 
         operator SightNodeTemplateAddress() const;
     };
@@ -323,6 +325,8 @@ namespace sight {
         std::string getLastOpenGraph() const;
 
         absl::btree_map<std::string, SightEntity> const& getEntitiesMap() const;
+        SightEntity const* getSightEntity(std::string_view fullName) const;
+        SightEntity* getSightEntity(std::string_view fullName);
 
         bool addEntity(SightEntity const& entity);
         bool updateEntity(SightEntity const& entity, SightEntity const& oldEntity);

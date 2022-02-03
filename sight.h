@@ -71,6 +71,25 @@ namespace sight {
         CODE_NODE_HAS_CONNECTIONS,
     };
 
+    struct UIWindowStatus {
+        bool nodeGraph = false;
+        bool createEntity = false;
+        bool testWindow = false;
+        bool aboutWindow = false;
+        bool projectSettingsWindow = false;
+        bool entityListWindow = false;
+        bool entityInfoWindow = false;
+        bool generateResultWindow = false;
+
+        bool layoutReset = false;
+
+        // popups
+        bool popupGraphName = false;
+        bool popupAskModal = false;
+        bool popupSaveModal = false;
+        bool popupAlertModal = false;
+    };
+
     /**
      * @brief 
      * 
@@ -80,6 +99,8 @@ namespace sight {
 
         std::string lastOpenProject = "";
         ushort networkListenPort = 39455;
+
+        UIWindowStatus windowStatus;
 
         bool autoSave = false;
     };

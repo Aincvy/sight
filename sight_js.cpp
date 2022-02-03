@@ -1627,6 +1627,7 @@ namespace sight {
         v8pp::class_<SightEntity> entityClass(isolate);
         entityClass.ctor<>()
             .set("simpleName", v8pp::property(&SightEntity::getSimpleName))
+            .set("packageName", v8pp::property(&SightEntity::getPackageName))
             .set("name", &SightEntity::name)
             .set("templateAddress", &SightEntity::templateAddress)
             .set("fields", &SightEntity::fields);
@@ -2649,12 +2650,6 @@ namespace sight {
     SightJsNode& registerEntityFunctions(SightJsNode& node) {
         node.generateCodeWork = g_V8Runtime->entityFunctions.generateCodeWork;
         node.onReverseActive = g_V8Runtime->entityFunctions.onReverseActive;
-        // auto isolate = Isolate::GetCurrent();
-        // auto context = isolate->GetCurrentContext();
-        // auto f = g_V8Runtime->entityFunctions.generateCodeWork.Get(isolate);
-        // auto code = functionProtoToString(isolate, context, f);
-        // dbg(code);
-        // dbg(f.IsEmpty(), f->IsNullOrUndefined(), f->IsFunction(), f->IsObject());
         return node;
     }
 

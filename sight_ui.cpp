@@ -17,6 +17,7 @@
 #include "sight_undo.h"
 
 #include "imgui.h"
+#include "imgui_internal.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "sight_widgets.h"
@@ -596,12 +597,66 @@ namespace sight {
             if (ImGui::Begin(WINDOW_LANGUAGE_KEYS.generateResult, &g_UIStatus->windowStatus.generateResultWindow)) {
                 auto & data =g_UIStatus->generateResultData;
                 ImGui::Text("%s", data.source.c_str());
-                ImGui::InputTextMultiline("##text", data.text.data(), data.text.size(), ImVec2(), ImGuiInputTextFlags_ReadOnly);
+                const auto windowWidth = ImGui::GetWindowWidth() - 13;
+                const auto windowHeight = ImGui::GetWindowHeight();
+                const auto lineHeight = ImGui::GetFrameHeightWithSpacing() + 2.5f;
+
+                ImGui::InputTextMultiline("##text", data.text.data(), data.text.size(), ImVec2(windowWidth, windowHeight - lineHeight*3), ImGuiInputTextFlags_ReadOnly);
                 if (ImGui::Button(ICON_MD_CONTENT_COPY)) {
                     ImGui::SetClipboardText(data.text.c_str());
                 }
             }
             ImGui::End();
+        }
+
+        void showEntityOperations(SightEntity* sightEntity = nullptr, UICreateEntity* createEntityData = nullptr) {
+            auto& entityOperations = g_UIStatus->entityOperations;
+            const auto& operationNames = entityOperations.names;
+            if (!operationNames.empty()) {
+                const auto width = ImGui::GetWindowWidth();
+                constexpr const auto comboWidth = 110;
+                const char* comboLabel = "##Operations";
+                const auto comboLabelWidth = ImGui::CalcTextSize(comboLabel).x;
+                const char* generateStr = "Generate";
+                const auto generateWidth = ImGui::CalcTextSize(generateStr).x + 15;
+                auto selectedOperationName = operationNames[entityOperations.selected].c_str();
+
+                ImGui::SameLine(width - generateWidth);
+                if (ImGui::Button(generateStr)) {
+                    // call generate
+                    auto& o = entityOperations.map[selectedOperationName];
+
+                    std::string text{};
+                    if (!sightEntity) {
+                        assert(createEntityData);
+                        SightEntity tmpSightEntity;
+                        convert(tmpSightEntity, *createEntityData);
+                        sightEntity = &tmpSightEntity;
+                        text = o.function.getString(currentUIStatus()->isolate, sightEntity);
+                    } else {
+                        text = o.function.getString(currentUIStatus()->isolate, sightEntity);
+                    }
+                    
+                    openGenerateResultWindow(generateStr, text);     // todo more info about source
+                }
+                ImGui::SameLine(width - comboWidth - generateWidth - 5);
+                ImGui::SetNextItemWidth(comboWidth);
+                if (ImGui::BeginCombo(comboLabel, selectedOperationName)) {
+                    int tmpIndex = 0;
+                    for (const auto& item : operationNames) {
+                        bool isSelected = tmpIndex == entityOperations.selected;
+                        if (ImGui::Selectable(item.c_str(), isSelected)) {
+                            entityOperations.selected = tmpIndex;
+                        }
+
+                        if (isSelected) {
+                            ImGui::SetItemDefaultFocus();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                helpMarker(entityOperations.map[selectedOperationName].description.c_str());
+            }
         }
 
         void showCreateEntityWindow(){
@@ -768,57 +823,40 @@ namespace sight {
                     ImGui::Text("Edit Mode");
                 }
 
-                auto& entityOperations = g_UIStatus->entityOperations;
-                const auto& operationNames = entityOperations.names;
-                if (!operationNames.empty()) {
-                    const auto width = ImGui::GetWindowWidth();
-                    constexpr const auto comboWidth = 90;
-                    const char* comboLabel = "##Operations";
-                    const auto comboLabelWidth = ImGui::CalcTextSize(comboLabel).x;
-                    const char* generateStr = "Generate";
-                    const auto generateWidth = ImGui::CalcTextSize(generateStr).x + 15;
-                    auto selectedOperationName = operationNames[entityOperations.selected].c_str();
+                showEntityOperations(nullptr, &createEntityData);
+            }
+            ImGui::End();
+        }
 
-                    ImGui::SameLine(width - generateWidth);
-                    if (ImGui::Button(generateStr)) {
-                        // call generate
-                        dbg(generateStr);
-                        SightEntity sightEntity;
-                        convert(sightEntity, createEntityData);
-                        auto& o = entityOperations.map[selectedOperationName];
-                        std::string text = o.function.getString(currentUIStatus()->isolate, &sightEntity);
-                        openGenerateResultWindow(generateStr, text);    // todo more info about source
+        void showEntityInfoWindow(){
+            if (ImGui::Begin(WINDOW_LANGUAGE_KEYS.entityInfo, &g_UIStatus->windowStatus.entityInfoWindow)) {
+                auto& name = g_UIStatus->createEntityData.showInfoEntityName;
+                if (name.empty()) {
+                    ImGui::Text("Select an entity to show info.");
+                } else {
+                    auto entityData = currentProject()->getSightEntity(name);
+                    if (entityData) {
+                        ImGui::Text("%s", entityData->name.c_str());
+                        showEntityOperations(entityData);
+                    } else {
+                        ImGui::Text("Entity not found: ");
+                        ImGui::SameLine();
+                        ImGui::Text("%s", name.c_str());
                     }
-                    ImGui::SameLine(width - comboWidth - generateWidth - 5);
-                    ImGui::SetNextItemWidth(comboWidth);
-                    if (ImGui::BeginCombo(comboLabel, selectedOperationName)) {
-                        int tmpIndex = 0;
-                        for (const auto& item : operationNames) {
-                            bool isSelected = tmpIndex == entityOperations.selected;
-                            if (ImGui::Selectable(item.c_str(), isSelected)) {
-                                entityOperations.selected = tmpIndex;
-                            }
-
-                            if (isSelected) {
-                                ImGui::SetItemDefaultFocus();
-                            }
-                        }
-                        ImGui::EndCombo();
-                    }
-                    helpMarker(entityOperations.map[selectedOperationName].description.c_str());
-
-                }
+                }   
             }
             ImGui::End();
         }
 
         void showEntityListWindow(){
-            if (ImGui::Begin("Entity List", &g_UIStatus->windowStatus.entityListWindow)) {
-                // ImGui::Text(ICON_MD_SEARCH);
-                // ImGui::SameLine();
+            if (ImGui::Begin(WINDOW_LANGUAGE_KEYS.entityList, &g_UIStatus->windowStatus.entityListWindow)) {
                 ImGui::InputText(ICON_MD_SEARCH "##Filter", g_UIStatus->buffer.entityListSearch, std::size(g_UIStatus->buffer.entityListSearch));
-                ImGui::SameLine(ImGui::GetWindowWidth() - 60);
-                
+                const auto windowWidth = ImGui::GetWindowWidth();
+                constexpr const auto buttonSize = 26;
+                constexpr const auto buttonInterval = 5;
+
+                ImGui::SameLine(windowWidth - 60);
+
                 if (ImGui::Button("Create")) {
                     dbg(1);
                     activeWindowCreateEntity();
@@ -829,7 +867,7 @@ namespace sight {
                 // also be a template address.
                 std::string delFullName{};
                 auto entityListSearch = g_UIStatus->buffer.entityListSearch;
-
+                
                 for( const auto& [name, info]: p->getEntitiesMap()){
                     if (strlen(entityListSearch) > 0) {
                         if (!absl::StrContains(name, entityListSearch)) {
@@ -840,7 +878,17 @@ namespace sight {
                     ImGui::Text("%8s", info.getSimpleName().c_str());
                     ImGui::SameLine();
                     ImGui::Text("%18s", name.c_str());
-                    ImGui::SameLine();
+
+                    auto width = windowWidth - buttonSize - buttonInterval;
+                    ImGui::SameLine(width);
+                    std::string infoLabel{ ICON_MD_INFO "##info-" };
+                    infoLabel += name;
+                    if (ImGui::Button(infoLabel.c_str())) {
+                        openEntityInfoWindow(name);
+                    }
+
+                    width = width - buttonSize - buttonInterval;
+                    ImGui::SameLine(width);
                     std::string editButtonLabel{ICON_MD_EDIT "##edit-"};
                     editButtonLabel += name;
                     if (ImGui::Button(editButtonLabel.c_str())) {
@@ -852,12 +900,16 @@ namespace sight {
 
                         activeWindowCreateEntity();
                     }
-                    ImGui::SameLine();
+
+                    width = width - buttonSize - buttonInterval;
+                    ImGui::SameLine(width);
                     std::string delButtonLabel{ICON_MD_DELETE "##del-" };
                     delButtonLabel += name;
                     if (ImGui::Button(delButtonLabel.c_str())) {
                         delFullName = name;
                     }
+
+                    
                 }
 
                 if (!delFullName.empty()) {
@@ -985,22 +1037,36 @@ namespace sight {
                     auto map = pluginManager()->getSnapshotMap();
                     auto pluginNames = pluginManager()->getSortedPluginNames();
                     for (const auto& key : pluginNames) {
-                        auto value = map[key];
+                        auto plugin = map[key];
                         ImGui::Text("%s", key.c_str());
-                        ImGui::Text("%7s: %s", "Author", value->getAuthor());
-                        ImGui::Text("%7s: %s", "Version", value->getVersion());
-                        ImGui::Text("%7s: %s", "Path", value->getPath());
-                        ImGui::Text("%7s: %s", "Status", value->getPluginStatusString());
+                        ImGui::Text("%7s: %s", "Author", plugin->getAuthor());
+                        ImGui::Text("%7s: %s", "Version", plugin->getVersion());
+                        ImGui::Text("%7s: %s", "Path", plugin->getPath());
+                        ImGui::Text("%7s: %s", "Status", plugin->getPluginStatusString());
                         
-                        constexpr const char* reloadLabel = "Reload";
+                        constexpr const char* reloadLabel = ICON_MD_REFRESH;
                         std::string labelBuf = reloadLabel;
-                        labelBuf += "##";
-                        labelBuf += key;
-
+                        labelBuf += "##reload-";
+                        labelBuf += key;        
+                        ImGui::BeginDisabled(plugin->isReloadAble());
                         if (ImGui::Button(labelBuf.c_str())) {
                             // send reload 
                             addJsCommand(JsCommandType::PluginReload, strdup(key.c_str()), key.length(), true);
                         }
+                        ImGui::EndDisabled();
+
+                        // open url
+                        labelBuf = ICON_MD_OPEN_IN_BROWSER;
+                        labelBuf += "##openUrl-";
+                        labelBuf += key;
+                        ImGui::SameLine();
+                        ImGui::BeginDisabled(plugin->isUrlEmpty());
+                        if (ImGui::Button(labelBuf.c_str())) {
+                            // open 
+                            openUrlWithDefaultBrowser(plugin->getUrl());
+                        }
+                        ImGui::EndDisabled();
+
                         ImGui::Separator();
                     }
                 }
@@ -1236,6 +1302,9 @@ namespace sight {
         if (windowStatus.generateResultWindow) {
             showGenerateResultWindow();
         }
+        if (windowStatus.entityInfoWindow) {
+            showEntityInfoWindow();
+        }
 
         nodeEditorFrameEnd();
 
@@ -1290,7 +1359,9 @@ namespace sight {
                 break;
             }
             case UICommandType::RunScriptFile:{
+                // 
                 auto isolate = g_UIStatus->isolate;
+                v8::HandleScope handleScope(isolate);
                 auto module = v8::Object::New(isolate);
                 if (runJsFile(isolate, command->args.argString, nullptr, module) == CODE_OK) {
                     // 
@@ -1367,6 +1438,7 @@ namespace sight {
                                           true,
                                           &io,
                                           false,
+                                          getSightSettings()->windowStatus,
                                   });
         UIStatus & uiStatus = *g_UIStatus;
         uiStatus.uvAsync = new uv_async_t();
@@ -1627,10 +1699,10 @@ namespace sight {
 
         g_UIStatus->entityOperations.reset();
         g_UIStatus->v8GlobalContext.Reset();
-        delete g_UIStatus->arrayBufferAllocator;
-        g_UIStatus->arrayBufferAllocator = nullptr;
         g_UIStatus->isolate->Dispose();
         g_UIStatus->isolate = nullptr;
+        delete g_UIStatus->arrayBufferAllocator;
+        g_UIStatus->arrayBufferAllocator = nullptr;
 
         // free uv
         uv_loop_close(g_UIStatus->uvLoop);
@@ -1798,6 +1870,12 @@ namespace sight {
         } else {
             g_UIStatus->windowStatus.generateResultWindow = true;
         }
+    }
+
+    void openEntityInfoWindow(std::string_view entityName) {
+        g_UIStatus->createEntityData.showInfoEntityName = entityName;
+
+        showOrFocusWindow(g_UIStatus->windowStatus.entityInfoWindow, WINDOW_LANGUAGE_KEYS.entityInfo);
     }
 
 

@@ -83,7 +83,7 @@ namespace sight {
         char name[NAME_BUF_SIZE] = {0};
         char templateAddress[NAME_BUF_SIZE] = {0};
         struct EntityField* first = nullptr;
-
+        std::string showInfoEntityName;
 
         void addField();
 
@@ -131,24 +131,6 @@ namespace sight {
          */
         EntityField* findSelectedEntity(int *statusCode, bool resetOthers = false);
 
-    };
-
-    struct UIWindowStatus {
-        bool nodeGraph = false;
-        bool createEntity = false;
-        bool testWindow = false;
-        bool aboutWindow = false;
-        bool projectSettingsWindow = false;
-        bool entityListWindow = false;
-        bool generateResultWindow = false;
-
-        bool layoutReset = false;
-
-        // popups
-        bool popupGraphName = false;
-        bool popupAskModal = false;
-        bool popupSaveModal = false;
-        bool popupAlertModal = false;
     };
 
     struct UIColors {
@@ -265,7 +247,7 @@ namespace sight {
         bool needInit = false;
         ImGuiIO* io;
         bool closeWindow = false;
-        struct UIWindowStatus windowStatus;
+        struct UIWindowStatus& windowStatus;
         struct UICreateEntity createEntityData;
         struct LoadingStatus loadingStatus;
         class Selection selection;
@@ -281,7 +263,6 @@ namespace sight {
         struct KeyBindings* keybindings = nullptr;
 
         // others
-        // absl::flat_hash_map<std::string, CommonOperation> entityOperations;
         struct EntityOperations entityOperations;
 
         // for execute js code in ui thread.
@@ -385,5 +366,16 @@ namespace sight {
     void openAlertModal(std::string_view title = "Alert!", std::string_view content = "");
 
     void openGenerateResultWindow(std::string const& source, std::string const& text);
+
+    void openEntityInfoWindow(std::string_view entityName);
+
+
+    void inline showOrFocusWindow(bool& flag, std::string_view windowName){
+        if (flag) {
+            ImGui::SetWindowFocus(windowName.data());
+        } else {
+            flag = true;
+        }
+    }
 
 }

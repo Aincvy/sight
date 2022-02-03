@@ -63,6 +63,19 @@ namespace sight {
             sightSettings.autoSave = n.as<bool>();
         }
 
+        n = root["windowStatus"];
+        if (n.IsDefined()) {
+            auto& windowStatus = sightSettings.windowStatus;
+            windowStatus.nodeGraph = n["nodeGraph"].as<bool>();
+            windowStatus.createEntity = n["createEntity"].as<bool>();
+            windowStatus.testWindow = n["testWindow"].as<bool>();
+            windowStatus.aboutWindow = n["aboutWindow"].as<bool>();
+            windowStatus.projectSettingsWindow = n["projectSettingsWindow"].as<bool>();
+            windowStatus.entityListWindow = n["entityListWindow"].as<bool>();
+            windowStatus.entityInfoWindow = n["entityInfoWindow"].as<bool>();
+            windowStatus.generateResultWindow = n["generateResultWindow"].as<bool>();
+        }
+
         return CODE_OK;
     }
 
@@ -74,6 +87,20 @@ namespace sight {
         out << YAML::Key << "networkListenPort" << YAML::Value << sightSettings.networkListenPort;
         out << YAML::Key << "lastOpenProject" << YAML::Value << sightSettings.lastOpenProject;
         out << YAML::Key << "autoSave" << YAML::Value << sightSettings.autoSave;
+
+        // windows status
+        out << YAML::Key << "windowStatus" << YAML::Value << YAML::BeginMap;
+        auto& windowStatus = sightSettings.windowStatus;
+        out << YAML::Key << "nodeGraph" << YAML::Value << windowStatus.nodeGraph;
+        out << YAML::Key << "createEntity" << YAML::Value << windowStatus.createEntity;
+        out << YAML::Key << "testWindow" << YAML::Value << windowStatus.testWindow;
+        out << YAML::Key << "aboutWindow" << YAML::Value << windowStatus.aboutWindow;
+        out << YAML::Key << "projectSettingsWindow" << YAML::Value << windowStatus.projectSettingsWindow;
+        out << YAML::Key << "entityListWindow" << YAML::Value << windowStatus.entityListWindow;
+        out << YAML::Key << "entityInfoWindow" << YAML::Value << windowStatus.entityInfoWindow;
+        out << YAML::Key << "generateResultWindow" << YAML::Value << windowStatus.generateResultWindow;
+    
+        out << YAML::EndMap;
 
         out << YAML::EndMap;
         std::ofstream fOut(sightSettings.path, std::ios::out | std::ios::trunc);

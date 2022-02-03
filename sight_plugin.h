@@ -52,6 +52,7 @@ namespace sight {
         const char* getVersion() const;
         const char* getAuthor() const;
         const char* getUrl() const;
+        bool isUrlEmpty() const;
 
         int reload();
 

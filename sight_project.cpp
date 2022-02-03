@@ -632,6 +632,19 @@ namespace sight {
         return this->entitiesMap;
     }
 
+    SightEntity const* Project::getSightEntity(std::string_view fullName) const {
+        return const_cast<Project*>(this)->getSightEntity(fullName);
+    }
+
+    SightEntity* Project::getSightEntity(std::string_view fullName) {
+        auto iter = entitiesMap.find(fullName);
+        if (iter == entitiesMap.end()) {
+            return nullptr;
+        }
+
+        return &iter->second;
+    }
+
     bool Project::addEntity(SightEntity const& entity) {
         if (this->entitiesMap.contains(entity.templateAddress)) {
             return false;
@@ -1175,6 +1188,15 @@ namespace sight {
 
     std::string SightEntity::getSimpleName() const {
         return getLastAfter(name, ".");
+    }
+
+    std::string SightEntity::getPackageName() const {
+        auto pos = name.rfind(".");
+        if (pos == std::string::npos) {
+            return {};    // no package name
+        }
+
+        return name.substr(0, pos);
     }
 
     SightEntity::operator SightNodeTemplateAddress() const {
