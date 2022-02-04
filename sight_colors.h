@@ -149,3 +149,10 @@
 #define KNOWNIMGUICOLOR_YELLOW IM_COL32(255,255,0,255)
 #define KNOWNIMGUICOLOR_YELLOWGREEN IM_COL32(154,205,50,255)
 #endif // NO_IMGUIKNOWNCOLOR_DEFINITIONS
+
+namespace sight {
+
+    static const ImVec4 colorRed = ImColor(KNOWNIMGUICOLOR_RED);
+    static const ImVec4 colorGrey = ImColor(KNOWNIMGUICOLOR_GRAY);
+
+}

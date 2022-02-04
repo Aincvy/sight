@@ -1,5 +1,5 @@
 this.info = {
-    name: 'sight-imgui-plugin',
+    name: 'sight-entity-plus-plugin',
     version: '1.0',
     author: 'aincvy(aincvy@gmail.com)',
     disabled: false,

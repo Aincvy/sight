@@ -7,6 +7,7 @@
 #include "sight.h"
 #include "sight_address.h"
 #include "sight_keybindings.h"
+#include "sight_colors.h"
 
 #include "imgui.h"
 #include "sight_nodes.h"

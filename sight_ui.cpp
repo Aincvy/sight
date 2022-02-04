@@ -15,6 +15,7 @@
 #include "sight_project.h"
 #include "sight_util.h"
 #include "sight_undo.h"
+#include "sight_colors.h"
 
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -66,8 +67,6 @@ static std::atomic<bool> uiCommandFree = true;
 namespace sight {
 
     using directory_iterator = std::filesystem::directory_iterator;
-
-    const ImVec4 UIColors::red = rgba(255, 0, 0, 255);
 
     namespace {
         // private members and functions.
@@ -264,8 +263,13 @@ namespace sight {
                 // if (p) {
                 //     dbg(serializeJsNode(*p));
                 // }
-                // addJsCommand(JsCommandType::Test, "/Volumes/mac_extend/Project/sight/scripts/run_in_test.js");
-                currentProject()->parseAllGraphs();
+                // currentProject()->parseAllGraphs();
+                static std::vector<SightEntityField> fields;
+                fields.push_back({"age","int",""});
+                fields.push_back({"real","int","0"});
+                fields.push_back({"name","string","no-name"});
+                std::swap(fields[0], fields[2]);
+                dbg(fields[0].name);
             }
             if (ImGui::MenuItem("Crash")) {
                 // produce a crash for test.
@@ -474,7 +478,7 @@ namespace sight {
                 
             } else if (selection.selectedNodeOrLinks.size() > 1) {
                 ImGui::Text("%zu nodes is selected.", selection.selectedNodeOrLinks.size());
-                ImGui::TextColored(UIColors::red, "Now, we do not support mutiple items edit.");
+                ImGui::TextColored(colorRed, "Now, we do not support mutiple items edit.");
             } else {
                 auto node = selection.getSelectedNode();
                 SightNodeConnection* connection = nullptr;
@@ -687,7 +691,6 @@ namespace sight {
                 ImGui::SameLine();
                 if (ImGui::Button(ICON_MD_REMOVE)) {
                     createEntityData.deleteSelected();
-                    createEntityData.resetFieldsStatus(true, true);
                 }
                 ImGui::SameLine();
                 if (ImGui::ArrowButton("^", ImGuiDir_Up)) {
@@ -711,8 +714,11 @@ namespace sight {
                     ImGui::TableSetupColumn(COMMON_LANGUAGE_KEYS.fieldDefaultValue);
                     ImGui::TableHeadersRow();
 
-                    auto p = createEntityData.first;
-                    while (p) {
+                    auto index = -1;
+                    for(auto& item: createEntityData.fields){
+                        index++;
+                        auto p = &item;
+
                         // show
                         ImGui::TableNextRow();
 
@@ -731,13 +737,13 @@ namespace sight {
 
                         } else {
                             ImGui::TableSetColumnIndex(0);
-                            bool oldSelected = p->selected;
+                            bool oldSelected = createEntityData.selectedFieldIndex == index;
                             sprintf(buf, "##.%d", inputTextId++);
-                            if (ImGui::Selectable(buf, &p->selected, ImGuiSelectableFlags_SpanAllColumns)) {
+                            if (ImGui::Selectable(buf, oldSelected, ImGuiSelectableFlags_SpanAllColumns)) {
                                 if (!ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKeyModFlags_Ctrl))) {
                                     g_UIStatus->createEntityData.resetFieldsStatus(true, true);
                                 }
-                                p->selected = true;
+                                createEntityData.selectedFieldIndex = index;
                                 if (oldSelected) {
                                     p->editing = true;
                                 }
@@ -751,8 +757,6 @@ namespace sight {
                             ImGui::TableSetColumnIndex(2);
                             ImGui::Text("%s", p->defaultValue);
                         }
-
-                        p = p->next;
                     }
 
                     ImGui::EndTable();
@@ -760,11 +764,6 @@ namespace sight {
 
                 ImGui::Dummy(ImVec2(0,3));
                 ImGui::Separator();
-                // preview
-                ImGui::Text("%s (%s)", COMMON_LANGUAGE_KEYS.preview, COMMON_LANGUAGE_KEYS.readonly);
-                ImGui::PushStyleColor(ImGuiCol_Text, g_UIStatus->uiColors->readonlyText);
-                ImGui::InputTextMultiline("##preview", buf, NAME_BUF_SIZE, ImVec2(0,0), ImGuiInputTextFlags_ReadOnly);
-                ImGui::PopStyleColor();
 
                 auto resetDataAndCloseWindow = []() {
                     g_UIStatus->createEntityData.reset();
@@ -815,7 +814,9 @@ namespace sight {
                 }
                 ImGui::SameLine();
                 if (ImGui::Button(COMMON_LANGUAGE_KEYS.cancel)) {
-                    g_UIStatus->windowStatus.createEntity = false;
+                    // createEntityData.reset();
+                    // g_UIStatus->windowStatus.createEntity = false;
+                    resetDataAndCloseWindow();
                 }
                 if (createEntityData.isEditMode()) {
                     // In edit mode
@@ -1880,184 +1881,54 @@ namespace sight {
 
 
     void UICreateEntity::addField() {
-        auto p = (struct EntityField*) calloc(1, sizeof (struct EntityField));
-
-        auto t = findAttachTo();
-        if (!t) {
-            first = p;
-        } else {
-            t->next = p;
-            p->prev = t;
-        }
-    }
-
-    EntityField *UICreateEntity::findAttachTo() {
-        EntityField* c = first;
-        while ( c ) {
-            if (!c->next) {
-                break;
-            }
-
-            c = c->next;
-        }
-
-        return c;
+        fields.push_back({ .editing = true });
+        selectedFieldIndex = fields.size() - 1;
     }
 
     void UICreateEntity::resetFieldsStatus(bool editing, bool selected) {
-        auto c = this->first;
-        while (c) {
+        for(auto& item: fields){
             if (editing) {
-                c->editing = false;
+                item.editing = false;
             }
-            if (selected) {
-                c->selected = false;
-            }
-
-            c = c->next;
+        }
+        if (selected) {
+            selectedFieldIndex = -1;
         }
     }
 
     EntityField *UICreateEntity::lastField() {
-        auto c = first;
-        while (c) {
-            if (!c->next) {
-                break;
-            }
-            c = c->next;
+        if (fields.empty()) {
+            return nullptr;
         }
-        return c;
+        return & fields.back();
     }
 
     int UICreateEntity::deleteSelected() {
-        auto c = first;
-        auto count = 0;
-        while (c) {
-            if (c->selected) {
-                // delete
-                count++;
-                auto t = c;
-                if (c->prev) {
-                    c->prev->next = c->next;
-                    if (c->next) {
-                        c->next->prev = c->prev;
-                    }
-                } else {
-                    // no previous element, this is the first element.
-                    first = c->next;
-                    if (first) {
-                        first->prev = nullptr;
-                    }
+        if (selectedFieldIndex >= 0 && selectedFieldIndex < fields.size()) {
+            fields.erase(fields.begin() + selectedFieldIndex);
+            if (!fields.empty()) {
+                if (selectedFieldIndex >= fields.size()) {
+                    selectedFieldIndex = fields.size() - 1;
                 }
-
-                free(t);
             }
-            c = c->next;
+            
+            return 1;
         }
-
-        return count;
+        return 0;
     }
 
     void UICreateEntity::moveItemUp() {
-        int statusCode = 0;
-        auto p = findSelectedEntity(&statusCode, true);
-
-        if (!p || !p->prev) {
-            return;
-        }
-
-        // swap p and p->prev
-        auto a = p->prev;
-        if (a->prev) {
-            a->prev->next = p;
-            p->prev = a->prev;
-            auto b = p->next;
-
-            p->next = a;
-            a->prev = p;
-
-            a->next = b;
-            if (b) {
-                b->prev = a;
-            }
-        } else {
-            // a is the first element.
-            first = p;
-            p->prev = nullptr;
-            auto b = p->next;
-
-            a->prev = p;
-            p->next = a;
-
-            a->next = b;
-            if (b) {
-                b->prev = a;
-            }
+        if (selectedFieldIndex >= 1) {
+            std::swap(fields[selectedFieldIndex], fields[selectedFieldIndex - 1]);
+            selectedFieldIndex--;
         }
     }
 
     void UICreateEntity::moveItemDown() {
-        int statusCode = 0;
-        auto p = findSelectedEntity(&statusCode, true);
-
-        if (!p || !p->next) {
-            return;
+        if (selectedFieldIndex < fields.size() - 1) {
+            std::swap(fields[selectedFieldIndex], fields[selectedFieldIndex + 1]);
+            selectedFieldIndex++;
         }
-
-        // swap p and p->next
-        auto a = p->next;
-        if (a->next) {
-            a->next->prev = p;
-            p->next = a->next;
-            auto b = p->prev;
-
-            p->prev = a;
-            a->next = p;
-
-            a->prev = b;
-            if (b) {
-                b->next = a;
-            } else {
-                first = a;
-            }
-
-        } else {
-            // a is the last element.
-            p->next = nullptr;
-            auto b = p->prev;
-
-            p->prev = a;
-            a->next = p;
-
-            a->prev = b;
-            if (b) {
-                b->next = a;
-            } else {
-                first = a;
-            }
-        }
-    }
-
-    EntityField *UICreateEntity::findSelectedEntity(int *statusCode, bool resetOthers) {
-        auto c = first;
-
-        EntityField *r = nullptr;
-        while (c) {
-            if (c->selected) {
-                if (r) {
-                    *statusCode = -1;
-                    if (resetOthers) {
-                        c->selected = false;
-                    }
-                } else {
-                    r = c;
-                }
-            }
-
-            c = c->next;
-        }
-
-        return r;
     }
 
     void UICreateEntity::loadFrom(struct SightNode *node) {
@@ -2102,16 +1973,9 @@ namespace sight {
         sprintf(this->templateAddress, "");
         this->editingEntity = {};
         this->edit = false;
+        this->selectedFieldIndex = -1;
 
-        auto c = first;
-        while (c) {
-            auto t = c;
-            c = c->next;
-
-            free(t);
-        }
-
-        first = nullptr;
+        fields.clear();
     }
 
     bool UICreateEntity::isEditMode() const {

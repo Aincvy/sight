@@ -2,6 +2,7 @@
 //
 #pragma once
 #include "imgui.h"
+#include "sight_colors.h"
 #include "uv.h"
 
 #include "sight.h"
@@ -67,11 +68,7 @@ namespace sight {
         char name[NAME_BUF_SIZE] = {0};
         char type[NAME_BUF_SIZE] = {0};
         char defaultValue[NAME_BUF_SIZE] = {0};
-        bool selected = false;
         bool editing = false;
-
-        struct EntityField* next = nullptr;
-        struct EntityField* prev = nullptr;
     };
 
     /**
@@ -82,11 +79,19 @@ namespace sight {
         SightEntity editingEntity{};
         char name[NAME_BUF_SIZE] = {0};
         char templateAddress[NAME_BUF_SIZE] = {0};
-        struct EntityField* first = nullptr;
+        // struct EntityField* first = nullptr;
+        std::vector<EntityField> fields;
         std::string showInfoEntityName;
+        int selectedFieldIndex = -1;
 
         void addField();
 
+        /**
+         * @brief 
+         * 
+         * @param editing  reset editing ?
+         * @param selected  reset selected ?
+         */
         void resetFieldsStatus(bool editing = false, bool selected = false);
 
         EntityField* lastField();
@@ -116,34 +121,13 @@ namespace sight {
         bool isEditMode() const;
 
     private:
-
-        /**
-         * For internal use.
-         * @return
-         */
-        EntityField* findAttachTo();
-
-        /**
-         *
-         * @param statusCode if has more than 1 select item, it will be -1, otherwise 0.
-         * @param resetOthers
-         * @return The first selected element. First by index,not user's selection index.
-         */
-        EntityField* findSelectedEntity(int *statusCode, bool resetOthers = false);
-
     };
 
     struct UIColors {
-
-        ImU32 grey = IM_COL32(128,128,128,255);
-        ImU32 white = IM_COL32(255,255,255,255);
-
-        ImU32 readonlyText = grey;
+        ImU32 readonlyText = KNOWNIMGUICOLOR_GRAY;
         // ImU32 nodeIdText = IM_COL32(40,56,69,255);
         ImVec4 nodeIdText = rgb(51, 184, 255);
         ImVec4 errorText = rgba(239, 35, 60, 255);
-
-        const static ImVec4 red;
 
         UIColors();
     };
@@ -249,6 +233,7 @@ namespace sight {
         bool closeWindow = false;
         struct UIWindowStatus& windowStatus;
         struct UICreateEntity createEntityData;
+        // struct SightEntity createEntityData;
         struct LoadingStatus loadingStatus;
         class Selection selection;
         struct UIBuffer buffer;

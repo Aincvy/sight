@@ -10,11 +10,9 @@ namespace sight {
         entity.name = createEntityData.name;
         entity.templateAddress = createEntityData.templateAddress;
 
-        auto c = createEntityData.first;
-        while (c) {
+        for( const auto& item: createEntityData.fields){
+            auto c = &item;
             entity.fields.emplace_back(c->name, c->type, c->defaultValue);
-
-            c = c->next;
         }
 
         entity.fixTemplateAddress();
