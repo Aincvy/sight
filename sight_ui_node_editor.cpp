@@ -16,6 +16,7 @@
 #include "sight_widgets.h"
 #include <cassert>
 #include <iostream>
+#include <iterator>
 #include <string_view>
 #include <sys/stat.h>
 #include <vector>
@@ -1449,6 +1450,43 @@ namespace sight {
             }
             openGraphFunc();
         });
+    }
+
+    bool showNodePortType(NodePortType& portType) {
+        // combo box
+        static const char* strings[] = {"Input", "Output", "Both", "Field"};
+        const int offset = static_cast<int>(NodePortType::Input);
+        int value = static_cast<int>(portType) - offset;
+        assert(value >= 0 && value < std::size(strings));
+
+        bool f = false;
+        if (ImGui::BeginCombo("PortType", strings[value])) {
+            for (int i = 0; i < std::size(strings); i++) {
+                if (ImGui::Selectable(strings[i], i == value)) {
+                    value = i;
+                    portType = static_cast<NodePortType>(value + offset);
+                    f = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        return f;
+    }
+
+    void showPortOptions(SightNodePortOptions& options) {
+        ToggleButton("Show", &options.show);
+        ImGui::SameLine();
+        ImGui::Text("Show");
+        ImGui::SameLine();
+        ToggleButton("ShowValue", &options.showValue);
+        ImGui::SameLine();
+        ImGui::Text("ShowValue");
+        ImGui::SameLine();
+        ToggleButton("Readonly", &options.readonly);
+        ImGui::SameLine();
+        ImGui::Text("Readonly");
+
+        // return false;
     }
 
     bool isNodeEditorReady() {

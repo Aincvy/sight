@@ -32,6 +32,9 @@
 #include "v8pp/convert.hpp"
 #include "v8pp/class.hpp"
 
+#include "absl/strings/numbers.h"
+#include "absl/strings/str_split.h"
+
 
 // node editor status
 static sight::NodeEditorStatus* g_NodeEditorStatus;
@@ -1877,6 +1880,59 @@ namespace sight {
         }
     }
 
+    uint SightNodeValue::getType() const {
+        return this->type;
+    }
+
+    bool SightNodeValue::setValue(std::string_view str) {
+
+        auto vectorData = [this, str](const int size) {
+            std::vector<std::string> data = absl::StrSplit(str, ",");
+            if (data.size() != size) {
+                return false;
+            }
+
+            auto p = u.vector3;
+            for (int i = 0; i < data.size(); i++) {
+                float f = 0;
+                if (!absl::SimpleAtof(data[i], &f)) {
+                    return false;
+                }
+                p[i] = f;
+            }
+            return true;
+        };
+
+        switch (type) {
+        case IntTypeInt:
+        case IntTypeLong:
+            return absl::SimpleAtoi(str, &u.i);
+        case IntTypeString:
+            if (str.length() >= std::size(u.string)) {
+                return false;
+            }
+            // sprintf(u.string, "%s", str.data());
+            str.copy(u.string, std::size(u.string));
+            return true;
+        case IntTypeLargeString:
+            stringCopy(std::string{ str.data() });
+            return true;
+        case IntTypeBool:
+            return absl::SimpleAtob(str, &u.b);
+        case IntTypeFloat:
+            return absl::SimpleAtof(str, &u.f);
+        case IntTypeDouble:
+            return absl::SimpleAtod(str, &u.d);
+        case IntTypeVector3:
+            return vectorData(3);
+        case IntTypeVector4:
+        case IntTypeColor:
+            return vectorData(4);
+        }
+
+        return false;
+    }
+
     void SightNodeValue::stringInit() {
         auto & largeString = u.largeString;
         // largeString.bufferSize = NAME_BUF_SIZE * 2;
@@ -1923,18 +1979,6 @@ namespace sight {
     {
         setType(type);
     }
-
-    // SightNodeValue SightNodeValue::copy(int type) const {
-    //     SightNodeValue tmp;
-        
-    //     if (type == IntTypeLargeString) {
-    //         // large string
-    //         tmp.stringCopy(this->u.largeString.pointer);
-    //     } else {
-    //         memcpy(tmp.u.string, this->u.string, std::size(this->u.string));
-    //     }
-    //     return tmp;
-    // }
 
     SightNodeValue::SightNodeValue(SightNodeValue const& rhs)
     {

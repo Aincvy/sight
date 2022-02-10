@@ -108,4 +108,15 @@ namespace sight {
      */
     void uiChangeGraph(const char* path);
     
+    /**
+     * @brief Render as combo box
+     * 
+     * @param portType 
+     * @return true   value changed!
+     * @return false 
+     */
+    bool showNodePortType(NodePortType& portType);
+
+    void showPortOptions(SightNodePortOptions& options);
+
 }

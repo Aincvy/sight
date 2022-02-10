@@ -5,6 +5,7 @@
 
 #include <future>
 #include <string>
+#include <string_view>
 
 #include "sight_defines.h"
 
@@ -40,6 +41,15 @@ namespace sight {
          * dispose command
          */
         void dispose();
+
+        /**
+         * @brief Copy from a string.  use `strdup()`
+         * 
+         * @param str 
+         * @return CommandArgs 
+         */
+        static CommandArgs copyFrom(std::string_view str);
+        
     };
 
     enum ErrorCode {
@@ -69,6 +79,28 @@ namespace sight {
         CODE_NO_TEMPLATE_ADDRESS,
         CODE_GRAPH_BROKEN,
         CODE_NODE_HAS_CONNECTIONS,
+    };
+
+    enum TypeIntValues {
+        IntTypeProcess = 1,
+
+        IntTypeInt = 100,
+        IntTypeFloat,
+        IntTypeDouble,
+        IntTypeChar,
+        IntTypeString,
+        IntTypeBool,
+        IntTypeLong,
+        IntTypeColor,
+        IntTypeVector3,
+        IntTypeVector4,
+        IntTypeObject,
+        // a large string.
+        IntTypeLargeString,
+        // render as a button
+        IntTypeButton,
+
+        IntTypeNext = 3000,
     };
 
     struct UIWindowStatus {
@@ -103,6 +135,8 @@ namespace sight {
         UIWindowStatus windowStatus;
 
         bool autoSave = false;
+
+        std::string lastUseEntityOperation = "";
     };
 
     /**

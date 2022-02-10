@@ -13,9 +13,9 @@
 
 #include "yaml-cpp/yaml.h"
 
+#include "sight.h"
 #include "sight_colors.h"
 #include "sight_defines.h"
-#include "sight_project.h"
 #include "sight_memory.h"
 
 #include "v8.h"
@@ -62,6 +62,7 @@ namespace sight {
     struct SightJsNode;
     struct SightJsNodePort;
     struct SightNodePortHandle;
+    struct SightEntity;
 
     struct SightNodeValue{
         union {
@@ -82,6 +83,14 @@ namespace sight {
         } u;
         
         void setType(uint type);
+        uint getType() const;
+
+        /**
+         * @brief Set the Value object from a string.
+         * You must call setType(type) first.
+         * @param str 
+         */
+        bool setValue(std::string_view str);
 
         // if this union is largeString, then you can call below functions.
         // if not, DO NOT call those functions.
@@ -125,8 +134,8 @@ namespace sight {
         bool showValue = false;
         // if false, this node port will be hidden.
         bool show = true;
-        std::string errorMsg;
         bool readonly = false;
+        std::string errorMsg;
         // render as a combo box 
         std::vector<std::string> alternatives;
     };

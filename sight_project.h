@@ -15,6 +15,9 @@
 
 #include "absl/container/btree_map.h"
 #include "v8.h"
+#include "sight.h"
+
+#include "sight_nodes.h"
 
 namespace sight {
 
@@ -22,28 +25,6 @@ namespace sight {
     class SightNodeGraph;
     struct SightNodePort;
     struct SightNodeTemplateAddress;
-
-    enum TypeIntValues {
-        IntTypeProcess = 1,
-
-        IntTypeInt = 100,
-        IntTypeFloat,
-        IntTypeDouble,
-        IntTypeChar,
-        IntTypeString,
-        IntTypeBool,
-        IntTypeLong,
-        IntTypeColor,
-        IntTypeVector3,
-        IntTypeVector4,
-        IntTypeObject,
-        // a large string.
-        IntTypeLargeString,
-        // render as a button
-        IntTypeButton,
-
-        IntTypeNext = 3000,
-    };
 
     enum class TypeInfoRenderKind {
         Default,
@@ -140,10 +121,18 @@ namespace sight {
         std::atomic<uint> nodeOrPortId = 3000;
     };
 
+    struct SightEntityFieldOptions {
+        NodePortType portType = NodePortType::Both;
+        SightNodePortOptions portOptions;
+
+        int portTypeValue() const;
+    };
+
     struct SightEntityField{
         std::string name;
         std::string type;
         std::string defaultValue;
+        SightEntityFieldOptions options;
 
         SightEntityField() = default;
         SightEntityField(std::string name, std::string type, std::string defaultValue);

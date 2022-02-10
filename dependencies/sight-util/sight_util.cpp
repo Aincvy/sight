@@ -8,6 +8,7 @@
 #include "sstream"
 
 #include <cstring>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <sys/stat.h>
@@ -115,6 +116,42 @@ namespace sight {
         }
 
         return std::string{ source.substr(pos + separator.length()) };
+    }
+
+    std::string removeExcessSpaces(std::string_view str, int indentSpaceCount) {
+        std::stringstream ss;
+        
+        int normalCount = 0;
+        int indentLevel = 0;
+        for (int i = 0; i < str.length(); i++) {
+            char c = str[i];
+            if (c == '\n') {
+                // line  
+                if (normalCount > 0) {
+                    ss << c;
+                } 
+                normalCount = 0;
+            } else if (isspace(c)) {
+                // ss << c;
+            }
+            else {
+                if (c == '}' && indentLevel > 0) {
+                    indentLevel--;
+                }
+
+                if (normalCount <= 0) {
+                    // new line 
+                    ss << std::string(indentLevel * indentSpaceCount, ' ');
+                }
+                normalCount++;
+                ss << c;
+
+                if (c == '{') {
+                    indentLevel++;
+                }
+            }
+        }
+        return ss.str();
     }
 
 }

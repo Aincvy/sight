@@ -150,9 +150,18 @@ namespace sight {
                 out << YAML::Key << item.name << YAML::BeginMap;
                 out << YAML::Key << "type" << YAML::Value << item.type;
                 out << YAML::Key << "defaultValue" << YAML::Value << item.defaultValue;
+
+                out << YAML::Key << "options" << YAML::BeginMap;
+                out << YAML::Key << "portType" << YAML::Value << item.options.portTypeValue();
+                out << YAML::Key << "show" << YAML::Value << item.options.portOptions.show;
+                out << YAML::Key << "showValue" << YAML::Value << item.options.portOptions.showValue;
+                out << YAML::Key << "readonly" << YAML::Value << item.options.portOptions.readonly;
+                out << YAML::EndMap;
+
                 out << YAML::EndMap;
             }
             out << YAML::EndMap;
+
 
             out << YAML::EndMap;
             return out;
@@ -172,6 +181,15 @@ namespace sight {
                 std::string name = item.first.as<std::string>();
                 auto &dataNode = item.second;
                 entity.fields.emplace_back(name, dataNode["type"].as<std::string>(), dataNode["defaultValue"].as<std::string>());
+
+                auto & f = entity.fields.back();
+                auto optionsNode = dataNode["options"];
+                if (optionsNode.IsDefined()) {
+                    f.options.portType = static_cast<NodePortType>(optionsNode["portType"].as<int>());
+                    f.options.portOptions.show = optionsNode["show"].as<bool>();
+                    f.options.portOptions.showValue = optionsNode["showValue"].as<bool>();
+                    f.options.portOptions.readonly = optionsNode["readonly"].as<bool>();
+                }
             }
 
             return entity;
@@ -1211,15 +1229,23 @@ namespace sight {
         for( const auto& item: this->fields){
             SightJsNodePort port{
                 item.name,
-                NodePortType::Both
+                item.options.portType
             };
             port.type = getIntType(item.type);
             port.value.setType(port.type);
+            if (!item.defaultValue.empty()) {
+                port.value.setValue(item.defaultValue);
+            }
+            port.options = item.options.portOptions;
 
             node.addPort(port);
         }
         node.options.titleBarPortType = sight::getIntType(this->name, true);
         registerEntityFunctions(node);
         return address;
+    }
+
+    int SightEntityFieldOptions::portTypeValue() const {
+        return static_cast<int>(portType);
     }
 }

@@ -8,6 +8,7 @@
 #include <map>
 #include <stdio.h>
 #include <sstream>
+#include "IconsMaterialDesign.h"
 #include "dbg.h"
 #include "functional"
 #include <string>
@@ -1433,6 +1434,19 @@ namespace sight {
 
             return true;
         }
+
+        void v8EntityFieldTypedValue(FunctionCallbackInfo<Value> const& args) {
+            auto isolate = args.GetIsolate();
+            auto field = v8pp::class_<SightEntityField>::unwrap_object(isolate, args.This());
+            if (!field || field->defaultValue.empty()) {
+                return args.GetReturnValue().SetUndefined();
+            }
+            
+            SightNodeValue v;
+            v.setType(getIntType(field->type));
+            v.setValue(field->defaultValue);
+            args.GetReturnValue().Set(getPortValue(isolate, v.getType(), v));
+        }
     }
 
 
@@ -1616,11 +1630,20 @@ namespace sight {
         entityModule.set("addOperation", addEntityOperation);
         module.set("entity", entityModule);
 
+        v8pp::class_<SightEntityFieldOptions> entityFieldOptionsClass(isolate);
+        entityFieldOptionsClass
+            .ctor()
+            .set("portType", v8pp::property(&SightEntityFieldOptions::portTypeValue))
+            .set("portOptions", &SightEntityFieldOptions::portOptions);
+        entityFieldOptionsClass.auto_wrap_objects();
+
         v8pp::class_<SightEntityField> entityFieldClass(isolate);
         entityFieldClass.ctor<>()
             .set("name", &SightEntityField::name)
             .set("type", &SightEntityField::type)
-            .set("defaultValue", &SightEntityField::defaultValue);
+            .set("defaultValue", &SightEntityField::defaultValue)
+            .set("options", &SightEntityField::options)
+            .set("v8TypedValue", v8EntityFieldTypedValue);
         entityFieldClass.auto_wrap_objects(true);
         module.set("entityFieldClass", entityFieldClass);
 
@@ -1755,7 +1778,6 @@ namespace sight {
             }
         }
     }
-
 
     void flushJsNodeCache(std::promise<int>* promise /*= nullptr */){
         // send nodes to ui thread.
@@ -2482,10 +2504,19 @@ namespace sight {
             {
                 auto & map = pluginManager()->getPluginMap();
                 auto iter = map.find(command.args.argString);
+                std::string msg;
                 if (iter != map.end()) {
                     iter->second->reload();
                     flushJsNodeCache();
+                    msg = command.args.argString;
+                    msg += " Load Success " ICON_MD_DONE;
+                } else {
+                    msg = ICON_MD_ERROR " Cannot found plugin: ";
+                    msg += command.args.argString;
                 }
+
+                // send ui command
+                addUICommand(UICommandType::PluginReloadOver, CommandArgs::copyFrom(msg));
                 break;
             }
             case JsCommandType::ProjectBuild:

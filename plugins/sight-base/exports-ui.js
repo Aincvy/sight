@@ -24,3 +24,10 @@ globals.checkValue1 = function (obj, key, value, f ) {
 
 // end of node functions
 
+sight.entityFieldClass.prototype.typedValue = function(){
+    let v = this.v8TypedValue();
+    if (_.isString(v)) {
+        return `'${v}'`;
+    }
+    return v;
+}

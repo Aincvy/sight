@@ -2,6 +2,7 @@
 // Created by Aincvy(aincvy@gmail.com) on 2021/7/21.
 //
 
+#include <cstring>
 #include <fstream>
 #include <ostream>
 #include <stdio.h>
@@ -76,6 +77,11 @@ namespace sight {
             windowStatus.generateResultWindow = n["generateResultWindow"].as<bool>();
         }
 
+        n = root["lastUseEntityOperation"];
+        if (n.IsDefined()) {
+            sightSettings.lastUseEntityOperation = n.as<std::string>();
+        }
+
         return CODE_OK;
     }
 
@@ -99,8 +105,9 @@ namespace sight {
         out << YAML::Key << "entityListWindow" << YAML::Value << windowStatus.entityListWindow;
         out << YAML::Key << "entityInfoWindow" << YAML::Value << windowStatus.entityInfoWindow;
         out << YAML::Key << "generateResultWindow" << YAML::Value << windowStatus.generateResultWindow;
-    
-        out << YAML::EndMap;
+        out << YAML::EndMap;        // end of windowStatus
+        
+        out << YAML::Key << "lastUseEntityOperation" << YAML::Value << sightSettings.lastUseEntityOperation;
 
         out << YAML::EndMap;
         std::ofstream fOut(sightSettings.path, std::ios::out | std::ios::trunc);
@@ -142,5 +149,13 @@ namespace sight {
                 dataLength = 0;
             }
         }
+    }
+
+    CommandArgs CommandArgs::copyFrom(std::string_view str) {
+        return {
+            .argString = strdup(str.data()),
+            .argStringLength = static_cast<int>(str.length()),
+            .needFree = true,
+        };
     }
 }     // namespace sight

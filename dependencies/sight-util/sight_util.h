@@ -156,4 +156,12 @@ namespace sight {
      */
     std::string getLastAfter(std::string_view source, std::string_view separator);
 
+    /**
+     * @brief 
+     * 
+     * @param str 
+     * @return std::string 
+     */
+    std::string removeExcessSpaces(std::string_view str, int indentSpaceCount = 2);
+    
 }

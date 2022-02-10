@@ -152,7 +152,6 @@
 
 namespace sight {
 
-    static const ImVec4 colorRed = ImColor(KNOWNIMGUICOLOR_RED);
-    static const ImVec4 colorGrey = ImColor(KNOWNIMGUICOLOR_GRAY);
-
+    inline const ImVec4 colorRed = ImColor(KNOWNIMGUICOLOR_RED);
+    inline const ImVec4 colorGrey = ImColor(KNOWNIMGUICOLOR_GRAY);
 }

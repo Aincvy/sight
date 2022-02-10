@@ -42,6 +42,7 @@ namespace sight {
         // clean data after used.
         RegScriptGlobalFunctions = 300,
         RunScriptFile,
+        PluginReloadOver, 
 
     };
 
@@ -69,6 +70,8 @@ namespace sight {
         char type[NAME_BUF_SIZE] = {0};
         char defaultValue[NAME_BUF_SIZE] = {0};
         bool editing = false;
+
+        SightEntityFieldOptions fieldOptions;
     };
 
     /**
@@ -76,6 +79,7 @@ namespace sight {
      */
     struct UICreateEntity {
         bool edit = false;
+        bool useRawTemplateAddress = false;     // use raw template address string ?
         SightEntity editingEntity{};
         char name[NAME_BUF_SIZE] = {0};
         char templateAddress[NAME_BUF_SIZE] = {0};
@@ -216,6 +220,7 @@ namespace sight {
         absl::flat_hash_map<std::string, CommonOperation> map;
         std::vector<std::string> names;
         int selected = 0;
+        bool init = false;
 
         bool addOperation(const char* name, const char* desc, ScriptFunctionWrapper::Function const& f, bool replace = true);
 
@@ -286,6 +291,14 @@ namespace sight {
      * @param argInt
      */
     void addUICommand(UICommandType type, int argInt = 0);
+
+    /**
+     * @brief 
+     * 
+     * @param type 
+     * @param args do not dispose this command!
+     */
+    void addUICommand(UICommandType type, CommandArgs&& args);
 
     /**
      *

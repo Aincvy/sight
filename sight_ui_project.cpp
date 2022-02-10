@@ -13,9 +13,13 @@ namespace sight {
         for( const auto& item: createEntityData.fields){
             auto c = &item;
             entity.fields.emplace_back(c->name, c->type, c->defaultValue);
+            auto& f = entity.fields.back();
+            f.options = item.fieldOptions;
         }
 
-        entity.fixTemplateAddress();
+        if (!createEntityData.useRawTemplateAddress) {
+            entity.fixTemplateAddress();
+        }
     }
 
     int addEntity(const UICreateEntity& createEntityData) {

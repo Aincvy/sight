@@ -4,7 +4,7 @@
 //     return;
 // }
 if (typeof module.reloading === 'boolean' && module.reloading){
-    print("reloading ...");
+    print("reloading ... jump once!");
     return; 
 }
 

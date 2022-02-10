@@ -83,6 +83,7 @@ namespace sight {
             if ((i = currentProject()->save()) != CODE_OK) {
                 dbg(i);
             }
+            saveSightSettings();
         }
 
         void activeWindowCreateEntity(){
@@ -597,6 +598,8 @@ namespace sight {
         }
 
         void showGenerateResultWindow(){
+            static float showTipsTime = 0;
+            static std::string tipsText{};
 
             if (ImGui::Begin(WINDOW_LANGUAGE_KEYS.generateResult, &g_UIStatus->windowStatus.generateResultWindow)) {
                 auto & data =g_UIStatus->generateResultData;
@@ -604,11 +607,19 @@ namespace sight {
                 const auto windowWidth = ImGui::GetWindowWidth() - 13;
                 const auto windowHeight = ImGui::GetWindowHeight();
                 const auto lineHeight = ImGui::GetFrameHeightWithSpacing() + 2.5f;
+                const auto now = ImGui::GetTime();
 
                 ImGui::InputTextMultiline("##text", data.text.data(), data.text.size(), ImVec2(windowWidth, windowHeight - lineHeight*3), ImGuiInputTextFlags_ReadOnly);
                 if (ImGui::Button(ICON_MD_CONTENT_COPY)) {
                     ImGui::SetClipboardText(data.text.c_str());
+                    tipsText = "Copy Success!";
+                    showTipsTime = now + 2.5f;
                 }
+                if (showTipsTime > now) {
+                    ImGui::SameLine();
+                    ImGui::Text("%s", tipsText.c_str());
+                }
+
             }
             ImGui::End();
         }
@@ -616,6 +627,18 @@ namespace sight {
         void showEntityOperations(SightEntity* sightEntity = nullptr, UICreateEntity* createEntityData = nullptr) {
             auto& entityOperations = g_UIStatus->entityOperations;
             const auto& operationNames = entityOperations.names;
+            if (!entityOperations.init) {
+                entityOperations.init = true;
+                auto lastUse = getSightSettings()->lastUseEntityOperation;
+                if (!lastUse.empty()) {
+                    auto iter = std::find(operationNames.begin(), operationNames.end(), lastUse);
+                    if (iter != operationNames.end()) {
+                        entityOperations.selected = iter - operationNames.begin();
+                    }
+                }
+            }
+
+            
             if (!operationNames.empty()) {
                 const auto width = ImGui::GetWindowWidth();
                 constexpr const auto comboWidth = 110;
@@ -641,16 +664,19 @@ namespace sight {
                         text = o.function.getString(currentUIStatus()->isolate, sightEntity);
                     }
                     
+                    text = removeExcessSpaces(text);
                     openGenerateResultWindow(generateStr, text);     // todo more info about source
                 }
                 ImGui::SameLine(width - comboWidth - generateWidth - 5);
                 ImGui::SetNextItemWidth(comboWidth);
                 if (ImGui::BeginCombo(comboLabel, selectedOperationName)) {
-                    int tmpIndex = 0;
+                    int tmpIndex = -1;
                     for (const auto& item : operationNames) {
-                        bool isSelected = tmpIndex == entityOperations.selected;
+                        bool isSelected = (++tmpIndex) == entityOperations.selected;
                         if (ImGui::Selectable(item.c_str(), isSelected)) {
                             entityOperations.selected = tmpIndex;
+                            
+                            getSightSettings()->lastUseEntityOperation = item;
                         }
 
                         if (isSelected) {
@@ -679,6 +705,9 @@ namespace sight {
                 ImGui::SameLine();
                 ImGui::Text("(%s)", COMMON_LANGUAGE_KEYS.readonly);
                 ImGui::InputText(COMMON_LANGUAGE_KEYS.address, g_UIStatus->createEntityData.templateAddress, NAME_BUF_SIZE);
+                ImGui::SameLine();
+                ImGui::Checkbox("Raw", &createEntityData.useRawTemplateAddress);
+                helpMarker("Use raw string as template address? Which means do not add prefix and suffix.");
                 // maybe need a help marker ?
 
                 ImGui::Separator();
@@ -704,7 +733,6 @@ namespace sight {
                 if (ImGui::Button(ICON_MD_EDIT_OFF)) {
                     createEntityData.resetFieldsStatus(true, true);
                 }
-
 
                 // fields
                 char buf[NAME_BUF_SIZE] = {0};
@@ -762,6 +790,14 @@ namespace sight {
                     ImGui::EndTable();
                 }
 
+                ImGui::Dummy(ImVec2(0, 3));
+                ImGui::Text("Options");
+                if (createEntityData.selectedFieldIndex >= 0) {
+                    auto& field = createEntityData.fields[createEntityData.selectedFieldIndex];
+                    showNodePortType(field.fieldOptions.portType);
+                    showPortOptions(field.fieldOptions.portOptions);
+                }
+
                 ImGui::Dummy(ImVec2(0,3));
                 ImGui::Separator();
 
@@ -778,6 +814,7 @@ namespace sight {
                             nameBuf = getLastAfter(fullName, ".");
                         }
                         
+                        // todo fix with raw
                         std::string nowTemplateAddress = createEntityData.templateAddress;
                         if (!endsWith(nowTemplateAddress, nameBuf)) {
                             // name changed
@@ -1049,7 +1086,7 @@ namespace sight {
                         std::string labelBuf = reloadLabel;
                         labelBuf += "##reload-";
                         labelBuf += key;        
-                        ImGui::BeginDisabled(plugin->isReloadAble());
+                        ImGui::BeginDisabled(!plugin->isReloadAble());
                         if (ImGui::Button(labelBuf.c_str())) {
                             // send reload 
                             addJsCommand(JsCommandType::PluginReload, strdup(key.c_str()), key.length(), true);
@@ -1372,7 +1409,10 @@ namespace sight {
 
                 break;
             }
-
+            case UICommandType::PluginReloadOver:
+                // std::string msg= "";
+                g_UIStatus->toastController.toast("Plugin Reload", command->args.argString);
+                break;
             }
 
         command->args.dispose();
@@ -1730,6 +1770,11 @@ namespace sight {
         addUICommand(command);
     }
 
+    void addUICommand(UICommandType type, CommandArgs&& args) {
+        UICommand command{ type, args };
+        addUICommand(command);
+    }
+
 
     int addUICommand(UICommandType type, void *data, size_t dataLength, bool needFree) {
         UICommand command = {
@@ -1881,7 +1926,7 @@ namespace sight {
 
 
     void UICreateEntity::addField() {
-        fields.push_back({ .editing = true });
+        fields.push_back({});     //  .editing = true
         selectedFieldIndex = fields.size() - 1;
     }
 
@@ -1965,6 +2010,8 @@ namespace sight {
             snprintf(p->name, std::size(p->name), "%s", item.name.c_str());
             snprintf(p->type, std::size(p->type), "%s", item.type.c_str());
             snprintf(p->defaultValue, std::size(p->defaultValue), "%s", item.defaultValue.c_str());
+
+            p->fieldOptions = item.options;
         }
     }
 
@@ -1973,6 +2020,7 @@ namespace sight {
         sprintf(this->templateAddress, "");
         this->editingEntity = {};
         this->edit = false;
+        this->useRawTemplateAddress = false;
         this->selectedFieldIndex = -1;
 
         fields.clear();
