@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cstring>
 #include <iterator>
+#include <string>
 #include <unistd.h>
 #include <vector>
 
@@ -301,16 +302,26 @@ namespace sight {
         //     depends: [],
         // };
 
+        // init something
+        loadFiles.clear();
+        loadFiles.push_back("main.js");
+        loadFiles.push_back("exports.js");
+
+        depends.clear();
+
         auto isolate = this->pluginManager->getIsolate();
         auto context = isolate->GetCurrentContext();
 
         auto loadStringArray = [isolate](std::vector<std::string>& list, v8::Local<v8::Value> valueObject) {
             if (IS_V8_STRING(valueObject)) {
-                list.clear();
-                list.push_back(v8pp::from_v8<std::string>(isolate, valueObject));
+                std::string str = v8pp::from_v8<std::string>(isolate, valueObject);
+                addIfNotExist<std::string>(list, str);
             } else if (valueObject->IsArray()) {
                 // expect array of strings.
-                list = v8pp::from_v8<std::vector<std::string>>(isolate, valueObject);
+                auto tmpList = v8pp::from_v8<std::vector<std::string>>(isolate, valueObject);
+                for( const auto& item: tmpList){
+                    addIfNotExist(list, item);
+                }
             }
         };
 
@@ -347,8 +358,6 @@ namespace sight {
                 }
             } else if (key == "loadFiles") {
                 loadStringArray(loadFiles, valueObject);
-                loadFiles.push_back("main.js");
-                loadFiles.push_back("exports.js");
             } else if (key == "depends") {
                 loadStringArray(depends, valueObject);
             }

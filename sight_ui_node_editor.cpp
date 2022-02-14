@@ -209,7 +209,7 @@ namespace sight {
                 if (g_ContextStatus->isNextNodePositionEmpty()) {
                     g_ContextStatus->nextNodePosition = ImGui::GetMousePos();
                 }
-                for (auto& item : getCurrentNodeStatus()->templateAddressList) {
+                for (auto& item : currentNodeStatus()->templateAddressList) {
                     item.showContextMenu();
                 }
 
@@ -457,7 +457,7 @@ namespace sight {
             auto project = currentProject();
             auto templateNode = node->templateNode;
             if (!templateNode->isStyleInitialized()) {
-                const_cast<SightJsNode*>(templateNode)->updateStyle();
+                const_cast<SightJsNode*>(templateNode)->updateStyle();     // try to optimization, but ... 
             }
             auto& nodeStyle = templateNode->nodeStyle;
 
@@ -662,9 +662,6 @@ namespace sight {
             auto graph = currentGraph();
             auto sightSettings = getSightSettings();
 
-            // auto io = uiStatus.io;
-            // ImGui::Text("FPS: %.2f (%.2gms)", io->Framerate, io->Framerate ? 1000.0f / io->Framerate : 0.0f);
-            // ImGui::SameLine();
             ImGui::SameLine();
             if (ImGui::Button("Parse")) {
                 dbg("Not impl");
@@ -679,7 +676,8 @@ namespace sight {
             ImGui::Checkbox("Auto Save", &(sightSettings->autoSave));
             if (graph->isBroken()) {
                 ImGui::SameLine();
-                ImGui::TextColored(uiStatus.uiColors->errorText, "Graph Broken!");
+                ImGui::TextColored(uiStatus.uiColors->errorText, "Graph Broken: %s" , graph->getBrokenReason().c_str());
+                return CODE_FAIL;
             }
             ImGui::Separator();
 
@@ -950,7 +948,7 @@ namespace sight {
                 graph->save();
             }
 
-            return 0;
+            return CODE_OK;
         }
     }
 
@@ -971,14 +969,18 @@ namespace sight {
             windowTitle += "###Node Editor Graph";
         }
 
-        ImGui::Begin(windowTitle.c_str(), nullptr,
+        bool flag = ImGui::Begin(windowTitle.c_str(), nullptr,
                      ImGuiWindowFlags_NoCollapse |
                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus);
-        if (graph) {
-            showNodes(uiStatus);
+        if (flag) {
+            if (graph) {
+                showNodes(uiStatus);
+            } else {
+                ImGui::Text("Please open a graph.");
+            }
         }
-
+        
         ImGui::End();
 
         return CODE_OK;
@@ -1045,11 +1047,7 @@ namespace sight {
         config.SettingsFile = configFilePath;
         g_ContextStatus->context = ed::CreateEditor(&config);
         g_ContextStatus->lastSyncPositionTime = 0;
-        
-        // ed::SetCurrentEditor(g_ContextStatus->context);
-        // ed::EnableShortcuts(false);
-        // ed::SetCurrentEditor(nullptr);
-
+    
         return CODE_OK;
     }
 
@@ -1084,7 +1082,6 @@ namespace sight {
             if (ImGui::DragFloat(labelBuf, &port->value.u.f, 0.5f, 0, 0, "%.3f", flags)) {
             }
             if (ImGui::IsItemDeactivatedAfterEdit()) {
-                // onNodePortValueChange(port);
                 callOnValueChange();
             }
             break;
@@ -1095,7 +1092,6 @@ namespace sight {
             if (ImGui::InputDouble(labelBuf, &port->value.u.d, 0, 0, "%.6f", flags)) {
             }
             if (ImGui::IsItemDeactivatedAfterEdit()) {
-                // onNodePortValueChange(port);
                 callOnValueChange();
             }
             break;
@@ -1107,7 +1103,6 @@ namespace sight {
             if (ImGui::DragInt(labelBuf, &port->value.u.i, 1, 0, 0, "%d", flags)) {
             }
             if (ImGui::IsItemDeactivatedAfterEdit()) {
-                // onNodePortValueChange(port);
                 callOnValueChange();
             }
             break;
@@ -1152,7 +1147,6 @@ namespace sight {
                     onNodePortAutoComplete(port);
                 }
                 if (ImGui::IsItemDeactivatedAfterEdit()) {
-                    // onNodePortValueChange(port);
                     callOnValueChange();
                 }
             }
@@ -1162,7 +1156,6 @@ namespace sight {
         case IntTypeBool:
         {
             if (checkBox(labelBuf, &port->value.u.b, options.readonly)) {
-                // onNodePortValueChange(port);
                 callOnValueChange();
             }
             break;
@@ -1171,7 +1164,6 @@ namespace sight {
         {
             int flags = options.readonly ? ImGuiColorEditFlags_DefaultOptions_ | ImGuiColorEditFlags_NoInputs : 0;
             if (ImGui::ColorEdit3(labelBuf, port->value.u.vector4, flags)) {
-                // onNodePortValueChange(port);
                 callOnValueChange();
             }
             break;
@@ -1181,7 +1173,6 @@ namespace sight {
             // fixme: vector3 and vector4 has a value change bug.
             int flags = options.readonly ? ImGuiSliderFlags_ReadOnly : 0;
             if (ImGui::DragFloat3(labelBuf, port->value.u.vector3, 1, 0, 0, "%.3f", flags)) {
-                // onNodePortValueChange(port);
                 callOnValueChange();
             }
             break;
@@ -1190,7 +1181,6 @@ namespace sight {
         {
             int flags = options.readonly ? ImGuiSliderFlags_ReadOnly : 0;
             if (ImGui::DragFloat4(labelBuf, port->value.u.vector4, 1, 0, 0, "%.3f", flags)) {
-                // onNodePortValueChange(port);
                 callOnValueChange();
             }
             break;
@@ -1200,7 +1190,6 @@ namespace sight {
             int flags = options.readonly ? ImGuiInputTextFlags_ReadOnly : 0;
             ImGui::SetNextItemWidth(SightNodeFixedStyle::charTypeLength);
             if (ImGui::InputText(labelBuf, port->value.u.string, 2, 0)) {
-                // onNodePortValueChange(port);
                 callOnValueChange();
             }
             break;
@@ -1234,7 +1223,6 @@ namespace sight {
                                               ImVec2(nWidth, 150), flags, callback, &port->value)) {
                 }
                 if (ImGui::IsItemDeactivatedAfterEdit()) {
-                    // onNodePortValueChange(port);
                     callOnValueChange();
                 }
             }
@@ -1425,15 +1413,22 @@ namespace sight {
         return CODE_OK;
     }
 
-    void uiChangeGraph(const char* path) {
+    void uiChangeGraph(std::string_view path) {
         auto g = currentGraph();
 
         auto openGraphFunc = [path]() {
-            char tmp[NAME_BUF_SIZE]{ 0 };
-            auto t = currentProject()->openGraph(path, false, tmp);
+            char tmp[FILENAME_BUF_SIZE]{ 0 };
+            auto t = currentProject()->openGraph(path, tmp);
             if (t) {
-                // open succeed.
-                changeNodeEditorGraph(tmp);
+                // 
+                if (t->verifyId() != CODE_OK) {
+                    t->markBroken(true, " Id has error!");
+                } 
+
+                auto code = changeNodeEditorGraph(tmp);
+                if (code == CODE_OK) {
+                    nodeEditorFrameBegin();      // update node editor context
+                }
             }
         };
         if (g == nullptr || !g->editing) {
@@ -1487,6 +1482,15 @@ namespace sight {
         ImGui::Text("Readonly");
 
         // return false;
+    }
+
+    void uiReloadGraph() {
+        auto g= currentGraph();
+        if (g) {
+            std::string path = g->getFilePath();
+            disposeGraph();
+            uiChangeGraph(path);
+        }
     }
 
     bool isNodeEditorReady() {

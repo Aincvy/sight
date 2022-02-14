@@ -67,12 +67,12 @@ sight.entity.addOperation('templateNode', 'generate addTemplateNode() function c
     let portTemplateText = 
 `<%= port.name%> : {
     type: '<%= port.type%>'
-    <% if(port.defaultValue){ %>defaultValue: <%=port.typedValue()%> <% } %>
+    <% if(port.defaultValue){ %>defaultValue: <%=port.typedValue()%>, <% } %>
     <% let options = port.options.portOptions; %>
-    <% if(!options.show){ %>show: <%=options.show%> <% } %>
-    <% if(options.showValue){ %>showValue: <%=options.showValue%> <% } %>
-    <% if(options.readonly){ %>readonly: <%=options.readonly%> <% } %>
-}`;
+    <% if(!options.show){ %>show: <%=options.show%>, <% } %>
+    <% if(options.showValue){ %>showValue: <%=options.showValue%>, <% } %>
+    <% if(options.readonly){ %>readonly: <%=options.readonly%>, <% } %>
+},`;
 
     let portListTemplateText = 
 `<% for(const field of entity.fields) { %>
@@ -98,9 +98,9 @@ sight.entity.addOperation('templateNode', 'generate addTemplateNode() function c
     },
     __meta_outputs: {
         <%=f.portList(entity,sight.NodePortType.Output)%>
-    }
+    },
     <%=f.portList(entity,sight.NodePortType.Field)%>
-}`;
+});`;
 
     // print(sight.NodePortType.Input, sight.NodePortType.Output, sight.NodePortType.Field, sight.NodePortType.Both );
     let nodeTemplateFunc = _.template(nodeTemplateText);

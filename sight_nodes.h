@@ -585,8 +585,6 @@ namespace sight {
 
         void compact();
 
-        void compileFunctions(Isolate* isolate);
-
         /**
          * instantiate a node by this node.
          * if this node is a template, then instantiate one.
@@ -789,8 +787,6 @@ namespace sight {
         const SightArray <SightNode> & getNodes() const;
         const SightArray <SightNodeConnection> & getConnections() const;
 
-        bool isBroken() const;
-
         SightNodeGraphExternalData& getExternalData();
 
         void callNodeEventsAfterLoad();
@@ -822,10 +818,16 @@ namespace sight {
         void markDirty();
         bool isDirty() const;
 
+        void markBroken(bool broken = true, std::string_view str = {});
+        bool isBroken() const;
+        std::string const& getBrokenReason() const;
+
+
     private:
 
         // save and read path.
         std::string filepath;
+        std::string brokenReason;
         bool broken = false;
 
         // real nodes
@@ -847,6 +849,8 @@ namespace sight {
          * clear data
          */
         void reset();
+
+        void rebuildIdMap();
     };
 
 
@@ -888,6 +892,8 @@ namespace sight {
          */
         SightJsNode* findTemplateNode(const char* path);
 
+        void updateTemplateNodeStyles();
+
     private:
     };
 
@@ -910,7 +916,7 @@ namespace sight {
      *                          In this place, name = address.
      * @return
      */
-    int addTemplateNode(const SightNodeTemplateAddress& templateAddress);
+    int addTemplateNode(const SightNodeTemplateAddress& templateAddress, bool isUpdate = false);
 
     bool delTemplateNode(std::string_view fullName);
 
@@ -920,7 +926,7 @@ namespace sight {
      */
     SightNodeGraph* currentGraph();
 
-    NodeEditorStatus* getCurrentNodeStatus();
+    NodeEditorStatus* currentNodeStatus();
 
     /**
      *

@@ -79,7 +79,7 @@ namespace sight {
         return CURRENT_GRAPH;
     }
 
-    NodeEditorStatus* getCurrentNodeStatus() {
+    NodeEditorStatus* currentNodeStatus() {
         return g_NodeEditorStatus;
     }
 
@@ -498,10 +498,6 @@ namespace sight {
         this->originalOutputPorts.clear();
     }
 
-    void SightJsNode::compileFunctions(Isolate* isolate) {
-
-    }
-
     SightNode* SightJsNode::instantiate(bool generateId) const {
         dbg(this->nodeName);
         auto p = new SightNode();
@@ -649,7 +645,6 @@ namespace sight {
                 auto tmpSize = ImGui::CalcTextSize(tmp.c_str());
                 auto imguiStyle = ImGui::GetStyle();
 
-                // typeStyle.totalWidth = typeStyle.inputWidth + imguiStyle.ItemSpacing.x + tmpSize.x + imguiStyle.ItemInnerSpacing.x * 2;
                 typeStyle.totalWidth = typeStyle.inputWidth + tmpSize.x;
                 if (!isField) {
                     typeStyle.totalWidth += SightNodeFixedStyle::iconSize + imguiStyle.ItemSpacing.x;
@@ -668,11 +663,12 @@ namespace sight {
 
         auto inputOutputTotalWidth = style.inputStype.totalWidth + style.outputStype.totalWidth;
         style.width = std::max(inputOutputTotalWidth, style.fieldStype.totalWidth);
-        if (style.width <= 0) {
-            // do not have any fields or ports
-            style.width = ImGui::CalcTextSize(this->nodeName.c_str()).x;
-            style.width += (SightNodeFixedStyle::iconSize + SightNodeFixedStyle::iconTitlePadding) * 2 + SightNodeFixedStyle::iconTitlePadding * 2;
-        }
+
+        // node name width
+        auto titleBarWidth = ImGui::CalcTextSize(this->nodeName.c_str()).x;
+        titleBarWidth += (SightNodeFixedStyle::iconSize + SightNodeFixedStyle::iconTitlePadding) * 2 + SightNodeFixedStyle::iconTitlePadding * 2;
+
+        style.width = std::max(style.width, titleBarWidth);
         style.initialized = true;
     }
 
@@ -1005,7 +1001,8 @@ namespace sight {
         const int maxNodeOrPortId = currentProject()->maxNodeOrPortId();
 
         auto isIdInvalid = [&nodeIdSet, &portIdSet, &connectionIdSet, maxNodeOrPortId](uint id) {
-            return nodeIdSet.contains(id) || portIdSet.contains(id) || connectionIdSet.contains(id) || id > maxNodeOrPortId;
+            return nodeIdSet.contains(id) || portIdSet.contains(id) || connectionIdSet.contains(id) 
+                    || id > maxNodeOrPortId || id < START_NODE_ID;
         };
 
         auto nodeFunc = [&onPortError, &isIdInvalid, &portIdSet, &status](std::vector<SightNodePort>& list) {
@@ -1093,9 +1090,10 @@ namespace sight {
         };
 
         verifyId(false, nodeFunc, portFunc, connectionFunc);
+        markDirty();
 
         if (rebuildIdMap) {
-            dbg("Need rebuild id map, but not impl!");
+            this->rebuildIdMap();
         }
     }
 
@@ -1105,6 +1103,11 @@ namespace sight {
 
     bool SightNodeGraph::isDirty() const {
         return editing;
+    }
+
+    void SightNodeGraph::markBroken(bool broken, std::string_view str) {
+        brokenReason = std::string(str);
+        this->broken = broken;
     }
 
     const SightArray<SightNodeConnection>& SightNodeGraph::getConnections() const {
@@ -1206,12 +1209,47 @@ namespace sight {
         this->idMap.clear();
     }
 
+    void SightNodeGraph::rebuildIdMap() {
+        idMap.clear();
+
+        auto nodeFunc = [this](std::vector<SightNodePort>& list, SightNode* n){
+            for(auto& item: list){
+                this->idMap[item.getId()] = {
+                    SightAnyThingType::Port,
+                    n,
+                    item.getId(),
+                };
+            }
+        };
+
+        for(auto& item: this->nodes){
+            idMap[item.getNodeId()] = {
+                SightAnyThingType::Node,
+                &item
+            };
+
+            auto p = &item;
+            CALL_NODE_FUNC(p, p);
+        }
+        for(auto& item: this->connections){
+            auto c = &item;
+            idMap[item.connectionId] = {
+                SightAnyThingType::Connection,
+                c
+            };
+        }
+    }
+
     SightArray<SightNode> &SightNodeGraph::getNodes() {
         return this->nodes;
     }
 
     bool SightNodeGraph::isBroken() const {
         return this->broken;
+    }
+
+    std::string const& SightNodeGraph::getBrokenReason() const {
+        return brokenReason;
     }
 
     SightNode *SightAnyThingWrapper::asNode() const {
@@ -1328,7 +1366,7 @@ namespace sight {
         return this->node && this->portId > 0;
     }
 
-    int addTemplateNode(const SightNodeTemplateAddress &templateAddress) {
+    int addTemplateNode(const SightNodeTemplateAddress& templateAddress, bool isUpdate) {
         dbg(templateAddress.name);
         if (templateAddress.name.empty()) {
             return -1;
@@ -1349,12 +1387,14 @@ namespace sight {
                 auto findResult = std::find_if(list->begin(), list->end(), [pointer](SightNodeTemplateAddress const& address) {
                     return address.name == pointer->part;
                 });
-                // templateNode->updateStyle();
+
                 if (findResult == list->end()) {
                     // not found
                     templateNode->compact();
                     auto tmpPointer = g_NodeEditorStatus->templateNodeArray.add(*templateNode);
-                    tmpPointer->compileFunctions(currentUIStatus()->isolate);
+                    if (isUpdate) {   
+                        tmpPointer->nodeStyle.initialized = false;
+                    }
                     auto tmpAddress = SightNodeTemplateAddress(pointer->part, tmpPointer);
                     tmpAddress.setNodeMemoryFromArray();
                     list->push_back(tmpAddress);
@@ -1366,26 +1406,26 @@ namespace sight {
                     auto willCopy = *templateNode;
 
                     // src1: pointers, src2:
-                    auto copyFunc = [](std::vector<SightJsNodePort*>& dst, std::vector<SightJsNodePort*> const& src1, std::vector<SightJsNodePort> const& src2) {
+                    auto copyFunc = [](std::vector<SightJsNodePort*>& dst, std::vector<SightJsNodePort*>& src1, std::vector<SightJsNodePort>& src2) {
                         if (!dst.empty()) {
                             dbg("Oops! dst not empty, clear!");
                             dst.clear();
                         }
-                        // copy pointers
-                        dst.assign(src1.begin(), src1.end());
+                        
+                        auto& templateNodePortArray = g_NodeEditorStatus->templateNodePortArray;
+
+                        // clear old data.
+                        for(auto& item: src1){
+                            templateNodePortArray.remove(item);
+                        }
+                        src1.clear();
 
                         // copy data
-                        auto& templateNodePortArray = g_NodeEditorStatus->templateNodePortArray;
-                        for (int i = 0; i < src2.size(); i++) {
-                            if (i >= dst.size()) {
-                                // add
-                                auto t = templateNodePortArray.add(src2[i]);
-                                dst.push_back(t);
-                            } else {
-                                // copy
-                                *dst[i] = src2[i];
-                            }
+                        for( const auto& item: src2){
+                            dst.push_back(templateNodePortArray.add(item));
                         }
+                        src2.clear();
+
                     };
 
                     // copy and compact
@@ -1394,6 +1434,9 @@ namespace sight {
                     copyFunc(willCopy.inputPorts, findResult->templateNode->inputPorts, willCopy.originalInputPorts);
                     copyFunc(willCopy.outputPorts, findResult->templateNode->outputPorts, willCopy.originalOutputPorts);
 
+                    if (isUpdate) {
+                        willCopy.nodeStyle.initialized = false;
+                    }
                     *findResult->templateNode = willCopy;
                 }
                 break;
@@ -1790,6 +1833,16 @@ namespace sight {
                 status = CODE_GRAPH_BROKEN;
             }
         }
+
+        // fix no-data-port's id.   Happened when template node add any port(s).
+        auto nodeFunc = [](std::vector<SightNodePort> & list){
+            for(auto& item: list){
+                if (item.id <= 0) {
+                    item.id = nextNodeOrPortId();   
+                }
+            }
+        };
+        CALL_NODE_FUNC(nodePointer);
 
         node = nodePointer;
         return status;
@@ -2190,6 +2243,7 @@ namespace sight {
         tmp.value = this->value;
         tmp.portName = this->portName;
         tmp.options = this->options;
+        tmp.id = 0;    // init 
         return tmp;
     }
 
@@ -2255,6 +2309,12 @@ namespace sight {
 
         freeAddress(address);
         return result;
+    }
+
+    void NodeEditorStatus::updateTemplateNodeStyles() {
+        for(auto& item: templateNodeArray){
+            item.updateStyle();
+        }
     }
 
     NodeEditorStatus::NodeEditorStatus() {

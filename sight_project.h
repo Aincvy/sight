@@ -118,7 +118,7 @@ namespace sight {
 
 
     struct ProjectConfig {
-        std::atomic<uint> nodeOrPortId = 3000;
+        std::atomic<uint> nodeOrPortId = START_NODE_ID;
     };
 
     struct SightEntityFieldOptions {
@@ -284,12 +284,12 @@ namespace sight {
         /**
          * @brief Create a Graph object
          * 
-         * @param path 
+         * @param path path, NOT a graph file name
          * @param fixPath if true it will be add pathGraphFolder as prefix. `openGraph` is same.
          * @return SightNodeGraph* 
          */
-        SightNodeGraph* createGraph(const char* path, bool fixPath = true);
-        SightNodeGraph* openGraph(const char* path, bool fixPath = true, char* pathWithoutExtOut = nullptr);
+        SightNodeGraph* createGraph(std::string_view path, char* pathWithoutExtOut = nullptr);
+        SightNodeGraph* openGraph(std::string_view path, char* pathWithoutExtOut = nullptr);
 
         /**
          * @brief if has last open graph, then open it.
@@ -306,6 +306,8 @@ namespace sight {
         std::string pathGraphFolder() const;
         std::string pathPluginsFolder() const;
         std::string pathEntityFolder() const;
+
+        std::string pathGraph(std::string_view graphName) const;
 
         absl::btree_map<std::string, BuildTarget> & getBuildTargetMap();
 

@@ -99,9 +99,15 @@ namespace sight {
             if (p->isAnyGraphHasTemplate(templateAddress, &pathOut)) {
                 // used, cannot be deleted.
                 if (alert) {
-                    std::string contentString = { "Used in graph: " };
+                    std::string contentString{ "Used in graph: " };
                     contentString += pathOut;
-                    openAlertModal("Alert! Operation denied", contentString);
+                    // if (out) {
+                    //     // question
+                    //     contentString += "\nAre you still want to do that?";
+                    //     openAskModal(ICON_MD_QUESTION_MARK, contentString, [](bool f){});
+                    // } else {
+                    // }
+                    openAlertModal(ICON_MD_WARNING " Operation denied", contentString);
                 }
                 return true;
             }
@@ -119,7 +125,7 @@ namespace sight {
                     std::string path = saveFileDialog(currentProject()->pathGraphFolder().c_str());
                     if (!path.empty()) {
                         // create
-                        currentProject()->createGraph(path.c_str(), false);
+                        currentProject()->createGraph(path.c_str());
                     }
                 }
                 ImGui::Separator();
@@ -249,9 +255,20 @@ namespace sight {
                 if (ImGui::MenuItem("VerifyId")) {
                     int c = currentGraph()->verifyId();
                     dbg(c == CODE_OK);
+                    if (c == CODE_OK) {
+                        g_UIStatus->toastController.toast(ICON_MD_SENTIMENT_SATISFIED " Id Fine!", "");
+                    } else {
+                        g_UIStatus->toastController.toast(ICON_MD_ERROR " Id has Error!", "");
+                    }
                 }
                 if (ImGui::MenuItem("CheckAndFixId")) {
-                    currentGraph()->checkAndFixIdError();
+                    auto graph = currentGraph();
+                    graph->checkAndFixIdError();
+                    graph->markBroken(false);
+                    g_UIStatus->toastController.toast(ICON_MD_INFO " Fix Over!", "");
+                }
+                if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.reload)) {
+                    uiReloadGraph();
                 }
                 ImGui::EndMenu();
             }
@@ -829,14 +846,17 @@ namespace sight {
 
                         auto p = currentProject();
                         if (checkTemplateNodeIsUsed(p, createEntityData.editingEntity.templateAddress)) {
-                            // todo update used-entity.
-
+                            // 
+                            if (createEntityData.editingEntity.templateAddress == createEntityData.templateAddress) {
+                                // only allow force update when template address does not changed.
+                                createEntityData.wantUpdateUsedEntity = true;
+                            }
                         }  else {
                             // not used entity.
                             if (updateEntity(createEntityData) == CODE_OK) {
                                 resetDataAndCloseWindow();
                             } else {
-                                dbg("update entity failed.");
+                                g_UIStatus->toastController.toast(ICON_MD_ERROR " Error", "update entity failed.");
                             }
                         }
                     } else {
@@ -851,16 +871,37 @@ namespace sight {
                 }
                 ImGui::SameLine();
                 if (ImGui::Button(COMMON_LANGUAGE_KEYS.cancel)) {
-                    // createEntityData.reset();
-                    // g_UIStatus->windowStatus.createEntity = false;
                     resetDataAndCloseWindow();
                 }
+
                 if (createEntityData.isEditMode()) {
                     // In edit mode
-                    ImGui::SameLine();
-                    ImGui::Text("Edit Mode");
-                }
+                    // ImGui::SameLine();
+                    ImGui::Text("In Edit Mode");
 
+                    if (createEntityData.wantUpdateUsedEntity) {
+                        ImGui::SameLine();
+                        if (ImGui::Button("Force Update")) {
+                            // update
+                            auto askCallBack = [&createEntityData](bool f) {
+                                if (!f) {
+                                    return;
+                                }
+
+                                int code = CODE_OK;
+                                if ((code = updateEntity(createEntityData)) == CODE_OK) {
+                                    g_UIStatus->toastController.toast("Update entity success " ICON_MD_DONE, "");
+                                    uiReloadGraph();
+                                } else {
+                                    
+                                    g_UIStatus->toastController.toast("Update entity fail " ICON_MD_ERROR, "Code: " + std::to_string(code));
+                                }
+                            };
+
+                            openAskModal(ICON_MD_QUESTION_MARK " Force Update?", "It maybe broken graph,do you really want to update entity?\nAnd it can't be undo.", askCallBack);
+                        }
+                    }
+                }
                 showEntityOperations(nullptr, &createEntityData);
             }
             ImGui::End();
@@ -1138,12 +1179,16 @@ namespace sight {
 
                 if (strlen(g_UIStatus->buffer.littleName) > 0) {
                     dbg(g_UIStatus->buffer.littleName);
-                    currentProject()->createGraph(g_UIStatus->buffer.littleName);
+                    auto p = currentProject();
+                    std::string path = p->pathGraph(g_UIStatus->buffer.littleName);
+                    uiChangeGraph(path);
+                    p->buildFilesCache();
                     g_UIStatus->buffer.littleName[0] = '\0';
                 }
                 ImGui::CloseCurrentPopup();
             }
 
+            ImGui::SameLine();
             if (ImGui::Button(COMMON_LANGUAGE_KEYS.cancel)) {
                 ImGui::CloseCurrentPopup();
             }
@@ -1293,7 +1338,7 @@ namespace sight {
         if (ImGui::BeginViewportSideBar("##MainStatusBar", NULL, ImGuiDir_Down, height, window_flags)) {
             if (ImGui::BeginMenuBar()) {
                 ImGui::Text("Status bar is testing!!! ");
-                ImGui::Text(ICON_MD_INFO "55");
+                ImGui::Text(ICON_MD_INFO "0");
                 ImGui::PushStyleColor(ImGuiCol_Button, ImColor().Value);
                 if (ImGui::Button(ICON_MD_PLAY_ARROW)) {
                     dbg("build");
@@ -1362,8 +1407,8 @@ namespace sight {
             case UICommandType::COMMON:
                 break;
             case UICommandType::JsEndInit: {
-                g_UIStatus->loadingStatus.jsThread = true;
                 dbg("js end init.");
+                g_UIStatus->loadingStatus.jsThread = true;
                 break;
             }
             case UICommandType::AddNode:
@@ -1591,6 +1636,14 @@ namespace sight {
             if (ImGui::Button("Exit")) {
                 exitFlag = true;
             }
+
+            //
+            if (uiStatus.loadingStatus.jsThread && !uiStatus.loadingStatus.nodeStyle) {
+                // update node style.
+                // currentNodeStatus()->updateTemplateNodeStyles();    // still has errors... 
+                uiStatus.loadingStatus.nodeStyle = true;
+            }
+
             ImGui::End();
 
             // Rendering
@@ -1682,7 +1735,6 @@ namespace sight {
         // project path 
         auto project = currentProject();
         if (project) {
-            ImGui::SetCurrentFont(fontPointer);
             onProjectAndUILoadSuccess(project);
         }
 
@@ -2021,6 +2073,7 @@ namespace sight {
         this->editingEntity = {};
         this->edit = false;
         this->useRawTemplateAddress = false;
+        this->wantUpdateUsedEntity = false;
         this->selectedFieldIndex = -1;
 
         fields.clear();
@@ -2063,7 +2116,7 @@ namespace sight {
     }
 
     bool LoadingStatus::isLoadingOver() const {
-        return jsThread;
+        return jsThread && nodeStyle;
     }
 
     std::string Selection::getProjectPath() const {

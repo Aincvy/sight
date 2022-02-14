@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace sight {
 
@@ -138,6 +139,14 @@ namespace sight {
         }
     }
 
+    template <class T>
+    inline void addIfNotExist(std::vector<T> & list, T const& s){
+        auto iter = std::find(list.begin(), list.end(), s);
+        if (iter == list.end()) {
+           list.push_back(s); 
+        }
+    }
+
     /**
      * @brief 
      * 
@@ -164,4 +173,6 @@ namespace sight {
      */
     std::string removeExcessSpaces(std::string_view str, int indentSpaceCount = 2);
     
+
+
 }

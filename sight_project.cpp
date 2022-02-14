@@ -29,6 +29,8 @@
 #include <utility>
 #include <vector>
 
+#include "absl/strings/substitute.h"
+
 namespace sight {
 
     namespace fs = std::filesystem;
@@ -549,14 +551,14 @@ namespace sight {
         return baseDir;
     }
 
-    SightNodeGraph* Project::createGraph(const char* path, bool fixPath) {
-        auto g = openGraph(path, fixPath);
+    SightNodeGraph* Project::createGraph(std::string_view path, char* pathWithoutExtOut) {
+        auto g = openGraph(path,pathWithoutExtOut);
         buildFilesCache();
         return g;
     }
 
-    SightNodeGraph* Project::openGraph(const char* path, bool fixPath, char* pathWithoutExtOut) {
-        std::string targetPath = fixPath ? pathGraphFolder() + path : path;
+    SightNodeGraph* Project::openGraph(std::string_view path, char* pathWithoutExtOut) {
+        std::string targetPath{path};
         std::filesystem::path temp(targetPath);
         if (temp.has_extension()) {
             std::string ext = temp.extension().generic_string();
@@ -713,12 +715,12 @@ namespace sight {
             // template address have been changed.
 
             // delete old
-            assert(entitiesMap.erase(editTemplateAddress) > 0);
+            auto eraseResult = entitiesMap.erase(editTemplateAddress);
+            assert(eraseResult > 0);
             delTemplateNode(editTemplateAddress);
 
             // add new one
             this->entitiesMap[entity.templateAddress] = entity;
-            addTemplateNode(entity);
         } else {
             // update fields
             auto& entityInMap = iter->second;
@@ -726,12 +728,12 @@ namespace sight {
             f.clear();
             f.assign(entity.fields.begin(), entity.fields.end());
 
-            // entityInMap.name = entity.name;
-            // if a entity's name has been changed, then it's templateAddress will be changed.
+            entityInMap.name = entity.name;
         }
 
-        
-        
+        // update template node
+        addTemplateNode(entity, true);
+
         return true;
     }
 
@@ -838,6 +840,10 @@ namespace sight {
 
     std::string Project::pathEntityFolder() const {
         return pathSrcFolder() + "entity/";
+    }
+
+    std::string Project::pathGraph(std::string_view graphName) const {
+        return absl::Substitute("$0$1", pathGraphFolder(), graphName);
     }
 
     void Project::initFolders() {

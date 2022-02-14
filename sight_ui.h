@@ -80,6 +80,7 @@ namespace sight {
     struct UICreateEntity {
         bool edit = false;
         bool useRawTemplateAddress = false;     // use raw template address string ?
+        bool wantUpdateUsedEntity = false;
         SightEntity editingEntity{};
         char name[NAME_BUF_SIZE] = {0};
         char templateAddress[NAME_BUF_SIZE] = {0};
@@ -138,6 +139,7 @@ namespace sight {
 
     struct LoadingStatus {
         bool jsThread = false;
+        bool nodeStyle = false;
 
         bool isLoadingOver() const;
     };

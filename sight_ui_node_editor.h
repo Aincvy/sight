@@ -106,7 +106,7 @@ namespace sight {
      * @return true 
      * @return false 
      */
-    void uiChangeGraph(const char* path);
+    void uiChangeGraph(std::string_view path);
     
     /**
      * @brief Render as combo box
@@ -118,5 +118,11 @@ namespace sight {
     bool showNodePortType(NodePortType& portType);
 
     void showPortOptions(SightNodePortOptions& options);
+
+    /**
+     * @brief reload current graph.
+     * 
+     */
+    void uiReloadGraph();
 
 }
