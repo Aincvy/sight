@@ -185,6 +185,7 @@ namespace sight{
 
     /**
      * run a js file. | only call this function from js thread.
+     * this function should be thread-safe!
      * @param filepath
      * @return
      */

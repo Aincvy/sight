@@ -146,6 +146,7 @@ namespace sight {
             out << YAML::Key << entity.templateAddress << YAML::BeginMap;            
             out << YAML::Key << "name" << YAML::Value << entity.name;
             out << YAML::Key << "typeId" << YAML::Value << entity.typeId;
+            out << YAML::Key << "parentEntity" << YAML::Value << entity.parentEntity;
 
             out << YAML::Key << "fields" << YAML::BeginMap;
             for( const auto& item: entity.fields){
@@ -176,6 +177,11 @@ namespace sight {
             auto tmp = node["typeId"];
             if (tmp.IsDefined()) {
                 entity.typeId = tmp.as<uint>();
+            }
+            
+            // tmp = node["parentEntity"];
+            if (node["parentEntity"]) {
+                entity.parentEntity = node["parentEntity"].as<std::string>();
             }
 
             auto fieldsNode = node["fields"];
@@ -474,7 +480,7 @@ namespace sight {
                 }
 
                 auto entity = loadEntity(key, item.second);
-                this->entitiesMap[key] = entity;
+                this->entitiesMap[entity.name] = entity;
 
                 getIntType(entity.name, true);
             }
@@ -665,8 +671,12 @@ namespace sight {
         return &iter->second;
     }
 
+    bool Project::hasEntity(std::string_view fullName) const {
+        return entitiesMap.contains(fullName);
+    }
+
     bool Project::addEntity(SightEntity const& entity) {
-        if (this->entitiesMap.contains(entity.templateAddress)) {
+        if (this->entitiesMap.contains(entity.name)) {
             return false;
         }
 
@@ -678,7 +688,7 @@ namespace sight {
         }
 
         // update to template
-        return (this->entitiesMap[entity.templateAddress] = entity).effect() == CODE_OK;
+        return (this->entitiesMap[entity.name] = entity).effect() == CODE_OK;
     }
 
     bool Project::updateEntity(SightEntity const& entity, SightEntity const& oldEntity) {
@@ -689,25 +699,23 @@ namespace sight {
             }
         }
 
-        auto iter = this->entitiesMap.find(entity.templateAddress);
+        auto iter = this->entitiesMap.find(entity.name);
         auto& editTemplateAddress = oldEntity.templateAddress;
-
-        // check condition
-        if (editTemplateAddress != entity.templateAddress) {
-            // template address have been changed.
-            if (iter != this->entitiesMap.end()) {
-                return false;
-            }
-        } else {
-            if (iter == this->entitiesMap.end()) {
-                return false;
-            }
-        }
 
         // update type name.
         if (entity.name != oldEntity.name) {
             // name have been changed.
+
+            // target name invalid.
+            if (iter != this->entitiesMap.end()) {
+                return false;
+            }
+
             changeTypeName(oldEntity.name, entity.name);
+        } else {
+            if (iter == this->entitiesMap.end()) {
+                return false;
+            }
         }
 
         // update template address
@@ -715,9 +723,10 @@ namespace sight {
             // template address have been changed.
 
             // delete old
-            auto eraseResult = entitiesMap.erase(editTemplateAddress);
-            assert(eraseResult > 0);
-            delTemplateNode(editTemplateAddress);
+            // auto eraseResult = entitiesMap.erase(entity.name);
+            // delTemplateNode(editTemplateAddress);
+            auto eraseResult = delEntity(entity.name);
+            assert(eraseResult);
 
             // add new one
             this->entitiesMap[entity.templateAddress] = entity;
@@ -746,7 +755,7 @@ namespace sight {
                 delIntType(entity.typeId);
                 entity.typeId = 0;
             }
-            delTemplateNode(fullName);
+            delTemplateNode(entity.templateAddress);
             entitiesMap.erase(iter);
             return true;
         }

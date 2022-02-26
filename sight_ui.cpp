@@ -709,23 +709,24 @@ namespace sight {
         void showCreateEntityWindow(){
             int inputTextId = 0;
 
-            auto & createEntityData = g_UIStatus->createEntityData;
+            auto& createEntityData = g_UIStatus->createEntityData;
 
             if (ImGui::Begin(WINDOW_LANGUAGE_KEYS.createEntity, &g_UIStatus->windowStatus.createEntity)) {
                 static std::string nameBuf{};
                 auto fullName = g_UIStatus->createEntityData.name;
-                if (ImGui::InputText(COMMON_LANGUAGE_KEYS.fullName, fullName, std::size(g_UIStatus->createEntityData.name))) {
+                if (ImGui::InputText(COMMON_LANGUAGE_KEYS.fullName, fullName, std::size(createEntityData.name))) {
                     // update nameBuf
                     nameBuf = getLastAfter(fullName, ".");
                 }
                 ImGui::InputText(COMMON_LANGUAGE_KEYS.className, nameBuf.data(), std::size(nameBuf), ImGuiInputTextFlags_ReadOnly);
                 ImGui::SameLine();
                 ImGui::Text("(%s)", COMMON_LANGUAGE_KEYS.readonly);
-                ImGui::InputText(COMMON_LANGUAGE_KEYS.address, g_UIStatus->createEntityData.templateAddress, NAME_BUF_SIZE);
+                ImGui::InputText(COMMON_LANGUAGE_KEYS.address, createEntityData.templateAddress, std::size(createEntityData.templateAddress));
                 ImGui::SameLine();
                 ImGui::Checkbox("Raw", &createEntityData.useRawTemplateAddress);
                 helpMarker("Use raw string as template address? Which means do not add prefix and suffix.");
-                // maybe need a help marker ?
+                ImGui::InputText("parent", createEntityData.parentEntity, std::size(createEntityData.parentEntity));
+                helpMarker("Type full entity name, NOT entity's template address!\nInherit fields only!\nFor now, update parent entity DO-NOT affect children!");
 
                 ImGui::Separator();
                 // first line buttons
@@ -866,6 +867,13 @@ namespace sight {
                             resetDataAndCloseWindow();
                         } else {
                             dbg(r);
+                            if (r == CODE_FAIL) {
+                                g_UIStatus->toastController.error().toast("Add entity failed!", "");
+                            } else if (r == CODE_CONVERT_ENTITY_FAILED) {
+                                g_UIStatus->toastController.error().toast("Add entity failed!", "Convert to SightEntity failed!Perhaps parent name error!");
+                            } else {
+                                g_UIStatus->toastController.error().toast("Add entity failed!", "Unkown reason.");
+                            }
                         }
                     }
                 }
@@ -937,7 +945,7 @@ namespace sight {
                 ImGui::SameLine(windowWidth - 60);
 
                 if (ImGui::Button("Create")) {
-                    dbg(1);
+                    g_UIStatus->createEntityData.reset();
                     activeWindowCreateEntity();
                 }
                 ImGui::Separator();
@@ -2054,6 +2062,7 @@ namespace sight {
         // convert data to  createEntityData
         snprintf(this->name, std::size(this->name), "%s", info.name.c_str());
         snprintf(this->templateAddress, std::size(this->templateAddress), "%s", info.templateAddress.c_str());
+        snprintf(this->parentEntity, std::size(this->parentEntity), "%s", info.parentEntity.c_str());
 
         for( const auto& item: info.fields){
             addField();
@@ -2070,6 +2079,7 @@ namespace sight {
     void UICreateEntity::reset() {
         sprintf(this->name, "");
         sprintf(this->templateAddress, "");
+        sprintf(this->parentEntity, "");
         this->editingEntity = {};
         this->edit = false;
         this->useRawTemplateAddress = false;

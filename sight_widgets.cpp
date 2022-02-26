@@ -7,6 +7,7 @@
 #include "sight_memory.h"
 #include "sight_undo.h"
 #include "sight_util.h"
+#include "sight_colors.h"
 
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -501,6 +502,7 @@ namespace sight {
         if (ImGui::Begin(windowTitle.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove)) {
             if (!title.empty()) {
                 ImGui::Text("%s", title.c_str());
+                
                 ImGui::SameLine();
             }
             if (ImGui::Button(ICON_MD_CLOSE)) {
@@ -527,9 +529,31 @@ namespace sight {
         close = true;
     }
 
+    ToastController& ToastController::info() {
+        nextToastType = ToastType::Info;
+        return *this;
+    }
+
+    ToastController& ToastController::warning() {
+        nextToastType = ToastType::Warning;
+        return *this;
+    }
+
+    ToastController& ToastController::error() {
+        nextToastType = ToastType::Error;
+        return *this;
+    }
+
     bool ToastController::toast(std::string title, std::string content, float showTime) {
         auto now = ImGui::GetTime();
         elements.emplace_back(getRuntimeId(), title, content, showTime > 0 ? now + showTime : showTime);
+        
+        // apply next args..
+        auto& element = elements.back();
+        element.toastType = nextToastType;
+        
+        resetNextArgs();
+
         return true;
     }
 
@@ -557,6 +581,11 @@ namespace sight {
             y -= bottomSpacing;
         }
         
+    }
+
+    void ToastController::resetNextArgs() {
+        info();
+
     }
 
 }

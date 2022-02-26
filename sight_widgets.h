@@ -93,6 +93,12 @@ namespace sight {
         void setTips(std::string tips);
     };
 
+    enum class ToastType {
+        Info,
+        Warning,
+        Error,
+    };
+
     /**
      * @brief Toast widget.
      * 
@@ -103,10 +109,11 @@ namespace sight {
         std::string windowTitle;
         // content title.
         std::string title;
+        std::string content;
         // target time, -1 = do not disappear.
         float disappearTime = 0;
-        std::string content;
         bool close = false;
+        ToastType toastType = ToastType::Info;
 
         ToastElement() = default;
         ToastElement(ToastElement const&) = default;
@@ -127,9 +134,18 @@ namespace sight {
     struct ToastController {
         std::vector<ToastElement> elements;
 
+        // next toast args.
+        ToastType nextToastType = ToastType::Info;
+
+
+        ToastController& info();
+        ToastController& warning();
+        ToastController& error();
+
         bool toast(std::string title, std::string content, float showTime = 5);
 
         void render();
+        void resetNextArgs();
     };
 
     /**

@@ -84,6 +84,7 @@ namespace sight {
         SightEntity editingEntity{};
         char name[NAME_BUF_SIZE] = {0};
         char templateAddress[NAME_BUF_SIZE] = {0};
+        char parentEntity[NAME_BUF_SIZE] = {0};
         // struct EntityField* first = nullptr;
         std::vector<EntityField> fields;
         std::string showInfoEntityName;

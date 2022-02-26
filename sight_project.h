@@ -145,6 +145,7 @@ namespace sight {
     struct SightEntity {
         std::string name {};
         std::string templateAddress {};
+        std::string parentEntity{};
 
         std::vector<SightEntityField> fields;
 
@@ -319,6 +320,7 @@ namespace sight {
         SightEntity const* getSightEntity(std::string_view fullName) const;
         SightEntity* getSightEntity(std::string_view fullName);
 
+        bool hasEntity(std::string_view fullName) const;
         bool addEntity(SightEntity const& entity);
         bool updateEntity(SightEntity const& entity, SightEntity const& oldEntity);
         bool delEntity(std::string_view fullName);
@@ -351,7 +353,7 @@ namespace sight {
 
         // key: name, 
         absl::btree_map<std::string, BuildTarget> buildTargetMap;
-        // key: template address
+        // key: entity full name
         absl::btree_map<std::string, SightEntity> entitiesMap;
 
         // file locations

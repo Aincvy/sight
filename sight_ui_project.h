@@ -14,7 +14,7 @@ namespace sight {
      * @param entity 
      * @param createEntityData 
      */
-    void convert(SightEntity& entity, const UICreateEntity& createEntityData);
+    bool convert(SightEntity& entity, const UICreateEntity& createEntityData);
 
     /**
      *

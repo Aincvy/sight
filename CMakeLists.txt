@@ -32,6 +32,7 @@ target_sources(sight PRIVATE
         sight_external_widgets.cpp
         sight_network.cpp
         sight_undo.cpp
+        sight_object.cpp
         # dependencies/imgui/imgui_demo.cpp           # for debug
 )
 

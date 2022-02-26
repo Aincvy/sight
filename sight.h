@@ -64,6 +64,7 @@ namespace sight {
         CODE_FILE_INIT,
 
         CODE_USER_CANCELED = 150,
+        CODE_CONVERT_ENTITY_FAILED,
 
         CODE_PLUGIN_NO_PKG_FILE = 200,
         CODE_PLUGIN_COMPILE_FAIL,
