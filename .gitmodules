@@ -31,3 +31,6 @@
 [submodule "dependencies/Flix01Imgui"]
 	path = dependencies/Flix01Imgui
 	url = https://github.com/Flix01/imgui.git
+[submodule "dependencies/ImTerm"]
+	path = dependencies/ImTerm
+	url = git@github.com:Aincvy/ImTerm.git
