@@ -1,6 +1,6 @@
 #include "sight_network.h"
 #include "sight.h"
-#include "dbg.h"
+#include "sight_log.h"
 
 #include <cassert>
 #include <cstdlib>
@@ -23,7 +23,7 @@ namespace sight {
     }
 
     void OnDisconnect(uv_stream_t* clientStream) {
-        dbg("onDisconnect");
+        logDebug("onDisconnect");
 
         uv_tcp_t* client = (uv_tcp_t*)clientStream;
         for (auto iter = netServer.clients.begin(); iter != netServer.clients.end(); iter++) {
@@ -50,7 +50,7 @@ namespace sight {
             // buffer data
             auto netClient = netServer.findClient(client);
             assert(netClient != nullptr);
-            dbg(nread, buf->len);
+            logDebug("$0, $1",nread, buf->len);
             netClient->buffer->write(buf->base, nread);
 
         }
@@ -115,7 +115,7 @@ namespace sight {
 
     SightNetClient::~SightNetClient()
     {
-        dbg(index);
+        logDebug(index);
         if (buffer) {
             delete buffer;
             buffer = nullptr;
@@ -136,7 +136,7 @@ namespace sight {
 
             if (!bufferStream.read(reinterpret_cast<char*>(&pkgLen), 2)) {
                 //
-                dbg("read pkgLen failed");
+                logDebug("read pkgLen failed");
                 return;
             }
 
@@ -152,7 +152,7 @@ namespace sight {
         short command = 0;
         if (!bufferStream.read(reinterpret_cast<char*>(&command), 2)) {
             //
-            dbg("read command failed");
+            logDebug("read command failed");
             return;
         }
 

@@ -3,7 +3,6 @@
 //
 
 #include "sight_plugin.h"
-#include "dbg.h"
 #include "sight.h"
 #include "filesystem"
 #include "sight_defines.h"
@@ -50,7 +49,7 @@ namespace sight {
     }
 
     int PluginManager::loadPlugins() {
-        dbg("load plugins");
+        logDebug("load plugins");
         loadedPluginCount = 0;
 
         auto afterPluginLoadSuccess = [this](Plugin* plugin) {
@@ -79,12 +78,12 @@ namespace sight {
             int i;
             if ((i = plugin->load()) != CODE_OK) {
                 if (i != CODE_PLUGIN_DISABLED) {
-                    dbg("plugin load fail", it->path().c_str());
+                    logDebug("plugin load fail: $0", it->path().c_str());
                 }
                 goto loadFailed;
             }
             if (pluginMap.contains(plugin->getName())) {
-                dbg("maybe name repeat", plugin->getName());
+                logDebug("maybe name repeat: $0", plugin->getName());
                 goto loadFailed;
             }
             
@@ -121,7 +120,6 @@ namespace sight {
             auto & sortedNames = sortedPluginNames;
             sortedPluginNames.clear();
             std::transform(pluginMap.begin(), pluginMap.end(), std::back_inserter(sortedNames), [](auto const& a){ return a.first;});
-            dbg(sortedNames);
 
             std::sort(sortedNames.begin(), sortedNames.end(), [this](auto const& a, auto const& b) {
                 Plugin* t1 = pluginMap[a];
@@ -134,8 +132,6 @@ namespace sight {
                 }
                 return false;
             });
-
-            dbg(sortedNames);
 
             for( const auto& [name, plugin]: pluginMap){
                 snapshotMap[name] = plugin;
@@ -165,7 +161,7 @@ namespace sight {
     }
 
     void Plugin::debugBrieflyInfo() const{
-        dbg(name, path, version, author);
+        logDebug("$0, $1, $2, $3", name, path, version, author);
     }
 
     Plugin::Plugin(PluginManager* pluginManager, std::string path) : path(std::move(path)), pluginManager(pluginManager) {
@@ -220,7 +216,7 @@ namespace sight {
             readBaseInfoFromJsObject(object);
         }
         if (this->disabled) {
-            dbg("plugin disabled", this->name);
+            logDebug("plugin disabled: $0", this->name);
             status = PluginStatus::Disabled;
             return CODE_PLUGIN_DISABLED;
         }
@@ -237,7 +233,7 @@ namespace sight {
             auto fullPath = std::filesystem::canonical(path);
             auto code = runJsFile(isolate, fullPath.c_str(), nullptr, module);
             if (code != CODE_OK) {
-                dbg("js run failed", fullPath.c_str());
+                logDebug("js run failed: $0", fullPath.c_str());
                 return CODE_PLUGIN_FILE_ERROR;
             }
         }

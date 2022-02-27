@@ -3,6 +3,7 @@
 #pragma once
 #include "imgui.h"
 #include "sight_colors.h"
+#include "sight_log.h"
 #include "uv.h"
 
 #include "sight.h"
@@ -10,6 +11,8 @@
 #include "sight_language.h"
 #include "sight_project.h"
 #include "sight_nodes.h"
+#include "sight_terminal.h"
+#include "imterm/terminal.hpp"
 
 #include "absl/container/btree_set.h"
 #include "absl/container/flat_hash_map.h"
@@ -235,13 +238,17 @@ namespace sight {
         std::string text;
     };
 
+    struct StatusBarData {
+        std::string logText;
+        LogLevel logLevel;
+    };
+
     struct UIStatus {
         bool needInit = false;
         ImGuiIO* io;
         bool closeWindow = false;
         struct UIWindowStatus& windowStatus;
         struct UICreateEntity createEntityData;
-        // struct SightEntity createEntityData;
         struct LoadingStatus loadingStatus;
         class Selection selection;
         struct UIBuffer buffer;
@@ -250,6 +257,7 @@ namespace sight {
         struct ModalAlertData modalAlertData;
         struct ToastController toastController;
         struct GenerateResultData generateResultData;
+        struct StatusBarData statusBarData;
 
         struct LanguageKeys* languageKeys = nullptr;
         struct UIColors* uiColors = nullptr;
@@ -257,6 +265,11 @@ namespace sight {
 
         // others
         struct EntityOperations entityOperations;
+        struct {
+            TerminalRuntimeArgs runtimeArgs;
+            ImTerm::terminal<TerminalCommands>* terminal = nullptr;
+            bool stopLogging = false;
+        } terminalData;
 
         // for execute js code in ui thread.
         v8::Isolate* isolate = nullptr;

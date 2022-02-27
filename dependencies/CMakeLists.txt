@@ -80,7 +80,6 @@ add_library(sight-util SHARED ${SIGHT_UTIL_SOURCES})
 target_include_directories(
         sight-util PUBLIC
         ${CMAKE_CURRENT_LIST_DIR}/sight-util
-        ${CMAKE_CURRENT_LIST_DIR}/dbg-macro
 )
 
 # macro

@@ -8,7 +8,6 @@
 #include "sight_ui_node_editor.h"
 #include "sight_util.h"
 #include "sight.h"
-#include "dbg.h"
 #include "sight_nodes.h"
 #include "sight_memory.h"
 #include "sight_widgets.h"
@@ -237,7 +236,7 @@ namespace sight {
         if (!path.is_absolute()) {
             // 
             this->baseDir = std::filesystem::canonical(path).generic_string();
-            dbg(this->baseDir);
+            logDebug(this->baseDir);
         }
         if (!endsWith(this->baseDir, "/")) {
             this->baseDir += "/";
@@ -400,7 +399,7 @@ namespace sight {
             }
 
         } catch (const YAML::BadConversion & e){
-            dbg("load project config error.", path.c_str(), e.what());
+            logDebug("load project config error. $0, $1", path.c_str(), e.what());
             return CODE_FILE_FORMAT_ERROR;
         }
 
@@ -420,7 +419,7 @@ namespace sight {
             auto temp = root[whoAmI];
             if (temp.IsDefined()) {
                 if (temp.as<std::string>() != "sight-styles") {
-                    dbg("style file who-am-i error", path);
+                    logDebug("style file who-am-i error: $0", path);
                     return CODE_FILE_ERROR;
                 }
             }
@@ -436,7 +435,7 @@ namespace sight {
 
                     auto iter = typeInfoMap.find(id);
                     if (iter == typeInfoMap.end()) {
-                        dbg("type not found.", id);
+                        logDebug("type not found: $0", id);
                         continue;
                     }
 
@@ -450,7 +449,7 @@ namespace sight {
             }
 
         } catch (const YAML::BadConversion& e) {
-            dbg("load project config error.", path.c_str(), e.what());
+            logDebug("load project config error. $0, $1", path.c_str(), e.what());
             return CODE_FILE_FORMAT_ERROR;
         }
         return CODE_OK;
@@ -468,7 +467,7 @@ namespace sight {
             auto temp = root[whoAmI];
             if (temp.IsDefined()) {
                 if (temp.as<std::string>() != "sight-entities") {
-                    dbg("entity file who-am-i error", path);
+                    logDebug("entity file who-am-i error: $0", path);
                     return CODE_FILE_ERROR;
                 }
             }
@@ -486,7 +485,7 @@ namespace sight {
             }
             
         } catch (const YAML::BadConversion& e) {
-            dbg("load project config error.", path.c_str(), e.what());
+            logDebug("load project config error. $0, $1", path.c_str(), e.what());
             return CODE_FILE_FORMAT_ERROR;
         }
 
@@ -547,7 +546,7 @@ namespace sight {
         }
 
         if (typeMap.erase(iter->second.name) <= 0) {
-            dbg("del failed from typeMap", iter->second.name);
+            logDebug("del failed from typeMap: $0", iter->second.name);
         }
         
         return typeInfoMap.erase(iter), true;
@@ -572,7 +571,7 @@ namespace sight {
                 targetPath = std::string(targetPath, 0, targetPath.rfind('.'));
             }
         }
-        dbg(targetPath);
+        logDebug(targetPath);
         changeGraph(targetPath.c_str());
         if (pathWithoutExtOut) {
             sprintf(pathWithoutExtOut, "%s", targetPath.c_str());
@@ -682,7 +681,7 @@ namespace sight {
 
         for( const auto& item: entity.fields){
             if (getIntType(item.type) <= 0) {
-                dbg("type not found", item.type);
+                logDebug("type not found: $0", item.type);
                 return false;
             }
         }
@@ -694,7 +693,7 @@ namespace sight {
     bool Project::updateEntity(SightEntity const& entity, SightEntity const& oldEntity) {
         for (const auto& item : entity.fields) {
             if (getIntType(item.type) <= 0) {
-                dbg("type not found", item.type);
+                logDebug("type not found, $0", item.type);
                 return false;
             }
         }
@@ -787,7 +786,7 @@ namespace sight {
                     auto relative = std::filesystem::relative(path, pathGraphFolder());
                     std::filesystem::path targetPath(targetPathString + relative.generic_string());
                     targetPath.replace_extension(".js");
-                    dbg(targetPath.generic_string());
+                    logDebug(targetPath.generic_string());
                     std::filesystem::create_directories(targetPath.parent_path());
 
                     std::ofstream out(targetPath);
@@ -836,7 +835,7 @@ namespace sight {
 
             SightNodeGraph graph;
             if (graph.load(path.c_str()) != CODE_OK) {
-                dbg("graph load failed", path.c_str());
+                logDebug("graph load failed: $0", path.c_str());
                 continue;
             }
 
@@ -870,7 +869,6 @@ namespace sight {
     }
 
     uint Project::addTypeInfo(TypeInfo info, TypeStyle const& typeStyle, bool merge) {
-        // dbg(info.intValue, info.name);
         uint id = 0;
         if (info.intValue > 0) {
             id = info.intValue;
@@ -888,10 +886,10 @@ namespace sight {
                         typeStyleArray.remove(info.style);
                         info.style = nullptr;
                     }
-                    dbg(iter->first, iter->second.name, "type merged.");
+                    logDebug("$0, $1, type merged.", iter->first, iter->second.name);
                     return iter->first;
                 } else {
-                    dbg("already exist", info.intValue);
+                    logDebug("already exist: $0", info.intValue);
                     return 0;
                 }
             }
@@ -906,7 +904,6 @@ namespace sight {
         }
         typeInfoMap[info.intValue] = info;
         typeMap[info.name] = info.intValue;
-//        dbg(info.intValue, info.name);
         return info.intValue;
     }
 
@@ -980,7 +977,7 @@ namespace sight {
         g_Project = new Project(baseDir, createIfNotExist);
         auto code = g_Project->load();
         if (code == CODE_OK && callLoadSuccess) {
-            dbg(baseDir);
+            logDebug(baseDir);
             onProjectAndUILoadSuccess(g_Project);
         }
         return code;
@@ -1002,7 +999,7 @@ namespace sight {
                 // has files
                 auto path = fs::path(folder);
                 path /= "project.yaml";
-                dbg(path.c_str());
+                logDebug(path.c_str());
 
                 if (!fs::exists(path) || !fs::is_regular_file(path)) {
                    return CODE_FAIL; 

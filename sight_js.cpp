@@ -9,7 +9,6 @@
 #include <stdio.h>
 #include <sstream>
 #include "IconsMaterialDesign.h"
-#include "dbg.h"
 #include "functional"
 #include <string>
 #include <string_view>
@@ -149,7 +148,7 @@ namespace sight {
                     }
                 }
             }
-            dbg("unhandled type error", type);
+            logDebug("unhandled type error: $0", type);
             break;
         }
         }
@@ -174,11 +173,10 @@ namespace sight {
             break;
         case IntTypeString:
         {
-            // dbg(port->value.string);
             std::string tmp = v8pp::from_v8<std::string>(isolate, value);
             auto size = std::size(port->value.u.string);
             if (tmp.size() >= size) {
-                dbg("Warning!!  string is too large. It will be truncated.");
+                logDebug("Warning!!  string is too large. It will be truncated.");
             }
             snprintf(port->value.u.string, size, "%s", tmp.c_str());
             break;
@@ -234,7 +232,7 @@ namespace sight {
                 flag = false;
             }
             if (!flag) {
-                dbg("unhandled type error", port->getType());
+                logDebug("unhandled type error: $0", port->getType());
             }
             break;
         }
@@ -500,7 +498,7 @@ namespace sight {
             if (IS_V8_STRING(str)) {
                 return v8pp::from_v8<std::string>(isolate, str);
             } else {
-                dbg("toString's result not a string");
+                logDebug("toString's result not a string");
                 return {};
             }
         }
@@ -640,7 +638,7 @@ namespace sight {
                 }
                 auto filename = frame->GetScriptName();
                 if (filename.IsEmpty()) {
-                    dbg("empty script name, cannot include other script.");
+                    logDebug("empty script name, cannot include other script.");
                     return v8::Undefined(isolate);
                 }
 
@@ -663,7 +661,7 @@ namespace sight {
         void checkTinyData(const char* key, Local<Object> data, Isolate* isolate){
             auto g = currentGraph();
             if (!g) {
-                dbg("need a graph opened!");
+                logDebug("need a graph opened!");
                 return;
             }
 
@@ -677,7 +675,7 @@ namespace sight {
         MaybeLocal<Object> tinyData(const char* key, MaybeLocal<Object> mayData, Isolate* isolate) {
             auto g = currentGraph();
             if (!g) {
-                dbg("need a graph opened!");
+                logDebug("need a graph opened!");
                 return {};
             }
 
@@ -826,42 +824,33 @@ namespace sight {
                 } else if (IS_V8_NUMBER(arg)) {
                     if (arg->IsInt32() ) {
                         int msg = arg->Int32Value(context).ToChecked();
-                        // dbg(msg);
                         printf("%s%d\n", traceMsg.c_str(), msg);
                     } else if (arg->IsUint32()) {
                         uint msg = arg->Uint32Value(context).ToChecked();
-                        // dbg(msg);
                         printf("%s%d\n", traceMsg.c_str(), msg);
                     } else {
                         auto msg = arg->NumberValue(context).ToChecked();
-                        // dbg(msg);
                         printf("%s%f\n", traceMsg.c_str(), msg);
                     }
                 } else if (arg->IsObject()) {
-                    // dbg("print object is waited for impl.");
                     auto str = v8pp::json_str(isolate, arg);
                     auto msg = str.c_str();
-                    // dbg(msg);
                     printf("%s%s\n", traceMsg.c_str(), msg);
                 } else if (arg->IsUndefined()) {
                     constexpr const char* msg = "undefined";
-                    // dbg(msg);
                     printf("%s%s\n", traceMsg.c_str(), msg);
                 } else if (arg->IsNull()) {
                     constexpr const char* msg = "null";
-                    // dbg(msg);
                     printf("%s%s\n", traceMsg.c_str(), msg);
                 } else if (arg->IsExternal()) {
                     constexpr const char* msg = "external";
-                    // dbg(msg);
                     printf("%s%s\n", traceMsg.c_str(), msg);
                 } else if (arg->IsBoolean() || arg->IsBooleanObject()) {
                     const char* msg = arg->BooleanValue(isolate) ? "true" : "false";
-                    // dbg(msg);
                     printf("%s%s\n", traceMsg.c_str(), msg);
                 }
                 else {
-                    dbg("no-handled-type");
+                    logDebug("no-handled-type");
                 }
             }
         }
@@ -954,7 +943,7 @@ namespace sight {
                                 render.kind = TypeInfoRenderKind::ComboBox;
                             }
                         } else {
-                            dbg("kind not a string");
+                            logDebug("kind not a string");
                             return;
                         }
 
@@ -1001,7 +990,7 @@ namespace sight {
                     } 
                     else {
 
-                        dbg("unhandled option", keyString);
+                        logDebug("unhandled option", keyString);
                     }
                 }
             }
@@ -1041,7 +1030,6 @@ namespace sight {
                     auto copiedFunc = tempVal.As<Function>();
                     // copiedFunc->SetName(v8pp::to_v8(isolate, key));
                     auto source = functionProtoToString(isolate, context, copiedFunc);
-                    // dbg(source);
                     f = source;
                 }
             };
@@ -1200,7 +1188,7 @@ namespace sight {
 
                         temp = functionRoot->Get(context, v8pp::to_v8(isolate, "onReverseActive"));
                         if (temp.IsEmpty()) {
-                            dbg("empty function");
+                            logDebug("empty function");
                             templateNode->onReverseActive = templateNode->generateCodeWork;
                         } else {
                             auto checkedTemp = temp.ToLocalChecked();
@@ -1244,7 +1232,7 @@ namespace sight {
                         }
 
                         else {
-                            dbg("unknown option key", keyString);
+                            logDebug("unknown option key: $0", keyString);
                         }
                     }
                 } else if (key == "__meta_events") {
@@ -1262,10 +1250,9 @@ namespace sight {
                         auto eventValue = eventsRoot->Get(context, eventKey).ToLocalChecked();
                         std::string sourceCode = functionProtoToString(isolate, context, eventValue.As<Function>());
                         if (sourceCode.empty()) {
-                            dbg("function source not found", keyString);
+                            logDebug("function source not found: $0", keyString);
                             continue;
                         }
-                        // dbg(sourceCode);
                         if (keyString == "onInstantiate") {
                             templateNode->onInstantiate = sourceCode;
                         } else if (keyString == "onDestroyed") {
@@ -1498,7 +1485,7 @@ namespace sight {
         }
 
         clearJsNodeCache();
-        dbg("destroy js engine..");
+        logDebug("destroy js engine..");
         g_V8Runtime->isolateScope.reset();
         g_V8Runtime->entityFunctions.reset();
         if (g_V8Runtime->isolate) {
@@ -1813,7 +1800,7 @@ namespace sight {
             promise->set_value(1);
         }
 
-        dbg("flush node cache over!");
+        logDebug("flush node cache over!");
     }
 
     void clearJsNodeCache(){
@@ -1896,7 +1883,7 @@ namespace sight {
         if (!isolate) {
             return CODE_FAIL;
         }
-        dbg(filepath);
+        logDebug(filepath);
 
         v8::HandleScope handle_scope(isolate);
         auto context = isolate->GetCurrentContext();
@@ -1905,7 +1892,7 @@ namespace sight {
 
         auto maySource = readFile(isolate, filepath).ToLocalChecked();
         if (maySource.IsEmpty()) {
-            dbg("file path error", filepath);
+            logDebug("file path error: $0", filepath);
             return CODE_FILE_NOT_EXISTS;
         }
 
@@ -1929,7 +1916,7 @@ namespace sight {
         }
         
         if (mayFunction.IsEmpty()) {
-            dbg("js file compile error", filepath);
+            logDebug("js file compile error: $0", filepath);
             if (promise) {
                 promise->set_value(0);
             }
@@ -1965,7 +1952,7 @@ namespace sight {
         }
         
         if (tryCatch.HasCaught()) {
-            dbg("js file has error");
+            logDebug("js file has error");
             if (promise) {
                 promise->set_value(0);
             }
@@ -1984,7 +1971,7 @@ namespace sight {
             }
             *resultOuter = result.ToLocalChecked();
         }
-        dbg("js file success ran.");
+        logDebug("js file success ran.");
         return CODE_OK;
     }
 
@@ -2000,7 +1987,7 @@ namespace sight {
         if (IS_V8_STRING(str)) {
             code = v8pp::from_v8<std::string>(isolate, str);
         } else {
-            dbg("toString's result not a string");
+            logDebug("toString's result not a string");
             return {};
         }
 
@@ -2010,7 +1997,6 @@ namespace sight {
 
         if (status) {
             auto title = std::string(code, 0, p1);
-            // dbg(title);
             bool parentheses = false;
             bool one = false;
             bool lastIsDollar = false;
@@ -2079,7 +2065,6 @@ namespace sight {
 
     MaybeLocal<Value> runGenerateCode(std::string const& functionCode, Isolate* isolate, Local<Context>& context, SightNode* node, Local<Object> graphObject,
                                       GenerateOptions* options = nullptr, GenerateFunctionStatus* status = nullptr, int reverseActivePort = -1 ) {
-        // dbg(functionCode.c_str());
         auto sourceCode = v8pp::to_v8(isolate, functionCode);
         ScriptCompiler::Source source(sourceCode);
         Local<Object> contextExt[0];
@@ -2088,7 +2073,7 @@ namespace sight {
         v8::Local<v8::String> arguments[] = {param$, paramOptions};
         auto mayTargetFunction = ScriptCompiler::CompileFunctionInContext(context, &source, std::size(arguments), arguments, 0,contextExt);
         if (mayTargetFunction.IsEmpty()) {
-            dbg("code compiles error!", functionCode.c_str());
+            logDebug("code compiles error: $0", functionCode.c_str());
             return {};
         }
         auto targetFunction = mayTargetFunction.ToLocalChecked();
@@ -2119,7 +2104,7 @@ namespace sight {
                             auto c = connections.front();
                             SightNodePortConnection connection(node->graph, c, node);
                             if (connection.bad()) {
-                                dbg("bad connection");
+                                logDebug("bad connection");
                                 return "";
                             }
 
@@ -2190,7 +2175,7 @@ namespace sight {
     std::string runGenerateFunction(PersistentFunction const& persistent, Isolate* isolate, SightNode* node, int reverseActivePort) {
         if (persistent.IsEmpty()) {
             // no function ?
-            dbg("no function");
+            logDebug("no function");
             return "";
         }
 
@@ -2205,7 +2190,7 @@ namespace sight {
         if (status.shouldEval) {
             // The code need be eval first.
 #if GENERATE_CODE_DETAILS == 1
-            dbg(status.shouldEval, functionCode);
+            logDebug("$0, $1",status.shouldEval, functionCode);
 #endif
             if (!functionCode.empty()) {
                 resultMaybe = runGenerateCode(functionCode, isolate, context, node, graphObject, &options, &status, reverseActivePort);
@@ -2229,7 +2214,7 @@ namespace sight {
 
         if (!functionCode.empty() && !options.noCode) {
 #if GENERATE_CODE_DETAILS == 1
-            dbg("second run", functionCode);
+            logDebug("second run: $0", functionCode);
 #endif
             std::stringstream ss;
             bool dollar = false;
@@ -2285,7 +2270,7 @@ namespace sight {
             };
             auto result = runGenerateCode(ss.str(), isolate, context, node, graphObject, nullptr, &status, reverseActivePort);
             if (result.IsEmpty()) {
-                dbg("result is empty", ss.str());
+                logDebug("result is empty: $0", ss.str());
             } else {
                 auto resultString = v8pp::from_v8<std::string>(isolate, result.ToLocalChecked());
                 return resultString;
@@ -2344,7 +2329,7 @@ namespace sight {
      * @return
      */
     int parseGraph(const char* filename, std::string& source) {
-        dbg(filename);
+        logDebug(filename);
         SightNodeGraph graph;
         int i = graph.load(filename);
         if (i == 1) {
@@ -2358,7 +2343,7 @@ namespace sight {
         int status = -1;
         auto node = graph.findNode(SightNodeProcessType::Enter, &status);
         if (status != 0) {
-            dbg("error graph",filename, status);
+            logDebug("error graph: $0, $1",filename, status);
             return 3;
         }
 
@@ -2381,7 +2366,8 @@ namespace sight {
 
             if (data.lastUsedIndex == outerList.size() -1 && list.link.empty()) {
 #if GENERATE_CODE_DETAILS == 1
-                dbg("append source, delete last list..", list.sourceStream.str());
+                logDebug("append source, delete last list..");
+                logDebug(list.sourceStream.str());
 #endif
                 finalSourceStream << list.sourceStream.str();
                 outerList.erase(outerList.end() - 1);
@@ -2393,7 +2379,7 @@ namespace sight {
         }
 
         if (tryCatch.HasCaught()) {
-            dbg("code error.");
+            logDebug("code error.");
             ReportException(isolate, &tryCatch);
         } else if (data.hasError()) {
             // report error
@@ -2439,12 +2425,12 @@ namespace sight {
 
             // maybe need append more info ?
 
-            dbg(tmpErrorMsg.str());
-            dbg(filename);
+            logDebug(tmpErrorMsg.str());
+            logDebug(filename);
         } else {
             std::string finalSource = finalSourceStream.str();
             trim(finalSource);
-            dbg(finalSource);
+            logDebug(finalSource);
             source = finalSource;
             return CODE_OK;
         }
@@ -2654,12 +2640,12 @@ namespace sight {
                 }
 
                 if (isValid(global->Get(context, key))) {
-                    dbg("repeat key, replace previous one", keyString);
+                    logDebug("repeat key, replace previous one: $0", keyString);
                     // continue;
                 }
 
                 if (!global->Set(context, key, value).ToChecked()) {
-                    dbg("set failed", keyString);
+                    logDebug("set failed: $0", keyString);
                 }
             }
         }
@@ -2691,7 +2677,7 @@ namespace sight {
 
     sight::SightNodePortWrapper::~SightNodePortWrapper()
     {
-        dbg("~SightNodePortWrapper");
+        logDebug("~SightNodePortWrapper");
     }
 
     uint sight::SightNodePortWrapper::getId() const {
@@ -2815,7 +2801,7 @@ namespace sight {
 
     sight::SightNodeGraphWrapper::~SightNodeGraphWrapper()
     {
-        dbg("~SightNodeGraphWrapper");
+        logDebug("~SightNodeGraphWrapper");
     }
 
     bool SightNodeGenerateInfo::hasGenerated() const {
@@ -2828,7 +2814,7 @@ namespace sight {
 
         auto result = v8pp::call_v8(isolate, func, Object::New(isolate), v8pp::class_<ProjectWrapper>::import_external(isolate, new ProjectWrapper(currentProject())));
         if (!result.IsEmpty()) {
-            dbg("has result");
+            logDebug("has result");
         }
         return CODE_OK;
     }

@@ -154,8 +154,11 @@ namespace sight {
 
     inline const ImVec4 colorRed = ImColor(KNOWNIMGUICOLOR_RED);
     inline const ImVec4 colorGrey = ImColor(KNOWNIMGUICOLOR_GRAY);
+    inline const ImVec4 colorYellow = ImColor(KNOWNIMGUICOLOR_YELLOW);
+    inline const ImVec4 colorOrange = ImColor(KNOWNIMGUICOLOR_ORANGE);
 
     struct Colors {
-        const ImVec4 error = colorRed;
+        const static ImVec4 error ;
+        const static ImVec4 warning;
     };
 }

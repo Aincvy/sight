@@ -2,7 +2,6 @@
 
 #include "imgui_node_editor.h"
 #include "sight.h"
-#include "dbg.h"
 #include "sight_defines.h"
 #include "sight_nodes.h"
 #include "sight_ui_node_editor.h"
@@ -362,9 +361,9 @@ namespace sight {
                 nodeRoot[stringData]
             };
         }catch(YAML::ParserException const& e){
-            dbg(e.what());
+            logDebug(e.what());
         }catch(YAML::BadSubscript const& e){
-            dbg(e.what());
+            logDebug(e.what());
         }
         
         return {};

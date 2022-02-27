@@ -2,7 +2,6 @@
 #include "IconsMaterialDesign.h"
 #include "nfd.h"
 #include "sight.h"
-#include "dbg.h"
 #include "sight_defines.h"
 #include "sight_memory.h"
 #include "sight_undo.h"
@@ -363,7 +362,7 @@ namespace sight {
     }
 
     bool SightKey::isKeyReleased() const {
-        dbg(code);
+        logDebug(code);
         return ImGui::IsKeyReleased(code);
     }
 
@@ -421,7 +420,7 @@ namespace sight {
     }
 
     bool SightTwoKey::isKeyReleased() const {
-        dbg("1");
+        logDebug("1");
         if (this->both) {
             ImGui::IsKeyPressed(1);
             return key1->isKeyReleased() && key2->isKeyReleased();
@@ -493,7 +492,7 @@ namespace sight {
             // window title
             windowTitle = "##toast-";
             absl::StrAppend(&windowTitle, id);
-            dbg(windowTitle.c_str());
+            logDebug(windowTitle.c_str());
     }
 
     void ToastElement::render(ImVec2 const& pos, ImVec2 const& size) {

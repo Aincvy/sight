@@ -2,13 +2,13 @@
 #include <thread>
 #include <filesystem>
 
-#include "dbg.h"
 #include "sight.h"
 #include "sight_ui.h"
 #include "sight_js.h"
 #include "sight_project.h"
 #include "sight_util.h"
 #include "sight_network.h"
+#include "sight_log.h"
 
 #ifdef SIGHT_DEBUG
 #include "backward.hpp"
@@ -23,40 +23,40 @@ void handler(int sig) {
 }
 
 int main(int argc, char* argv[]){
-    dbg("program start!");
+    logDebug("program start!");
 
 #ifdef SIGHT_DEBUG
     backward::SignalHandling sh;
-    dbg("in debug mode");
+    logDebug("in debug mode");
     auto path = std::filesystem::current_path();
     auto cwd = path.generic_string();
-    dbg(cwd);
+    logDebug(cwd);
     if (endsWith(cwd, "/sight/build")) {
         if (path.has_parent_path()) {
             std::filesystem::current_path(path.parent_path());
-            dbg("change working directory", std::filesystem::current_path().generic_string());
+            logDebug("change working directory: $0", std::filesystem::current_path().generic_string());
         }
     }
 #endif
     signal(SIGSEGV, handler);
 
-    dbg(argv[0]);
-    dbg("load settings");
+    logDebug(argv[0]);
+    logDebug("load settings");
     loadSightSettings(nullptr);
 
-    dbg("init project");
+    logDebug("init project");
     auto settings = getSightSettings();
     if (!settings->lastOpenProject.empty()) {
         openProject(settings->lastOpenProject.c_str(), true);
     } else {
         // 
-        dbg("no path, do not load project.");
+        logDebug("no path, do not load project.");
     }
 
-    dbg("start js thread!");
+    logDebug("start js thread!");
     std::thread jsThread(sight::jsThreadRun, argv[0]);
 
-    // dbg("start network thread");
+    // logDebug("start network thread");
     // initNetworkServer(getSightSettings()->networkListenPort);
     // std::thread networkThread(sight::runNetworkThread);
     

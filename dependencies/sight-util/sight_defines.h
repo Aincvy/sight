@@ -3,13 +3,7 @@
 //
 
 #pragma once
-
-#ifdef SIGHT_RELEASE
-#define dbg(...)
-#else
-#define DBG_MACRO_NO_WARNING 1
-#include "dbg.h"
-#endif
+#include <string>
 
 // used for name string
 #define FILENAME_BUF_SIZE 256

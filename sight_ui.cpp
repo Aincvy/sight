@@ -1,5 +1,11 @@
+#include "imgui.h"
+#include "imgui_internal.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
 #include "imgui_internal.h"
 #include "imgui_node_editor.h"
+
+#include "sight_terminal.h"
 #include "sight_defines.h"
 #include "sight_external_widgets.h"
 #include "sight_keybindings.h"
@@ -9,19 +15,15 @@
 #include "sight_ui_node_editor.h"
 #include "sight_ui_project.h"
 #include "sight.h"
-#include "dbg.h"
 #include "sight_js.h"
 #include "sight_js_parser.h"
 #include "sight_project.h"
 #include "sight_util.h"
 #include "sight_undo.h"
 #include "sight_colors.h"
-
-#include "imgui.h"
-#include "imgui_internal.h"
-#include "imgui_impl_glfw.h"
-#include "imgui_impl_opengl3.h"
+#include "sight_log.h"
 #include "sight_widgets.h"
+
 #include "v8pp/convert.hpp"
 
 #include "IconsMaterialDesign.h"
@@ -78,10 +80,10 @@ namespace sight {
         void saveAnyThing(){
             int i ;
             if ((i = currentGraph()->save()) != CODE_OK) {
-                dbg(i);
+                logDebug(i);
             }
             if ((i = currentProject()->save()) != CODE_OK) {
-                dbg(i);
+                logDebug(i);
             }
             saveSightSettings();
         }
@@ -182,6 +184,9 @@ namespace sight {
                 if (ImGui::MenuItem("Demo")) {
                     g_UIStatus->windowStatus.testWindow = true;
                 }
+                if (ImGui::MenuItem("Terminal")) {
+                    g_UIStatus->windowStatus.terminalWindow = true;
+                }
 
                 ImGui::EndMenu();
             }
@@ -193,7 +198,7 @@ namespace sight {
                 auto p = currentProject();
                 for (const auto& item : p->getBuildTargetMap()) {
                     if (ImGui::MenuItem(item.first.c_str())) {
-                        dbg(item.first);
+                        logDebug(item.first);
                         addJsCommand(JsCommandType::ProjectBuild, item.first.c_str());
                     }
                 }
@@ -212,7 +217,7 @@ namespace sight {
             if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.parseGraph)) {
                 auto lastOpenGraph = currentProject()->getLastOpenGraph();
                 if (lastOpenGraph.empty()) {
-                    dbg("not open any graph");
+                    logDebug("not open any graph");
                 } else {
                     saveAnyThing();
                     addJsCommand(JsCommandType::ParseGraph, strdup((lastOpenGraph + ".yaml").c_str()), 0, true);
@@ -223,7 +228,7 @@ namespace sight {
             }
             if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.reload, "Ctrl+R")) {
                 currentProject()->buildFilesCache();
-                dbg("reload");
+                logDebug("reload");
             }
             if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.settings)) {
                 if (g_UIStatus->windowStatus.projectSettingsWindow) {
@@ -254,7 +259,6 @@ namespace sight {
                 } 
                 if (ImGui::MenuItem("VerifyId")) {
                     int c = currentGraph()->verifyId();
-                    dbg(c == CODE_OK);
                     if (c == CODE_OK) {
                         g_UIStatus->toastController.toast(ICON_MD_SENTIMENT_SATISFIED " Id Fine!", "");
                     } else {
@@ -276,18 +280,8 @@ namespace sight {
 
         void showMainCustomMenu(){
             if (ImGui::MenuItem("Trigger")) {
-                // auto p = findTemplateNode("test/http/HttpGetReqNode");
-                // dbg(p);
-                // if (p) {
-                //     dbg(serializeJsNode(*p));
-                // }
-                // currentProject()->parseAllGraphs();
-                static std::vector<SightEntityField> fields;
-                fields.push_back({"age","int",""});
-                fields.push_back({"real","int","0"});
-                fields.push_back({"name","string","no-name"});
-                std::swap(fields[0], fields[2]);
-                dbg(fields[0].name);
+                logDebug("123");
+                logError(5.555f);
             }
             if (ImGui::MenuItem("Crash")) {
                 // produce a crash for test.
@@ -298,7 +292,7 @@ namespace sight {
 
         void showHelpMenu(){
             if (ImGui::MenuItem("About")) {
-                dbg("sight WIP v0.1");
+                logDebug("sight WIP v0.1");
                 if (g_UIStatus->windowStatus.aboutWindow) {
                     ImGui::SetWindowFocus(WINDOW_LANGUAGE_KEYS.about);
                 } else {
@@ -346,6 +340,22 @@ namespace sight {
         }
 
         void showDemoWindow(bool needInit){
+            // terminal test
+            // static bool initTerminal = false;
+            // TerminalRuntimeArgs customCommand;
+            // static ImTerm::terminal<TerminalCommands>* terminal = nullptr;
+            // if (!initTerminal) {
+            //     initTerminal = true;
+            //     terminal = new ImTerm::terminal<TerminalCommands>(customCommand);
+            //     terminal->add_text("1");
+            //     terminal->add_text("1");
+            //     terminal->add_text("1");
+            //     terminal->add_text("1");
+            // } else {
+            //     initTerminal = terminal->show();
+            // }
+
+            // a
             ImGui::Begin("Test Window", &g_UIStatus->windowStatus.testWindow);
             static const char* a[] = {
                 "A",
@@ -570,7 +580,7 @@ namespace sight {
                             break;
                     }
                     if (ImGui::Selectable(name.c_str(), selected, ImGuiSelectableFlags_AllowDoubleClick)) {
-                        dbg(item.path);
+                        logDebug(item.path);
 
                         if (ImGui::IsMouseDoubleClicked(0)) {
                             auto g = currentGraph();
@@ -583,7 +593,7 @@ namespace sight {
                             if (item.fileType == ProjectFileType::Graph) {
                                 uiChangeGraph(item.path.c_str());
                             } else {
-                                dbg("unHandle file type", item.fileType);
+                                logDebug("unHandle file type: $0", static_cast<int>(item.fileType));
                             }
                         } else {
                             
@@ -654,7 +664,6 @@ namespace sight {
                     }
                 }
             }
-
             
             if (!operationNames.empty()) {
                 const auto width = ImGui::GetWindowWidth();
@@ -866,7 +875,7 @@ namespace sight {
                         if (r == 0) {
                             resetDataAndCloseWindow();
                         } else {
-                            dbg(r);
+                            logDebug(r);
                             if (r == CODE_FAIL) {
                                 g_UIStatus->toastController.error().toast("Add entity failed!", "");
                             } else if (r == CODE_CONVERT_ENTITY_FAILED) {
@@ -1008,7 +1017,7 @@ namespace sight {
                         std::string str{ "! You only can delete the NOT-USED entity !\nYou will delete: " };
                         str += delFullName;
                         openAskModal("Delete entity", str.c_str(), [p, delFullName](bool f) {
-                            dbg(f);
+                            logDebug(f);
                             if (f) {
                                 p->delEntity(delFullName);
                             }
@@ -1186,7 +1195,7 @@ namespace sight {
                 // create
 
                 if (strlen(g_UIStatus->buffer.littleName) > 0) {
-                    dbg(g_UIStatus->buffer.littleName);
+                    logDebug(g_UIStatus->buffer.littleName);
                     auto p = currentProject();
                     std::string path = p->pathGraph(g_UIStatus->buffer.littleName);
                     uiChangeGraph(path);
@@ -1310,9 +1319,9 @@ namespace sight {
             return;
         }
 
-        // dbg("got control key");
+        // logDebug("got control key");
         if (keybindings->saveFile) {
-            dbg("save graph");
+            logDebug("save graph");
             saveAnyThing();
         } else if (keybindings->undo) {
             undo();
@@ -1342,14 +1351,31 @@ namespace sight {
         //
         ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_MenuBar;
         float height = ImGui::GetFrameHeight();
-
+        
+        auto& data = g_UIStatus->statusBarData;
         if (ImGui::BeginViewportSideBar("##MainStatusBar", NULL, ImGuiDir_Down, height, window_flags)) {
             if (ImGui::BeginMenuBar()) {
-                ImGui::Text("Status bar is testing!!! ");
-                ImGui::Text(ICON_MD_INFO "0");
+                if (!data.logText.empty()) {
+                    // show
+                    switch (data.logLevel) {
+                    case LogLevel::Warning:
+                        ImGui::TextColored(Colors::warning, ICON_MD_INFO "%s", data.logText.c_str());
+                        break;
+                    case LogLevel::Error:
+                        ImGui::TextColored(Colors::error, ICON_MD_INFO "%s", data.logText.c_str());
+                        break;
+                    default:
+                        ImGui::Text(ICON_MD_INFO "%s", data.logText.c_str());
+                        break;
+                    }
+                }
+
+                // start from right-most.
+                auto width = ImGui::GetWindowWidth();
+                ImGui::SameLine(width - 35);
                 ImGui::PushStyleColor(ImGuiCol_Button, ImColor().Value);
                 if (ImGui::Button(ICON_MD_PLAY_ARROW)) {
-                    dbg("build");
+                    logDebug("want to build, but not impl");
                 }
                 ImGui::PopStyleColor();
 
@@ -1396,6 +1422,10 @@ namespace sight {
         if (windowStatus.entityInfoWindow) {
             showEntityInfoWindow();
         }
+        if (windowStatus.terminalWindow) {
+            windowStatus.terminalWindow = uiStatus.terminalData.terminal->show();
+
+        }   
 
         nodeEditorFrameEnd();
 
@@ -1408,14 +1438,14 @@ namespace sight {
     }
 
     void runUICommand(UICommand *command){
-        dbg(command->type);
+        logDebug(static_cast<int>(command->type));
         switch (command->type) {
             case UICommandType::UICommandHolder:
                 break;
             case UICommandType::COMMON:
                 break;
             case UICommandType::JsEndInit: {
-                dbg("js end init.");
+                logDebug("js end init.");
                 g_UIStatus->loadingStatus.jsThread = true;
                 break;
             }
@@ -1456,7 +1486,7 @@ namespace sight {
                 auto module = v8::Object::New(isolate);
                 if (runJsFile(isolate, command->args.argString, nullptr, module) == CODE_OK) {
                     // 
-                    dbg("ok");
+                    logDebug("ok");
                     registerToGlobal(isolate, module->Get(isolate->GetCurrentContext(), v8pp::to_v8(isolate, "globals")).ToLocalChecked());
                 };
 
@@ -1497,7 +1527,7 @@ namespace sight {
     }
 
     int showLoadingWindow(){
-        dbg("start loading");
+        logDebug("start loading");
         // Create window with graphics context
         const int width = 640;
         const int height = 360;
@@ -1554,7 +1584,7 @@ namespace sight {
         g_UIStatus->uiColors = new UIColors();
 
         // init ui v8
-        dbg("init ui v8 Isolate");
+        logDebug("init ui v8 Isolate");
         v8::Isolate::CreateParams createParams;
         createParams.array_buffer_allocator =
             v8::ArrayBuffer::Allocator::NewDefaultAllocator();
@@ -1575,6 +1605,37 @@ namespace sight {
         bindUIThreadFunctions(context, module);
         context->Global()->Set(context, v8pp::to_v8(isolate, "sight"), module.new_instance()).ToChecked();
 
+        // terminal and log
+        g_UIStatus->terminalData.terminal = new ImTerm::terminal<TerminalCommands>(g_UIStatus->terminalData.runtimeArgs);
+        auto logWriterFunc = [](LogLevel l, std::string_view msg){
+            if (g_UIStatus->terminalData.stopLogging) {
+                return;
+            }
+
+            ImTerm::message::severity::severity_t s = ImTerm::message::severity::debug;
+            switch (l) {
+            case LogLevel::Trace:
+                s = ImTerm::message::severity::trace;
+                break;
+            case LogLevel::Debug:
+                break;
+            case LogLevel::Info:
+                s = ImTerm::message::severity::info;
+                break;
+            case LogLevel::Warning:
+                s = ImTerm::message::severity::warn;
+                break;
+            case LogLevel::Error:
+                s = ImTerm::message::severity::err;
+                break;
+            }
+            g_UIStatus->terminalData.terminal->add_message({s, std::string{msg}, 0, msg.length()});
+            g_UIStatus->statusBarData.logLevel = l;
+            g_UIStatus->statusBarData.logText = msg;
+        };
+        registerLogWriter(logWriterFunc);
+
+        // 
         uint progress = 0;
         int leftFrame = 0;
         bool pluginStartLoad = false;
@@ -1680,7 +1741,7 @@ namespace sight {
 
         glfwDestroyWindow(window);
 
-        dbg("end loading");
+        logDebug("end loading");
         return 0;
     }
 
@@ -1689,13 +1750,15 @@ namespace sight {
             return CODE_FAIL;
         }
 
+        logDebug("start show main window...");
+
         // create js context
         auto isolate = g_UIStatus->isolate;
         v8::Isolate::Scope isolateScope(isolate);
         v8::HandleScope handle_scope(isolate);
         v8::Local<v8::Context> context = g_UIStatus->v8GlobalContext.Get(isolate);
         v8::Context::Scope contextScope(context);
-        dbg("v8 runtime init over.");
+        logDebug("v8 runtime init over.");
 
         // Create window with graphics context
         glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
@@ -1871,8 +1934,7 @@ namespace sight {
         auto async = g_UIStatus->uvAsync;
         async->data = copyObject(&command, sizeof(UICommand));
         uv_async_send(async);
-        dbg(command.type);
-        return 0;
+        return CODE_OK;
     }
 
     bool LeftLabeledInput(const char *label, char *buf, size_t bufSize) {
@@ -1911,7 +1973,7 @@ namespace sight {
         int status = CODE_OK;
         std::string path = openFolderDialog(lastOpenFolder.c_str(), &status);
         if (status == CODE_OK) {
-            dbg(path);
+            logDebug(path);
             folderError = false;
 
             lastOpenFolder = path;

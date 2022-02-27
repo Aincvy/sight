@@ -33,6 +33,8 @@ target_sources(sight PRIVATE
         sight_network.cpp
         sight_undo.cpp
         sight_object.cpp
+        sight_terminal.cpp
+        sight_colors.cpp
         # dependencies/imgui/imgui_demo.cpp           # for debug
 )
 
@@ -77,6 +79,8 @@ target_link_libraries(sight PRIVATE ${EXTRA_LIBS})
 # backward-cpp
 target_include_directories(sight PRIVATE dependencies/backward-cpp)
 
+# ImTerm
+target_include_directories(sight PRIVATE dependencies/ImTerm/include)
 
 # yaml-cpp
 find_package(yaml-cpp REQUIRED)

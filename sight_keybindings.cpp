@@ -1,5 +1,5 @@
 #include "sight_keybindings.h"
-#include "dbg.h"
+#include "sight_log.h"
 #include "sight_util.h"
 #include "sight_widgets.h"
 #include "IconsMaterialDesign.h"
@@ -38,7 +38,7 @@ namespace sight {
                 }
                 pointer = getFromKeyMap(str);
                 if (!pointer) {
-                    dbg(keyName);
+                    logDebug(keyName);
                     return false;
                 }
                 wrapper = pointer;

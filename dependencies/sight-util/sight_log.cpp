@@ -5,13 +5,39 @@
 
 #include "sight_defines.h"
 #include "sight_log.h"
+#include "absl/strings/substitute.h"
+
+static std::function<void(sight::LogLevel, std::string_view msg)> logWriter = nullptr;
 
 namespace sight {
 
-    int logDebug(const char *msg) {
-        dbg(msg);
+#ifdef SIGHT_DEBUG
+    bool logSourceLocation = true;
+#endif
 
-        return 0;
+    bool registerLogWriter(std::function<void(LogLevel, std::string_view msg)> func) {
+        if (func) {
+            if (logWriter) {
+                return false;
+            }
+
+            logWriter = func;
+        } else {
+            logWriter = nullptr;
+        }
+
+        return true;
+    }
+
+    bool unregisterLogWriter() {
+        logWriter = nullptr;
+        return true;
+    }
+
+    void callLogWriter(LogLevel l, const char* msg) {
+        if (logWriter) {
+            logWriter(l, msg);
+        }
     }
     
 }

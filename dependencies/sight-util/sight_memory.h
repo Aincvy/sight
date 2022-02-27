@@ -8,7 +8,6 @@
 #include <type_traits>
 #include "absl/container/flat_hash_set.h"
 
-#include "dbg.h"
 #include "sight_defines.h"
 
 namespace sight {

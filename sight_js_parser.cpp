@@ -3,6 +3,7 @@
 //
 
 #include "sight_js_parser.h"
+#include "sight_log.h"
 
 #include <string.h>
 #include <tree_sitter/api.h>
@@ -72,7 +73,7 @@ namespace sight {
             if (iter != nodeHandlerMap.end()) {
                 return iter->second(generatedCode, node);
             }
-            dbg(std::string("do not handle ") + nodeType);
+            logDebug("do not handle $0", nodeType);
 
             return nullptr;
         }
@@ -109,7 +110,7 @@ namespace sight {
 
 
         /**
-         * Use `dbg()` to display hierarchy.
+         * 
          * @param generatedCode
          * @param node
          */
@@ -119,7 +120,7 @@ namespace sight {
             }
 
             char *string = ts_node_string(node);
-            dbg(string);
+            logDebug(string);
             free(string);
         }
 
@@ -144,13 +145,13 @@ namespace sight {
             };
 
             nodeHandlerMap["binary_expression"] = [](GeneratedCode &generatedCode,TSNode &node){
-                dbg("in binary_expression callback");
+                logDebug("in binary_expression callback");
 //                auto token = generatedCode.getToken(&node);
 //                if (token == GeneratedCode::invalidToken) {
 //                     // may need to do something.
 //                }
 
-                dbg(ts_node_child_count(node));
+                logDebug(ts_node_child_count(node));
                 // 3 children.
                 auto a = ts_node_child_by_field_id(node, fields.left);
                 auto b = ts_node_child_by_field_id(node, fields._operator);
@@ -163,10 +164,10 @@ namespace sight {
             };
 
             nodeHandlerMap["assignment_expression"] = [](GeneratedCode &generatedCode,TSNode &node){
-                dbg(ts_node_child_count(node));
+                logDebug(ts_node_child_count(node));
                 auto a = ts_node_named_child(node, 0);
                 auto b = ts_node_named_child(node, 1);
-                dbg("assignment_expression");
+                logDebug("assignment_expression");
 
                 auto left = generate(generatedCode, a);
                 auto right = generate(generatedCode, b);
@@ -209,7 +210,7 @@ namespace sight {
     }
 
     void parseSource(const char *source) {
-        dbg(source);
+        logDebug(source);
 
         TSTree *tree = ts_parser_parse_string(
                 g_parser,
@@ -225,13 +226,13 @@ namespace sight {
         generate(generatedCode, rootNode);
 
         if (generatedCode.assignValueStmt) {
-            dbg("start visitor");
+            logDebug("start visitor");
             GeneratedCodeVisitor visitor(&generatedCode);
             visitor.visit(generatedCode.assignValueStmt);
         }
 
         ts_tree_delete(tree);
-        dbg("end of function parseSource");
+        logDebug("end of function parseSource");
     }
 
     Token::Token(const char *string) {
@@ -435,8 +436,6 @@ namespace sight {
             return false;
         }
 
-        dbg(element->getElementType());
-
         switch (element->getElementType()) {
             case GeneratedElementType::Token:
                 return visit((Token*) element);
@@ -468,7 +467,7 @@ namespace sight {
     }
 
     bool GeneratedCodeVisitor::visit(AssignValueStmt *assignValueStmt) {
-        dbg("AssignValueStmt");
+        logDebug("AssignValueStmt");
 
         visit(assignValueStmt->left);
         visit(assignValueStmt->right);
@@ -476,7 +475,7 @@ namespace sight {
     }
 
     bool GeneratedCodeVisitor::visit(BinaryExpr *binaryExpr) {
-        dbg("BinaryExpr");
+        logDebug("BinaryExpr");
 
         visit(binaryExpr->left);
         visit(binaryExpr->symbol);
@@ -485,12 +484,12 @@ namespace sight {
     }
 
     bool GeneratedCodeVisitor::visit(IntLiteral *intLiteral) {
-        dbg("IntLiteral", intLiteral->value);
+        logDebug("IntLiteral", intLiteral->value);
         return true;
     }
 
     bool GeneratedCodeVisitor::visit(Token *token) {
-        dbg("Token", token->word);
+        logDebug("Token", token->word);
         return true;
     }
 

@@ -1,19 +1,20 @@
-#include "sight_ui_node_editor.h"
-
-#include "dbg.h"
-#include "sight_external_widgets.h"
-
+#define IMGUI_DEFINE_MATH_OPERATORS
+#include "imgui.h"
+#include "imgui_canvas.h"
+#include "imgui_internal.h"
 #include "imgui_node_editor.h"
+
+#include "sight_ui_node_editor.h"
+#include "sight_external_widgets.h"
 #include "sight.h"
 #include "sight_address.h"
 #include "sight_keybindings.h"
 #include "sight_colors.h"
-
-#include "imgui.h"
 #include "sight_nodes.h"
 #include "sight_project.h"
 #include "sight_undo.h"
 #include "sight_widgets.h"
+
 #include <cassert>
 #include <iostream>
 #include <iterator>
@@ -23,9 +24,6 @@
 
 #include "absl/strings/substitute.h"
 
-#define IMGUI_DEFINE_MATH_OPERATORS
-#include "imgui_canvas.h"
-#include "imgui_internal.h"
 
 #define BACKGROUND_CONTEXT_MENU "BackgroundContextMenu"
 #define LINK_CONTEXT_MENU "LinkContextMenu"
@@ -148,22 +146,22 @@ namespace sight {
         void showContextMenu(uint nodeId, uint linkId, uint pinId) {
             auto showPortDebugInfo = [](SightNodePort const& item) {
                 auto portInfoMsg = absl::Substitute("$0, $1", item.getId(), item.portName);
-                dbg(portInfoMsg);
+                logDebug(portInfoMsg);
             };
 
             if (ImGui::BeginPopup(NODE_CONTEXT_MENU)) {
                 if (ImGui::MenuItem("DebugInfo")) {
                     // show debug info.
-                    dbg(nodeId);
+                    logDebug(nodeId);
                     auto nodePointer = currentGraph()->findNode(nodeId);
-                    dbg(nodePointer);
+                    logDebug(nodePointer);
                     if (nodePointer) {
                         auto nodeFunc = [&showPortDebugInfo](std::vector<SightNodePort> const& list) {
                             if (list.empty()) {
                                 return ;
                             }
 
-                            dbg(getNodePortTypeName(list.front().kind));
+                            logDebug(getNodePortTypeName(list.front().kind));
                             for( const auto& item: list){
                                 showPortDebugInfo(item);
                             }
@@ -172,7 +170,7 @@ namespace sight {
                         CALL_NODE_FUNC(nodePointer);
                     }
                 } else if (ImGui::MenuItem("Copy")) {
-                    dbg(nodeId);
+                    logDebug(nodeId);
                     auto nodePointer = currentGraph()->findNode(nodeId);
                     if (nodePointer) {
                         auto str = CopyText::from(*nodePointer);
@@ -187,13 +185,13 @@ namespace sight {
                     if (port) {
                         showPortDebugInfo(*port);
                     } else {
-                        dbg("no-port-info");
+                        logDebug("no-port-info");
                     }
                 }
                 if (ImGui::MenuItem("ShowFlow")) {
                     for( const auto& item: port->connections){
                         ed::Flow(item->connectionId);
-                        dbg(item->connectionId);
+                        logDebug(item->connectionId);
                     }
                 }
 
@@ -201,7 +199,7 @@ namespace sight {
             }
             if (ImGui::BeginPopup(LINK_CONTEXT_MENU)) {
                 if (ImGui::MenuItem("itemA")) {
-                    dbg("item a");
+                    logDebug("item a");
                 }
                 ImGui::EndPopup();
             }
@@ -215,7 +213,7 @@ namespace sight {
 
                 ImGui::Separator();
                 if (ImGui::MenuItem("custom operations")) {
-                    dbg("custom operations");
+                    logDebug("custom operations");
                 }
 
                 ImGui::EndPopup();
@@ -664,7 +662,7 @@ namespace sight {
 
             ImGui::SameLine();
             if (ImGui::Button("Parse")) {
-                dbg("Not impl");
+                logDebug("Not impl");
             }
             if (!sightSettings->autoSave) {
                 ImGui::SameLine();
@@ -750,16 +748,16 @@ namespace sight {
                                     // may show something to user.
                                     switch (id) {
                                     case -1:
-                                        dbg("left or right is invalid");
+                                        logDebug("left or right is invalid");
                                         break;
                                     case -2:
-                                        dbg("same port id");
+                                        logDebug("same port id");
                                         break;
                                     case -3:
-                                        dbg("same kind");
+                                        logDebug("same kind");
                                         break;
                                     case -4:
-                                        dbg("left only can accept one connection");
+                                        logDebug("left only can accept one connection");
                                         break;
                                     }
                                 }
@@ -779,12 +777,12 @@ namespace sight {
                     g_ContextStatus->portForCreateNode = portHandle;
 
                     if (ed::AcceptNewItem()) {
-                        dbg("new node");
+                        logDebug("new node");
                         
                         if (portHandle) {
                             flagBackgroundContextMenu = true;
                         } else {
-                            dbg("invalid port handle");
+                            logDebug("invalid port handle");
                         }
                     }   
                 }
@@ -833,7 +831,7 @@ namespace sight {
             if (keybindings->controlKey.isKeyDown()) {
                 
                 if (keybindings->duplicateNode) {
-                    dbg("duplicate node");
+                    logDebug("duplicate node");
                     if (uiStatus.selection.selectedNodeOrLinks.size() == 1) {
                         auto tmpNode = uiStatus.selection.getSelectedNode();
                         if (tmpNode && tmpNode->templateNode) {
@@ -891,7 +889,7 @@ namespace sight {
                     }
                 } else if (keybindings->_delete) {
                     // delete
-                    dbg("delete");
+                    logDebug("delete");
                     auto& selected = uiStatus.selection.selectedNodeOrLinks;
                     if (selected.size() == 1) {
                         auto id = *selected.begin();
@@ -1214,7 +1212,7 @@ namespace sight {
                         // }
                         if (value->stringCheck(data->BufTextLen)) {
                             data->Buf = value->u.largeString.pointer;
-                            dbg("resize", largeString.bufferSize, data->BufSize, data->BufTextLen);
+                            logDebug("resize", largeString.bufferSize, data->BufSize, data->BufTextLen);
                         }
                     }
                     return 0;
@@ -1269,7 +1267,6 @@ namespace sight {
         if (children.empty()) {
             if (ImGui::MenuItem(name.c_str())) {
                 //
-                // dbg("it will create a new node.", this->name);
                 auto node = this->templateNode->instantiate();
                 auto nodeId = node->getNodeId();
                 node->position = convert(g_ContextStatus->nextNodePosition);

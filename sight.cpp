@@ -75,6 +75,7 @@ namespace sight {
             windowStatus.entityListWindow = n["entityListWindow"].as<bool>();
             windowStatus.entityInfoWindow = n["entityInfoWindow"].as<bool>();
             windowStatus.generateResultWindow = n["generateResultWindow"].as<bool>();
+            windowStatus.terminalWindow = n["terminal"].as<bool>(false);
         }
 
         n = root["lastUseEntityOperation"];
@@ -105,6 +106,7 @@ namespace sight {
         out << YAML::Key << "entityListWindow" << YAML::Value << windowStatus.entityListWindow;
         out << YAML::Key << "entityInfoWindow" << YAML::Value << windowStatus.entityInfoWindow;
         out << YAML::Key << "generateResultWindow" << YAML::Value << windowStatus.generateResultWindow;
+        out << YAML::Key << "terminal" << YAML::Value << windowStatus.terminalWindow;
         out << YAML::EndMap;        // end of windowStatus
         
         out << YAML::Key << "lastUseEntityOperation" << YAML::Value << sightSettings.lastUseEntityOperation;

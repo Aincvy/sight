@@ -1,7 +1,6 @@
 //
 // Created by Aincvy(aincvy@gmail.com) on 2021/7/20.
 //
-
 #include <cassert>
 #include <cstddef>
 #include <cstdio>
@@ -21,12 +20,12 @@
 #include "sight_defines.h"
 #include "sight.h"
 #include "sight_defines.h"
-#include "dbg.h"
 #include "sight_js.h"
 #include "sight_address.h"
 #include "sight_util.h"
 #include "sight_project.h"
 #include "sight_ui.h"
+#include "sight_log.h"
 
 #include "v8pp/call_v8.hpp"
 #include "v8pp/convert.hpp"
@@ -91,18 +90,17 @@ namespace sight {
     }
 
     void changeGraph(const char *pathWithoutExt) {
-        dbg(pathWithoutExt);
+        logDebug(pathWithoutExt);
         disposeGraph();
 
-        char buf[NAME_BUF_SIZE];
+        char buf[FILENAME_BUF_SIZE];
         sprintf(buf, "%s.yaml", pathWithoutExt);
         g_NodeEditorStatus->loadOrCreateGraph(buf);
 
         if (CURRENT_GRAPH) {
             CURRENT_GRAPH->callNodeEventsAfterLoad();
         }
-        dbg("change over!");
-        
+        logDebug("change over!");
     }
 
     SightNodePort::SightNodePort(NodePortType kind, uint type, const SightJsNodePort* templateNodePort)
@@ -141,7 +139,7 @@ namespace sight {
         std::transform(connections.begin(), connections.end(), std::back_inserter(ids), [](SightNodeConnection* c) {
             return c->connectionId;
         });
-        dbg(ids);
+        
         uint count = 0;
         for (const auto& item : ids) {
             if (g->delConnection(item) == CODE_OK) {
@@ -376,7 +374,7 @@ namespace sight {
     }
 
     void SightNode::reset() {
-        dbg("node reset");
+        logDebug("node reset");
         // call events
         if (templateNode) {
             auto t = dynamic_cast<const SightJsNode*>(templateNode);
@@ -499,7 +497,7 @@ namespace sight {
     }
 
     SightNode* SightJsNode::instantiate(bool generateId) const {
-        dbg(this->nodeName);
+        logDebug(this->nodeName);
         auto p = new SightNode();
         
         auto portCopyFunc = [](std::vector<SightJsNodePort*> const& src, std::vector<SightNodePort> & dst){
@@ -597,9 +595,6 @@ namespace sight {
 
     void SightJsNode::updateStyle() {
         auto& style = this->nodeStyle;
-        // if (this->nodeName == "VarDeclare") {
-        //     dbg(1);
-        // }
 
         auto nodeFunc = [](std::vector<SightJsNodePort*> const& p, SightNodeStyle::PortTypeStyle& typeStyle, bool isField){
             typeStyle.inputWidth = 0;
@@ -752,7 +747,7 @@ namespace sight {
         std::ofstream outToFile(path, std::ios::out | std::ios::trunc);
         outToFile << out.c_str() << std::endl;
         outToFile.close();
-        dbg("save over");
+        logDebug("save over");
         return CODE_OK;
     }
 
@@ -770,7 +765,7 @@ namespace sight {
 
             // nodes
             auto nodeRoot = root["nodes"];
-            dbg(nodeRoot.size());
+            logDebug(nodeRoot.size());
 
             int loadNodeStatus = CODE_OK;
             SightNode* sightNode = nullptr;
@@ -803,7 +798,7 @@ namespace sight {
             }
 
             this->editing = false;
-            dbg("load ok");
+            logDebug("load ok");
             return status;
         }catch (const YAML::BadConversion & e){
             fprintf(stderr, "read file %s error!\n", path);
@@ -1179,7 +1174,7 @@ namespace sight {
             *copyTo = *result;
         }
         connections.erase(result);
-        dbg(id);
+        logDebug(id);
         return CODE_OK;
     }
 
@@ -1367,7 +1362,8 @@ namespace sight {
     }
 
     int addTemplateNode(const SightNodeTemplateAddress& templateAddress, bool isUpdate) {
-        dbg(templateAddress.name);
+        logDebug(templateAddress.name);
+
         if (templateAddress.name.empty()) {
             return -1;
         }
@@ -1402,13 +1398,13 @@ namespace sight {
                     // find
                     std::string tmpMsg = "replace template node: ";
                     tmpMsg += pointer->part;
-                    dbg(tmpMsg);
+                    logDebug(tmpMsg);
                     auto willCopy = *templateNode;
 
                     // src1: pointers, src2:
                     auto copyFunc = [](std::vector<SightJsNodePort*>& dst, std::vector<SightJsNodePort*>& src1, std::vector<SightJsNodePort>& src2) {
                         if (!dst.empty()) {
-                            dbg("Oops! dst not empty, clear!");
+                            logDebug("Oops! dst not empty, clear!");
                             dst.clear();
                         }
                         
@@ -1702,7 +1698,7 @@ namespace sight {
             }
         }
         if (!pointer) {
-            dbg(portName, "not found");
+            logDebug("$0 not found", portName);
             return CODE_FAIL;
         }
 
@@ -1744,7 +1740,6 @@ namespace sight {
             case IntTypeProcess:
             case IntTypeButton:
             case IntTypeObject:
-                // dbg("IntTypeProcess" , portName);
                 break;
             case IntTypeChar:
                 if (valueNode.IsDefined() && !valueNode.IsNull()) {
@@ -1770,12 +1765,12 @@ namespace sight {
                             break;
                         case TypeInfoRenderKind::Default:
                         default:
-                            dbg("no-render-function", type, getTypeName(type));
+                            logDebug("no-render-function: $0, $1", type, getTypeName(type));
                             break;
                         }
                     }
                 } else {
-                    dbg("type error, unHandled", type, getTypeName(type));
+                    logDebug("type error, unHandled: $0, $1", type, getTypeName(type));
                 }
             } break;
             }
@@ -1796,7 +1791,7 @@ namespace sight {
         }
         auto templateNode = g_NodeEditorStatus->findTemplateNode(templateNodeAddress.c_str());
         if (!templateNode) {
-            dbg(templateNodeAddress, " template not found.");
+            logDebug("template not found: $0", templateNodeAddress, " template not found.");
             return CODE_TEMPLATE_ADDRESS_INVALID;
         }
 
@@ -1993,7 +1988,6 @@ namespace sight {
         largeString.size = 0;
         largeString.pointer = (char*)calloc(1, largeString.bufferSize);
 
-        // dbg(largeString.bufferSize, largeString.pointer, largeString.size);
     }
 
     bool SightNodeValue::stringCheck(size_t needSize) {
@@ -2187,7 +2181,6 @@ namespace sight {
 
     bool ScriptFunctionWrapper::checkFunction(Isolate* isolate) const {
         if (function.IsEmpty()) {
-            // dbg(sourceCode);
             if (!sourceCode.empty()) {
                 const_cast<ScriptFunctionWrapper*>(this)->compile(isolate);
             } else {

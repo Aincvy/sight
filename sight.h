@@ -6,6 +6,7 @@
 #include <future>
 #include <string>
 #include <string_view>
+#include <sys/types.h>
 
 #include "sight_defines.h"
 
@@ -113,6 +114,7 @@ namespace sight {
         bool entityListWindow = false;
         bool entityInfoWindow = false;
         bool generateResultWindow = false;
+        bool terminalWindow = false;
 
         bool layoutReset = false;
 
