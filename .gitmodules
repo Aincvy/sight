@@ -31,3 +31,6 @@
 [submodule "dependencies/ImTerm"]
 	path = dependencies/ImTerm
 	url = git@github.com:Aincvy/ImTerm.git
+[submodule "dependencies/cista"]
+	path = dependencies/cista
+	url = https://github.com/felixguendling/cista.git
