@@ -280,7 +280,10 @@ namespace sight {
 
         void showMainCustomMenu(){
             if (ImGui::MenuItem("Trigger")) {
+                trace("trace msg");
                 logDebug("123");
+                logInfo("info msg");
+                logWarning("warning msg");
                 logError(5.555f);
             }
             if (ImGui::MenuItem("Crash")) {
@@ -1607,6 +1610,7 @@ namespace sight {
 
         // terminal and log
         g_UIStatus->terminalData.terminal = new ImTerm::terminal<TerminalCommands>(g_UIStatus->terminalData.runtimeArgs);
+        g_UIStatus->terminalData.terminal->theme() = ImTerm::themes::cherry;
         auto logWriterFunc = [](LogLevel l, std::string_view msg){
             if (g_UIStatus->terminalData.stopLogging) {
                 return;

@@ -125,11 +125,15 @@ namespace sight {
 }
 
 #ifdef SIGHT_DEBUG
+#define trace(...) sight::LogConstructor(__FILE__, __LINE__, __func__, LogLevel::Trace).print(__VA_ARGS__)
 #define logDebug(...) sight::LogConstructor(__FILE__, __LINE__, __func__, LogLevel::Debug).print(__VA_ARGS__)
 #define logInfo(...) sight::LogConstructor(__FILE__, __LINE__, __func__, LogLevel::Info).print(__VA_ARGS__)
+#define logWarning(...) sight::LogConstructor(__FILE__, __LINE__, __func__, LogLevel::Warning).print(__VA_ARGS__)
 #define logError(...) sight::LogConstructor(__FILE__, __LINE__, __func__, LogLevel::Error).print(__VA_ARGS__)
 #else
+#    define trace(...)
 #    define logDebug(...)
 #    define logInfo(...) sight::LogConstructor("", 0, "", LogLevel::Info).print(__VA_ARGS__)
+#    define logWarning(...) sight::LogConstructor("", 0, "", LogLevel::Warning).print(__VA_ARGS__)
 #    define logError(...) sight::LogConstructor("", 0, "", LogLevel::Info).Error(__VA_ARGS__)
 #endif

@@ -1,5 +1,9 @@
 #include "sight_terminal.h"
 
+#include "absl/strings/substitute.h"
+#include "imterm/utils.hpp"
+#include <utility>
+
 namespace sight  {
 
     namespace {
@@ -139,6 +143,16 @@ namespace sight  {
                 "logs",
             };
         }
+
+        template<typename ...Args>
+        void addFormatText(TerminalCommands::argument_type& arg, const char* fmt, Args&& ...fmtArgs) {
+            arg.term.add_text(absl::Substitute(fmt, std::forward<Args>(fmtArgs)...));
+        }
+
+        template<typename... Args>
+        void addFormatTextError(TerminalCommands::argument_type& arg, const char* fmt, Args&&... fmtArgs) {
+            arg.term.add_text_err(absl::Substitute(fmt, std::forward<Args>(fmtArgs)...));
+        }
     }
 
     TerminalCommands::TerminalCommands() {
@@ -166,7 +180,7 @@ namespace sight  {
             } else if (cl[2] == strings[cmds::cpl_disable]) {
                 arg.term.set_autocomplete_pos(ImTerm::position::nowhere);
             } else {
-                // arg.term.add_formatted_err("Unknown completion parameter: {}", cl[2]);
+                arg.term.add_text_err(absl::Substitute("Unknown completion parameter: $0", cl[2]));
             }
         } else if (cl[1] == strings[cmds::colors]) {
             if (cl.size() == 3 && cl[2] == strings[cmds::col_list_themes]) {
@@ -194,7 +208,7 @@ namespace sight  {
                         return;
                     }
                 }
-                // arg.term.add_formatted_err("Unknown theme: {}", cl[3]);
+                addFormatTextError(arg, "Unknown theme: $0", cl[3]);
 
             } else if (((cl.size() == 8 || cl.size() == 7 || cl.size() == 4) && cl[2] == strings[cmds::col_set_value]) || ((cl.size() == 4) && cl[2] == strings[cmds::col_get_value])) {
                 auto it = misc::find_first_prefixed(cl[3], strings.begin() + cmds::csv_begin, strings.begin() + cmds::csv_end, [](auto&&) {
@@ -202,7 +216,7 @@ namespace sight  {
                 });
 
                 if (it == strings.begin() + cmds::csv_end) {
-                    // arg.term.add_formatted_err("Unknown item: {}", cl[3]);
+                    addFormatTextError(arg, "Unknown item: $0", cl[3]);
                     return;
                 }
 
@@ -341,9 +355,9 @@ namespace sight  {
                             return static_cast<int>(v * 255.f + 0.5f);
                         };
                         ;
-                        // arg.term.add_formatted("Current value for {}: [R: {}] [G: {}] [B: {}] [A: {}]", cl[3], to_255((**theme_color).r), to_255((**theme_color).g), to_255((**theme_color).b), to_255((**theme_color).a));
+                        addFormatText(arg, "Current value for $0:  [R: $1] [G: $2] [B: $3] [A: $4]", cl[3], to_255((**theme_color).r), to_255((**theme_color).g), to_255((**theme_color).b), to_255((**theme_color).a));
                     } else {
-                        // arg.term.add_formatted("Current value for {}: unset", cl[3]);
+                        addFormatText(arg, "Current value for $0: unset", cl[3]);
                     }
                 }
             }
@@ -357,7 +371,7 @@ namespace sight  {
                     return false;
                 });
                 if (it == strings.begin() + cmds::st_end) {
-                    // arg.term.add_formatted_err("Unknown text field: {}", cl[2]);
+                    addFormatTextError(arg, "Unknown text field: $0", cl[2]);
                 } else if (cl.size() != 10) {
                     arg.term.add_text_err("Not enough/Too much arguments !");
                     arg.term.add_text_err("You should specify, in order: trace text, debug text, info text, warning text, error text, critical text, none text");
@@ -395,7 +409,7 @@ namespace sight  {
             }
 
         } else {
-            // arg.term.add_formatted_err("Unknown parameter: {}", cl[1]);
+            addFormatTextError(arg, "Unknown parameter: $0", cl[1]);
         }
     }
 
@@ -476,14 +490,14 @@ namespace sight  {
 
     void TerminalCommands::echo(argument_type& arg) {
         if (arg.command_line.size() < 2) {
-            // arg.term.add_formatted("");
+            arg.term.add_text("Need two arg");
             return;
         }
         if (arg.command_line[1][0] == '-') {
             if (arg.command_line[1] == "--help" || arg.command_line[1] == "-help") {
-                // arg.term.add_formatted("usage: {} [text to be printed]", arg.command_line[0]);
+                addFormatText(arg, "usage: $0 [text to be printed]", arg.command_line[0]);
             } else {
-                // arg.term.add_formatted_err("Unknown argument: {}", arg.command_line[1]);
+                addFormatTextError(arg, "Unknown argument: $0", arg.command_line[1]);
             }
         } else {
             std::string str{};
@@ -502,7 +516,7 @@ namespace sight  {
                     str += *it;
                 }
             }
-            // arg.term.add_formatted("{}", str);
+            arg.term.add_text(str.c_str());
         }
     }
 
@@ -519,13 +533,15 @@ namespace sight  {
         arg.term.add_text("Available commands:");
         for (const command_type& cmd : local_command_list) {
             // arg.term.add_formatted("        {:{}} | {}", cmd.name, list_element_name_max_size, cmd.description);
-            arg.term.add_text(cmd.name.data());
+            addFormatText(arg, "        $0 | $1", cmd.name, cmd.description);
+            // arg.term.add_text(cmd.name.data());
         }
         arg.term.add_text("");
         arg.term.add_text("Additional information might be available using \"'command' --help\"");
     }
 
     void TerminalCommands::quit(argument_type& arg) {
-        arg.val.should_close = true;
+        arg.val.shouldClose = true;
     }
+
 }

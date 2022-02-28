@@ -14,7 +14,7 @@ using namespace ImTerm;
 namespace sight {
 
     struct TerminalRuntimeArgs {
-        bool should_close = false;
+        bool shouldClose = false;
     };
 
     class TerminalCommands : public ImTerm::basic_terminal_helper<TerminalCommands, TerminalRuntimeArgs> {
@@ -32,5 +32,9 @@ namespace sight {
         static void exit(argument_type&);
         static void help(argument_type&);
         static void quit(argument_type&);
+
     };
+
+    
+
 }
