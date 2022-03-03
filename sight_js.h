@@ -161,6 +161,8 @@ namespace sight{
      */
     int addJsCommand(JsCommandType type, int argInt = 0);
 
+    int addJsCommand(JsCommandType type, CommandArgs const& args);
+
     /**
      *
      * @param type
@@ -213,7 +215,7 @@ namespace sight{
      */
     std::string serializeJsNode(SightJsNode const& node);
 
-    int parseGraph(const char* filename, std::string& source);
+    int parseGraph(const char* filename, bool generateTargetLang = true, bool writeToOutFile = true);
 
     /**
      * @brief checkTinyData(), tinyData()
@@ -228,6 +230,8 @@ namespace sight{
     void bindNodeTypes(v8::Isolate* isolate, const v8::Local<v8::Context>& context, v8pp::module& module);
 
     void bindUIThreadFunctions(const v8::Local<v8::Context>& context, v8pp::module& module);
+
+    void bindLanguage(v8::Isolate* isolate, const v8::Local<v8::Context>& context, v8pp::module& module);
 
     v8::Isolate* getJsIsolate();
 

@@ -5,6 +5,7 @@
 
 #include "sight_ui.h"
 #include "sight_project.h"
+#include <string_view>
 
 namespace sight {
 
@@ -24,5 +25,11 @@ namespace sight {
     int addEntity(const UICreateEntity& createEntityData);
 
     int updateEntity(const UICreateEntity& createEntityData);
+
+    void uiEditEntity(SightEntity const& info);
+
+    void uiDeleteEntity(std::string_view fullName);
+
+    bool checkTemplateNodeIsUsed(Project* p, std::string_view templateAddress, bool alert = true);
     
 }

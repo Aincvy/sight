@@ -107,3 +107,4 @@ target_link_libraries(
 # nativefiledialog-extended
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/nativefiledialog-extended)
 target_link_libraries(sight-util PUBLIC nfd)
+

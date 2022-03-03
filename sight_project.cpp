@@ -780,19 +780,20 @@ namespace sight {
                     continue;
                 }
 
-                std::string source;
-                if (parseGraph(path.c_str(), source) == CODE_OK) {
-                    // parse success, write
-                    auto relative = std::filesystem::relative(path, pathGraphFolder());
-                    std::filesystem::path targetPath(targetPathString + relative.generic_string());
-                    targetPath.replace_extension(".js");
-                    logDebug(targetPath.generic_string());
-                    std::filesystem::create_directories(targetPath.parent_path());
+                // std::string source;
+                // if (parseGraph(path.c_str(), source) == CODE_OK) {
+                //     // parse success, write
+                //     auto relative = std::filesystem::relative(path, pathGraphFolder());
+                //     std::filesystem::path targetPath(targetPathString + relative.generic_string());
+                //     targetPath.replace_extension(".js");
+                //     logDebug(targetPath.generic_string());
+                //     std::filesystem::create_directories(targetPath.parent_path());
 
-                    std::ofstream out(targetPath);
-                    out << source;
-                    out.close();
-                }
+                //     std::ofstream out(targetPath);
+                //     out << source;
+                //     out.close();
+                // }
+                parseGraph(path.c_str());
             }
         }
     }

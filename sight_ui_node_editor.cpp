@@ -1,3 +1,4 @@
+#include "sight_js_parser.h"
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
 #include "imgui_canvas.h"
@@ -662,7 +663,7 @@ namespace sight {
 
             ImGui::SameLine();
             if (ImGui::Button("Parse")) {
-                logDebug("Not impl");
+                graph->asyncParse();
             }
             if (!sightSettings->autoSave) {
                 ImGui::SameLine();
@@ -1479,6 +1480,58 @@ namespace sight {
         ImGui::Text("Readonly");
 
         // return false;
+    }
+
+    void showGraphSettings() {
+        constexpr const auto fmt = "%10s: ";
+
+        auto graph = currentGraph();
+        auto& settings = graph->getSettings();
+
+        ImGui::Text("Language Info");
+        ImGui::Text(fmt, "Type");
+        ImGui::SameLine();
+        if (ImGui::BeginCombo("##type", DefLanguageTypeNames[settings.language.type])) {
+            for (int i = 0; i < std::size(DefLanguageTypeNames); i++) {
+                if (ImGui::Selectable(DefLanguageTypeNames[i], i == settings.language.type)) {
+                    // 
+                    settings.language.type = i;
+                    graph->markDirty();
+                }
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::Text(fmt, "Version");
+        ImGui::SameLine();
+        if (ImGui::InputInt("##version", &settings.language.version)) {
+            graph->markDirty();
+        }
+
+        ImGui::Text(fmt, "OutputFile");
+        ImGui::SameLine();
+        if (ImGui::Button("...")) {
+            // open 
+            int status = CODE_OK;
+            auto baseDir = currentProject()->pathTargetFolder();
+
+            std::string path = saveFileDialog(baseDir.c_str(), &status, graph->getFileName());
+            if (status == CODE_OK) {
+                settings.outputFilePath = path;
+                logDebug(path);
+                graph->markDirty();
+            } else {
+                if (status == CODE_USER_CANCELED) {
+                    logDebug("User cancelled.");
+                } else {
+                    logError("open file dialog error, code: $0", status);
+                }
+            }
+        }
+        helpMarker("The file to save graph-parse-result.\nClick to select file.");
+        if (!settings.outputFilePath.empty()) {
+            ImGui::TextWrapped("%s", settings.outputFilePath.data());
+        }
+
     }
 
     void uiReloadGraph() {

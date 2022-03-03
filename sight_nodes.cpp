@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <iterator>
 #include <set>
 #include <string>
@@ -16,6 +17,7 @@
 #include <algorithm>
 #include <fstream>
 
+#include "sight_js_parser.h"
 #include "sight_nodes.h"
 #include "sight_defines.h"
 #include "sight.h"
@@ -514,6 +516,7 @@ namespace sight {
         p->nodeName = this->nodeName;
         p->templateNode = this;
         p->tryAddChainPorts(this->options.titleBarPortType);
+        assert(CURRENT_GRAPH);
         p->graph = CURRENT_GRAPH;
 
         if (generateId) {
@@ -740,6 +743,12 @@ namespace sight {
         out << YAML::EndMap;
 
         // other info
+        // settings
+        out << YAML::Key << "settings" << YAML::Value << YAML::BeginMap;
+        out << YAML::Key << "lang.type" << YAML::Value << settings.language.type;
+        out << YAML::Key << "lang.version" << YAML::Value << settings.language.version;
+        out << YAML::Key << "outputFilePath" << YAML::Value << settings.outputFilePath;
+        out << YAML::EndMap;
 
         out << YAML::EndMap;       // end of 1st begin map
 
@@ -797,6 +806,14 @@ namespace sight {
                 createConnection(tmpConnection.left, tmpConnection.right, connectionId, tmpConnection.priority);
             }
 
+            // settings
+            auto settingsNode = root["settings"];
+            if (settingsNode.IsDefined()) {
+                settings.language.type = settingsNode["lang.type"].as<int>();
+                settings.language.version = settingsNode["lang.version"].as<int>();
+                settings.outputFilePath = settingsNode["outputFilePath"].as<std::string>();
+            }
+
             this->editing = false;
             logDebug("load ok");
             return status;
@@ -816,6 +833,14 @@ namespace sight {
 
     const char *SightNodeGraph::getFilePath() const {
         return this->filepath.c_str();
+    }
+
+    std::string SightNodeGraph::getFileName(std::string_view replaceExt) const {
+        if (filepath.empty()) {
+            return {};
+        }
+
+        return std::filesystem::path(this->filepath).filename().replace_extension(replaceExt).generic_string();
     }
 
     void SightNodeGraph::setFilePath(const char* path) {
@@ -1245,6 +1270,15 @@ namespace sight {
 
     std::string const& SightNodeGraph::getBrokenReason() const {
         return brokenReason;
+    }
+
+    SightNodeGraphSettings& SightNodeGraph::getSettings() {
+        return this->settings;
+    }
+
+    void SightNodeGraph::asyncParse() const {
+        addJsCommand(JsCommandType::ParseGraph, CommandArgs::copyFrom(filepath));
+        logInfo("use js-thread to start parsing.");
     }
 
     SightNode *SightAnyThingWrapper::asNode() const {

@@ -4,8 +4,11 @@
 #include <algorithm>
 #include <cstdio>
 #include <filesystem>
+#include <fstream>
+#include <ios>
 #include <iterator>
 #include <map>
+#include <ostream>
 #include <stdio.h>
 #include <sstream>
 #include "IconsMaterialDesign.h"
@@ -17,12 +20,14 @@
 #include <sys/types.h>
 #include <thread>
 #include <chrono>
+#include <vector>
 
 #include "sight.h"
 #include "sight_defines.h"
 #include "sight_js.h"
 #include "shared_queue.h"
 #include "sight_log.h"
+#include "sight_nodes.h"
 #include "sight_ui.h"
 #include "sight_util.h"
 #include "sight_js_parser.h"
@@ -417,6 +422,8 @@ namespace sight {
             SharedQueue<JsCommand> commandQueue;
             ParsingGraphData parsingGraphData;
             SightEntityFunctions entityFunctions;
+            
+            std::vector<CommonOperation> codeTemplates;
         };
 
         struct GenerateFunctionStatus {
@@ -1645,6 +1652,31 @@ namespace sight {
 
     }
 
+    void bindLanguage(v8::Isolate* isolate, const v8::Local<v8::Context>& context, v8pp::module& module){
+        v8pp::class_<DefLanguage> defLanguage(isolate);
+        defLanguage.ctor<int, int>()
+            .set("type", &DefLanguage::type)
+            .set("version", &DefLanguage::version);
+        module.set("DefLanguage", defLanguage);
+
+        v8pp::module langTypes(isolate);
+        langTypes.set_const("JavaScript", static_cast<int>(DefLanguageType::JavaScript));
+        langTypes.set_const("Java", static_cast<int>(DefLanguageType::Java));
+        langTypes.set_const("CSharp", static_cast<int>(DefLanguageType::CSharp));
+        langTypes.set_const("Cpp", static_cast<int>(DefLanguageType::Cpp));
+        langTypes.set_const("C", static_cast<int>(DefLanguageType::C));
+        module.set("DefLanguageTypes", langTypes);
+
+        // function
+        auto global = context->Global();
+        auto addCodeTemplate = [](DefLanguage* lang, const char* name, const char* desc, Local<Function> callback){
+            logDebug(name);
+        };
+        global->Set(context, v8pp::to_v8(isolate, "addCodeTemplate"), 
+            v8pp::wrap_function(isolate, "addCodeTemplate", addCodeTemplate)).ToChecked();
+        
+    }
+
     v8::Isolate* getJsIsolate() {
         return g_V8Runtime->isolate;
     }
@@ -1710,6 +1742,8 @@ namespace sight {
             .set("parseAllGraphs", &ProjectWrapper::parseAllGraphs);
         module.set("Project", projectWrapperClass);
 
+        bindLanguage(isolate, context, module);
+
         auto sightObject = module.new_instance();
         sightObject->Set(context, v8pp::to_v8(isolate, "entity"), 
             v8pp::class_<SightEntityFunctions>::reference_external(isolate, &g_V8Runtime->entityFunctions)).ToChecked();
@@ -1719,50 +1753,59 @@ namespace sight {
     }
 
     // Extracts a C string from a V8 Utf8Value.
-    const char* ToCString(const v8::String::Utf8Value& value) {
+    const char* toCString(const v8::String::Utf8Value& value) {
         return *value ? *value : "<string conversion failed>";
     }
 
-    void ReportException(v8::Isolate* isolate, v8::TryCatch* try_catch) {
+    void reportException(v8::Isolate* isolate, v8::TryCatch* try_catch, std::string& errorMsg) {
         v8::HandleScope handle_scope(isolate);
         v8::String::Utf8Value exception(isolate, try_catch->Exception());
-        const char* exception_string = ToCString(exception);
+        const char* exception_string = toCString(exception);
         v8::Local<v8::Message> message = try_catch->Message();
         if (message.IsEmpty()) {
             // V8 didn't provide any extra information about this error; just
             // print the exception.
-            fprintf(stderr, "%s\n", exception_string);
+            // fprintf(stderr, "%s\n", exception_string);
+            errorMsg = exception_string;
         } else {
             // Print (filename):(line number): (message).
+            std::stringstream msg;
             v8::String::Utf8Value filename(isolate,
                                            message->GetScriptOrigin().ResourceName());
             v8::Local<v8::Context> context(isolate->GetCurrentContext());
-            const char* filename_string = ToCString(filename);
+            const char* filename_string = toCString(filename);
             int linenum = message->GetLineNumber(context).FromJust();
-            fprintf(stderr, "%s:%i: %s\n", filename_string, linenum, exception_string);
+            // fprintf(stderr, "%s:%i: %s\n", filename_string, linenum, exception_string);
+            msg << filename_string << ":" << linenum << ":" << exception_string << std::endl;
             // Print line of source code.
             v8::String::Utf8Value sourceline(
                     isolate, message->GetSourceLine(context).ToLocalChecked());
-            const char* sourceline_string = ToCString(sourceline);
+            const char* sourceline_string = toCString(sourceline);
             fprintf(stderr, "%s\n", sourceline_string);
+            msg << sourceline_string << std::endl;
             // Print wavy underline (GetUnderline is deprecated).
             int start = message->GetStartColumn(context).FromJust();
             for (int i = 0; i < start; i++) {
-                fprintf(stderr, " ");
+                // fprintf(stderr, " ");
+                msg << " ";
             }
             int end = message->GetEndColumn(context).FromJust();
             for (int i = start; i < end; i++) {
-                fprintf(stderr, "^");
+                // fprintf(stderr, "^");
+                msg << "^";
             }
-            fprintf(stderr, "\n");
+            // fprintf(stderr, "\n");
+            msg << std::endl;
             v8::Local<v8::Value> stack_trace_string;
             if (try_catch->StackTrace(context).ToLocal(&stack_trace_string) &&
                 stack_trace_string->IsString() &&
                 v8::Local<v8::String>::Cast(stack_trace_string)->Length() > 0) {
                 v8::String::Utf8Value stack_trace(isolate, stack_trace_string);
-                const char* stack_trace_string = ToCString(stack_trace);
-                fprintf(stderr, "%s\n", stack_trace_string);
+                const char* stack_trace_string = toCString(stack_trace);
+                // fprintf(stderr, "%s\n", stack_trace_string);
+                msg << stack_trace_string << std::endl;
             }
+            errorMsg = msg.str();
         }
     }
 
@@ -1923,7 +1966,9 @@ namespace sight {
 
             if (tryCatch.HasCaught()) {
                 //
-                ReportException(isolate, &tryCatch);
+                std::string errorMsg;
+                reportException(isolate, &tryCatch, errorMsg);
+                logError(errorMsg);
             }
             return CODE_FILE_ERROR;
         }
@@ -1958,7 +2003,9 @@ namespace sight {
             }
 
             //
-            ReportException(isolate, &tryCatch);
+            std::string errorMsg;
+            reportException(isolate, &tryCatch, errorMsg);
+            logError(errorMsg);
             return CODE_FAIL;
         }
 
@@ -2323,32 +2370,17 @@ namespace sight {
         }
     }
 
-    /**
-     *
-     * @param filename
-     * @return
-     */
-    int parseGraph(const char* filename, std::string& source) {
-        logDebug(filename);
-        SightNodeGraph graph;
-        int i = graph.load(filename);
-        if (i == 1) {
-            return 1;
-        }
-        if (i < 0) {
-            return 2;
-        }
-
+    int parseGraphToJs(SightNodeGraph& graph, std::string& source, std::string& errorMsg) {
         // get enter node.
         int status = -1;
         auto node = graph.findNode(SightNodeProcessType::Enter, &status);
-        if (status != 0) {
-            logDebug("error graph: $0, $1",filename, status);
-            return 3;
+        if (status != CODE_OK) {
+            // logDebug("error graph: $0, $1", filename, status);
+            return CODE_FAIL;
         }
 
         // parse the enter node.
-        auto &data = g_V8Runtime->parsingGraphData;
+        auto& data = g_V8Runtime->parsingGraphData;
         auto isolate = g_V8Runtime->isolate;
         TryCatch tryCatch(isolate);
         v8::HandleScope handle_scope(isolate);
@@ -2356,15 +2388,15 @@ namespace sight {
         data.graph = &graph;
 
         data.addNewLink(node);
-        auto &outerList = data.list;
+        auto& outerList = data.list;
         std::stringstream finalSourceStream;
 
         while (!data.empty()) {
-            auto &list = outerList.back();
+            auto& list = outerList.back();
             data.lastUsedIndex = outerList.size() - 1;
             parseNode(isolate, data.graphObject);
 
-            if (data.lastUsedIndex == outerList.size() -1 && list.link.empty()) {
+            if (data.lastUsedIndex == outerList.size() - 1 && list.link.empty()) {
 #if GENERATE_CODE_DETAILS == 1
                 logDebug("append source, delete last list..");
                 logDebug(list.sourceStream.str());
@@ -2379,8 +2411,7 @@ namespace sight {
         }
 
         if (tryCatch.HasCaught()) {
-            logDebug("code error.");
-            ReportException(isolate, &tryCatch);
+            reportException(isolate, &tryCatch, errorMsg);
         } else if (data.hasError()) {
             // report error
             auto& errorInfo = data.errorInfo;
@@ -2402,7 +2433,7 @@ namespace sight {
                 } else {
                     tmpErrorMsg << "[No Port Info]";
                 }
-                
+
                 tmpErrorMsg << std::endl;
             }
             if (errorInfo.nodeId > 0) {
@@ -2424,9 +2455,9 @@ namespace sight {
             }
 
             // maybe need append more info ?
-
-            logDebug(tmpErrorMsg.str());
-            logDebug(filename);
+            errorMsg = tmpErrorMsg.str();
+            // logDebug(tmpErrorMsg.str());
+            
         } else {
             std::string finalSource = finalSourceStream.str();
             trim(finalSource);
@@ -2434,7 +2465,7 @@ namespace sight {
             source = finalSource;
             return CODE_OK;
         }
-        
+
         data.reset();
         return CODE_FAIL;
     }
@@ -2461,8 +2492,8 @@ namespace sight {
                 // do nothing.
                 break;
             case JsCommandType::ParseGraph:{
-                std::string source;
-                parseGraph(command.args.argString, source);
+                // std::string source;
+                parseGraph(command.args.argString);
                 break;
             }
             case JsCommandType::InitPluginManager:
@@ -2549,6 +2580,11 @@ namespace sight {
                 },
         };
 
+        return addJsCommand(command);
+    }
+
+    int addJsCommand(JsCommandType type, CommandArgs const& args) {
+        JsCommand command = { type, args };
         return addJsCommand(command);
     }
 
@@ -2819,4 +2855,49 @@ namespace sight {
         return CODE_OK;
     }
 
+
+    /**
+     *
+     * @param filename
+     * @return
+     */
+    int parseGraph(const char* filename, bool generateTargetLang, bool writeToOutFile) {
+        logDebug(filename);
+        SightNodeGraph graph;
+        int i = graph.load(filename);
+        if (i == 1) {
+            return CODE_FAIL;
+        }
+        if (i < 0) {
+            return CODE_FAIL;
+        }
+
+        std::string source;
+        std::string errorMsg;
+        if (parseGraphToJs(graph, source, errorMsg) != CODE_OK) {
+            logError(errorMsg);
+            return CODE_FAIL;
+        }
+
+        if (!generateTargetLang) {
+            return CODE_OK;
+        }
+
+        auto& settings = graph.getSettings();
+        source = parseSource(source, settings.language, &i);
+        if (i != CODE_OK) {
+            return i;
+        }
+
+        if (writeToOutFile) {
+            if (settings.outputFilePath.empty()) {
+                logWarning("graph $0 do not have a output path.", graph.getFilePath());
+            } else {
+                std::ofstream out(settings.outputFilePath.data(), std::ios::trunc);
+                out << source;
+            }
+        }
+
+        return CODE_OK;
+    }
 }

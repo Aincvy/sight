@@ -35,6 +35,7 @@ target_sources(sight PRIVATE
         sight_object.cpp
         sight_terminal.cpp
         sight_colors.cpp
+        sight_code_set.cpp
         # dependencies/imgui/imgui_demo.cpp           # for debug
 )
 
@@ -87,7 +88,6 @@ find_package(yaml-cpp REQUIRED)
 target_include_directories(sight PRIVATE YAML_CPP_INCLUDE_DIR)
 target_link_libraries(sight PRIVATE ${YAML_CPP_LIBRARIES})
 MESSAGE(STATUS "Found yaml-cpp at: ${YAML_CPP_INCLUDE_DIR}")
-
 
 # custom commands 
 add_custom_target(copyFiles)

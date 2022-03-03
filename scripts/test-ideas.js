@@ -435,3 +435,14 @@ sight.buildTarget('default', function(project){
     project.parseAllGraphs();
     print('building over!');
 });
+
+function addCodeTemplate(lang, name, desc, callback){
+
+};
+
+addCodeTemplate(DefLanguage(), 'rws-graph', 'Generate a graph class', function ({ index, graphName }) {
+    // index: 0=header, 1=footer. 
+    // this function will be called twice.
+    // return a string.
+    return '';
+});

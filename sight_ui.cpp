@@ -96,27 +96,6 @@ namespace sight {
             }
         }
 
-        bool checkTemplateNodeIsUsed(Project* p, std::string_view templateAddress, bool alert = true){
-            std::string pathOut;
-            if (p->isAnyGraphHasTemplate(templateAddress, &pathOut)) {
-                // used, cannot be deleted.
-                if (alert) {
-                    std::string contentString{ "Used in graph: " };
-                    contentString += pathOut;
-                    // if (out) {
-                    //     // question
-                    //     contentString += "\nAre you still want to do that?";
-                    //     openAskModal(ICON_MD_QUESTION_MARK, contentString, [](bool f){});
-                    // } else {
-                    // }
-                    openAlertModal(ICON_MD_WARNING " Operation denied", contentString);
-                }
-                return true;
-            }
-
-            return false;
-        }
-
         void showMainFileMenu(UIStatus& uiStatus){
             if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS._new)) {
                 if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.graph)) {
@@ -278,18 +257,30 @@ namespace sight {
             }
         }
 
-        void showMainCustomMenu(){
+        void showMainCustomMenu() {
             if (ImGui::MenuItem("Trigger")) {
                 trace("trace msg");
                 logDebug("123");
                 logInfo("info msg");
                 logWarning("warning msg");
                 logError(5.555f);
+                                     
+                std::string source = R"(
+let a = [1,2,3];
+for(const item of a) {
+  console.log(item);
+}
+                )";
+                parseSource(source);
             }
             if (ImGui::MenuItem("Crash")) {
                 // produce a crash for test.
-                int *p = NULL;
+                int* p = NULL;
                 *p = 1;
+            }
+            if (ImGui::MenuItem("Test1")) {
+                auto g = currentGraph();
+                
             }
         }
 
@@ -506,7 +497,8 @@ namespace sight {
             // it's should be show what user selected.
             auto & selection = g_UIStatus->selection;
             if (selection.selectedNodeOrLinks.empty()) {
-                
+                // show settings
+                showGraphSettings();
             } else if (selection.selectedNodeOrLinks.size() > 1) {
                 ImGui::Text("%zu nodes is selected.", selection.selectedNodeOrLinks.size());
                 ImGui::TextColored(colorRed, "Now, we do not support mutiple items edit.");
@@ -544,7 +536,6 @@ namespace sight {
                     ImGui::InputInt("## connection.priority", &connection->priority);
                 }
             }
-
 
             ImGui::End();
         }
@@ -942,6 +933,19 @@ namespace sight {
                         ImGui::SameLine();
                         ImGui::Text("%s", name.c_str());
                     }
+
+                    // operations
+                    ImGui::Text("Operations: ");
+                    ImGui::SameLine();
+                    if (ImGui::Button(ICON_MD_EDIT "##edit-")) {
+                        // edit
+                        uiEditEntity(*entityData);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button(ICON_MD_DELETE "##delete-")) {
+                        uiDeleteEntity(name);
+                        g_UIStatus->createEntityData.showInfoEntityName.clear();
+                    }
                 }   
             }
             ImGui::End();
@@ -992,12 +996,7 @@ namespace sight {
                     editButtonLabel += name;
                     if (ImGui::Button(editButtonLabel.c_str())) {
                         // edit
-                        auto& createEntityData = g_UIStatus->createEntityData;
-                        createEntityData.loadFrom(info);
-                        createEntityData.edit = true;
-                        createEntityData.editingEntity = info;
-
-                        activeWindowCreateEntity();
+                        uiEditEntity(info);
                     }
 
                     width = width - buttonSize - buttonInterval;
@@ -1012,20 +1011,7 @@ namespace sight {
                 }
 
                 if (!delFullName.empty()) {
-                    // check if used.
-                    if (checkTemplateNodeIsUsed(p, delFullName)) {
-                        // used, cannot be deleted.
-                    } else {
-                        // delete ask
-                        std::string str{ "! You only can delete the NOT-USED entity !\nYou will delete: " };
-                        str += delFullName;
-                        openAskModal("Delete entity", str.c_str(), [p, delFullName](bool f) {
-                            logDebug(f);
-                            if (f) {
-                                p->delEntity(delFullName);
-                            }
-                        });
-                    }
+                    uiDeleteEntity(delFullName);
                 }
             }
             ImGui::End();
@@ -1426,8 +1412,10 @@ namespace sight {
             showEntityInfoWindow();
         }
         if (windowStatus.terminalWindow) {
-            windowStatus.terminalWindow = uiStatus.terminalData.terminal->show();
+            auto& terminal = uiStatus.terminalData.terminal;
 
+            terminal->use_default_size();
+            windowStatus.terminalWindow = terminal->show();
         }   
 
         nodeEditorFrameEnd();
@@ -2284,6 +2272,15 @@ namespace sight {
         this->map.clear();
         this->names.clear();
         this->selected = 0;
+    }
+
+    void uiEditEntity(SightEntity const& info) {
+        auto& createEntityData = g_UIStatus->createEntityData;
+        createEntityData.loadFrom(info);
+        createEntityData.edit = true;
+        createEntityData.editingEntity = info;
+
+        activeWindowCreateEntity();
     }
 
 }

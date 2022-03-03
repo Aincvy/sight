@@ -3,9 +3,18 @@
 //
 
 #include "sight_js_parser.h"
+#include "sight.h"
+#include "sight_defines.h"
 #include "sight_log.h"
 
+#include <iterator>
+#include <ostream>
+#include <sstream>
 #include <string.h>
+#include <string>
+#include <string_view>
+#include <map>
+
 #include <tree_sitter/api.h>
 
 #include <utility>
@@ -24,23 +33,33 @@ TSParser* g_parser = nullptr;
 
 namespace sight {
 
-    const Token GeneratedCode::invalidToken = Token("[](invalid%token)");
-
     namespace {
+
+        struct GeneratedCode{
+            bool fail = false;
+            std::string failReason{};
+            std::string_view source;
+            // which language do you want to generate ? 
+            DefLanguage const& targetLang;
+        };
 
         struct TreeSitterFields {
             TSFieldId _operator;
             TSFieldId left;
             TSFieldId right;
             TSFieldId argument;
+            TSFieldId body;
         };
 
-        TreeSitterFields fields;
+        TreeSitterFields jsLangFields;
 
         /**
          * Used for tree-sitter node parse.
          */
-        absl::flat_hash_map<std::string,std::function<GeneratedElement*(GeneratedCode &,TSNode &)>> nodeHandlerMap;
+        using mapType = absl::flat_hash_map<std::string, std::function<void(GeneratedCode&, std::ostream&, TSNode)>>;
+        // mapType nodeHandlerMap;
+        // 
+        std::map<DefLanguage, mapType> langNodeHandlerMap;
 
         void initTreeSitterFields(TSLanguage* language){
 
@@ -48,64 +67,65 @@ namespace sight {
             constexpr const char* fieldLeft = "left";
             constexpr const char* fieldRight = "right";
             constexpr const char* fieldArgument = "argument";
+            constexpr const char* fieldBody = "body";
 
-            fields._operator = ts_language_field_id_for_name(language, fieldOperator, strlen(fieldOperator));
-            fields.left = ts_language_field_id_for_name(language, fieldLeft, strlen(fieldLeft));
-            fields.right = ts_language_field_id_for_name(language, fieldRight, strlen(fieldRight));
-            fields.argument = ts_language_field_id_for_name(language, fieldArgument, strlen(fieldArgument));
-
+            jsLangFields._operator = ts_language_field_id_for_name(language, fieldOperator, strlen(fieldOperator));
+            jsLangFields.left = ts_language_field_id_for_name(language, fieldLeft, strlen(fieldLeft));
+            jsLangFields.right = ts_language_field_id_for_name(language, fieldRight, strlen(fieldRight));
+            jsLangFields.argument = ts_language_field_id_for_name(language, fieldArgument, strlen(fieldArgument));
+            jsLangFields.body = ts_language_field_id_for_name(language, fieldBody, strlen(fieldBody));
 
         }
 
-        /**
-         * Generate this node to GeneratedElement
-         * @param generatedCode
-         * @param node
-         * @return
-         */
-        GeneratedElement* generate(GeneratedCode & generatedCode, TSNode & node){
+
+
+        void generate(GeneratedCode& code, std::ostream& out, TSNode node);
+
+
+        void plainAction(GeneratedCode& code, std::ostream& out, TSNode tsNode) {
+            auto source = code.source;
+            auto startPos = ts_node_start_byte(tsNode);
+            auto endPos = ts_node_end_byte(tsNode);
+            for (auto i = startPos; i < endPos; i++) {
+                out << source[i];
+            }
+            // out << " ";   // insert 1 space.
+
+            // out << std::endl;
+            // logDebug("s: $0, e: $1, ",startPos, endPos);
+        };
+
+        void defaultAction(GeneratedCode& code, std::ostream& out, TSNode& tsNode) {
+            uint count = 0;
+            auto source = code.source;
+            if ((count = ts_node_child_count(tsNode)) <= 0) {
+                // terminal node
+                plainAction(code, out, tsNode);
+            } else {
+                // loop item of children
+                for (int i = 0; i < count; i++) {
+                    auto n = ts_node_child(tsNode, i);
+                    generate(code, out, n);
+                }
+            }
+        }
+
+        void generate(GeneratedCode& code, std::ostream& out, TSNode node) {
             if (ts_node_is_null(node)) {
-                return nullptr;
+                return;
             }
 
+            auto& nodeHandlerMap = langNodeHandlerMap[code.targetLang];
             auto nodeType = ts_node_type(node);
             auto iter = nodeHandlerMap.find(nodeType);
             if (iter != nodeHandlerMap.end()) {
-                return iter->second(generatedCode, node);
+                iter->second(code, out, node);
+            } else {
+                defaultAction(code, out, node);
             }
-            logDebug("do not handle $0", nodeType);
+            // logDebug("do not handle $0", nodeType);
 
-            return nullptr;
-        }
-
-        /**
-         * Generate this node's children nodes to GeneratedElement. Do not generate this node.
-         * @param generatedCode
-         * @param node
-         * @return always return nullptr or block ?
-         */
-        GeneratedElement* generateChildrenNode(GeneratedCode & generatedCode, TSNode & node){
-            if (ts_node_is_null(node)) {
-                return nullptr;
-            }
-
-            auto cursor = ts_tree_cursor_new(node);
-            if (!ts_tree_cursor_goto_first_child(&cursor)) {
-                return nullptr;
-            }
-            auto childNode = ts_tree_cursor_current_node(&cursor);
-            generate(generatedCode, childNode);
-
-            while (ts_tree_cursor_goto_next_sibling(&cursor)) {
-                childNode = ts_tree_cursor_current_node(&cursor);
-                generate(generatedCode, childNode);
-            }
-
-            return nullptr;
-        }
-
-        GeneratedElement *generateEmpty(GeneratedCode & generatedCode, TSNode & node){
-            return nullptr;
+            return;
         }
 
 
@@ -114,7 +134,7 @@ namespace sight {
          * @param generatedCode
          * @param node
          */
-        void showNodeHierarchy(GeneratedCode & generatedCode, TSNode & node){
+        void showNodeHierarchy(TSNode & node){
             if (ts_node_is_null(node)) {
                 return;
             }
@@ -124,66 +144,42 @@ namespace sight {
             free(string);
         }
 
-        void initCaseMap(){
-            nodeHandlerMap["number"] = [](GeneratedCode& generatedCode,TSNode& node){
-                auto token = generatedCode.getToken(&node);
-                if (token == GeneratedCode::invalidToken) {
-                    // may need to do something.
-                }
+        void initCShaprHandlerMap(){
+            DefLanguage lang;
+            lang.setType(DefLanguageType::CSharp);
+            lang.version = 0;
 
-                auto f = token.asFloat();
-                if (f == static_cast<int>(f) ) {
-                    return generatedCode.addElement(IntLiteral(token.asInt()));
-                }
+            auto& nodeHandlerMap = langNodeHandlerMap[lang];
 
-                return generatedCode.addElement(FloatLiteral(f));
+            nodeHandlerMap["identifier"] = plainAction;
+
+            nodeHandlerMap["for_in_statement"] = [](GeneratedCode& code, std::ostream& out, TSNode tsNode) {
+                auto source = code.source;
+                logDebug(" for_in_statement");
+                out << "foreach( var ";
+                auto left = ts_node_child_by_field_id(tsNode, jsLangFields.left);
+                generate(code, out, left);
+                out << " in ";
+                auto right = ts_node_child_by_field_id(tsNode, jsLangFields.right);
+                generate(code, out, right);
+                out << "){ \n";
+                auto body = ts_node_child_by_field_id(tsNode, jsLangFields.body);
+                generate(code, out, body);
+                out << "}\n";
             };
 
-            nodeHandlerMap["identifier"] = [](GeneratedCode &generatedCode,TSNode &node) {
-                std::any a = node;
-                return generatedCode.addElement(generatedCode.getToken(a));
-            };
-
-            nodeHandlerMap["binary_expression"] = [](GeneratedCode &generatedCode,TSNode &node){
-                logDebug("in binary_expression callback");
-//                auto token = generatedCode.getToken(&node);
-//                if (token == GeneratedCode::invalidToken) {
-//                     // may need to do something.
-//                }
-
-                logDebug(ts_node_child_count(node));
-                // 3 children.
-                auto a = ts_node_child_by_field_id(node, fields.left);
-                auto b = ts_node_child_by_field_id(node, fields._operator);
-                auto c = ts_node_child_by_field_id(node, fields.right);
-                auto left = generate(generatedCode, a);
-                auto symbol = generatedCode.addElement(generatedCode.getToken(&b));
-                auto right = generate(generatedCode, c);
-
-                return generatedCode.addElement(BinaryExpr(left, symbol, right));
-            };
-
-            nodeHandlerMap["assignment_expression"] = [](GeneratedCode &generatedCode,TSNode &node){
-                logDebug(ts_node_child_count(node));
-                auto a = ts_node_named_child(node, 0);
-                auto b = ts_node_named_child(node, 1);
-                logDebug("assignment_expression");
-
-                auto left = generate(generatedCode, a);
-                auto right = generate(generatedCode, b);
-                return generatedCode.addElement(AssignValueStmt(left, right));
-            };
-
-            nodeHandlerMap["unary_expression"] = [](GeneratedCode &generatedCode,TSNode &node){
-
-                return nullptr;
-            };
-
-            nodeHandlerMap["program"] = generateChildrenNode;
-            nodeHandlerMap["expression_statement"] = generateChildrenNode;
-            nodeHandlerMap[";"] = generateEmpty;
 
         }
+
+        void initCaseMap(){
+            // field name from: https://github.com/Aincvy/tree-sitter-javascript/blob/master/grammar.js
+
+
+            initCShaprHandlerMap();
+
+        }
+
+    
 
     }
 
@@ -209,307 +205,81 @@ namespace sight {
         }
     }
 
-    void parseSource(const char *source) {
+    std::string parseSource(std::string_view source, DefLanguage const& targetLang, int* status) {
         logDebug(source);
+        if (langNodeHandlerMap.find(targetLang) == langNodeHandlerMap.end()) {
+            logError("Cannot find type: $0, version: $1, type-name: $2", targetLang.type, targetLang.version, targetLang.getTypeName());
+            return {};
+        }
 
         TSTree *tree = ts_parser_parse_string(
                 g_parser,
                 NULL,
-                source,
-                strlen(source)
+                source.data(),
+                source.length()
         );
 
-        GeneratedCode generatedCode(source);
         TSNode rootNode = ts_tree_root_node(tree);
+        showNodeHierarchy(rootNode);
 
-        showNodeHierarchy(generatedCode, rootNode);
-        generate(generatedCode, rootNode);
-
-        if (generatedCode.assignValueStmt) {
-            logDebug("start visitor");
-            GeneratedCodeVisitor visitor(&generatedCode);
-            visitor.visit(generatedCode.assignValueStmt);
-        }
-
+        GeneratedCode code{
+            .fail = false,
+            .source = source,
+            .targetLang = targetLang,
+        };
+        
+        std::stringstream ss;
+        generate(code, ss, rootNode);
         ts_tree_delete(tree);
-        logDebug("end of function parseSource");
-    }
 
-    Token::Token(const char *string) {
-        if (!string) {
-            return;
+        if (code.fail) {
+            // generate failed
+            logError("parse source error: $0", code.failReason);
+            SET_CODE(status, CODE_FAIL);
+            return {};
         }
 
-        sprintf(this->word, "%s", string);
+        SET_CODE(status, CODE_OK);
+        return ss.str();
     }
 
-    Token::Token(const char *source, size_t startPos, size_t endPos) {
-        memcpy(this->word, source + startPos, endPos - startPos);
+    DefLanguage::DefLanguage(int type, int version)
+        : type(type), version(version)
+    {
+        
     }
 
-    int Token::asInt(int fallback) const {
-        int i = 0;
-        if (absl::SimpleAtoi(this->word, &i)) {
-            return i;
+    DefLanguageType DefLanguage::getType() const {
+        return static_cast<DefLanguageType>(type);
+    }
+
+    void DefLanguage::setType(DefLanguageType type) {
+        this->type = static_cast<int>(type);
+    }
+
+    const char* DefLanguage::getTypeName() const {
+        if (type >= 0 && type < std::size(DefLanguageTypeNames)) {
+            return DefLanguageTypeNames[type];
         }
-
-        return fallback;
+        return nullptr;
     }
 
-    float Token::asFloat(float fallback) const {
-        float f = 0;
-        if (absl::SimpleAtof(this->word, &f)) {
-            return f;
-        }
-        return fallback;
+    bool DefLanguage::isCompatible(DefLanguage const& rhs) const {
+        return this->type == rhs.type && this->version >= rhs.version;
     }
 
-    double Token::asDouble(double fallback) const {
-        double d = 0;
-        if (absl::SimpleAtod(this->word, &d)) {
-            return d;
-        }
-        return fallback;
+    bool DefLanguage::operator==(DefLanguage const& rhs) const {
+        return this->type == rhs.type && this->version == rhs.version;
     }
 
-    bool Token::asBool(bool fallback) const {
-        bool b = false;
-        if (absl::SimpleAtob(this->word, &b)) {
-            return b;
-        }
-        return fallback;
-    }
-
-    bool Token::operator==(const Token &rhs) const {
-        return strcmp(this->word, rhs.word) == 0;
-    }
-
-    GeneratedElementType Token::getElementType() const{
-        return GeneratedElementType::Token;
-    }
-
-    GeneratedCode::GeneratedCode(const char *source) : source(source) {
-        this->sourceLength = strlen(source);
-    }
-
-    Token GeneratedCode::getToken(size_t startPos, size_t endPos) const{
-        if (startPos >= sourceLength || endPos >= sourceLength || endPos - startPos >= NAME_BUF_SIZE) {
-            return invalidToken;
-        }
-        return Token(this->source, startPos, endPos);
-    }
-
-    Token GeneratedCode::getToken(void *nodePointer) const{
-        auto node = (TSNode*) nodePointer;
-        return Token(this->source, ts_node_start_byte(*node), ts_node_end_byte(*node));
-    }
-
-    std::string GeneratedCode::getString(size_t startPos, size_t endPos) const {
-        return std::string(this->source, startPos, endPos - startPos);
-    }
-
-    void GeneratedCode::addFunction(const char *name, const char *returnType) {
-        auto p = functionArray.add();
-        p->name = name;
-        p->returnType = returnType;
-        this->currentFunction = p;
-    }
-
-    GeneratedElement *GeneratedCode::addElement(const GeneratedElement &element) {
-        GeneratedElement* result = nullptr;
-        switch (element.getElementType()) {
-            case GeneratedElementType::Token:
-            {
-                auto const & b = (Token const &)element;
-                result = tokenArray.add(b);
-                break;
-            }
-            case GeneratedElementType::IntLiteral:
-            {
-                auto const & b = (IntLiteral const &)element;
-                result = intLiteralArray.add(b);
-                break;
-            }
-            case GeneratedElementType::StringLiteral:
-                break;
-            case GeneratedElementType::BoolLiteral:
-                break;
-            case GeneratedElementType::CharLiteral:
-                break;
-            case GeneratedElementType::GeneratedBlock:
-                break;
-            case GeneratedElementType::FieldOrParameter:
-                break;
-            case GeneratedElementType::FunctionDeclaration:
-            {
-                auto const & f = (FunctionDeclaration const &)element;
-                result = functionArray.add(f);
-                break;
-            }
-            case GeneratedElementType::BinaryExpr:
-            {
-                auto const & b = (BinaryExpr const &)element;
-                result = binaryExprArray.add(b);
-                break;
-            }
-            case GeneratedElementType::AssignValueStmt:
-            {
-                auto const & e = (AssignValueStmt const &)element;
-                assignValueStmt = assignValueStmtArray.add(e);
-                result = assignValueStmt;
-                break;
-            }
-        }
-
-        return result;
-    }
-
-    Token GeneratedCode::getToken(std::any &tsNode) const {
-        auto node = std::any_cast<TSNode&>(tsNode);
-        if (ts_node_is_null(node)) {
-            return invalidToken;
-        }
-        return Token(this->source, ts_node_start_byte(node), ts_node_end_byte(node));
-    }
-
-    IntLiteral::IntLiteral(int value) : Literal(value) {
-
-    }
-
-    GeneratedElementType IntLiteral::getElementType() const {
-        return GeneratedElementType::IntLiteral;
-    }
-
-    IntLiteral::~IntLiteral() {
-
-    }
-
-    BoolLiteral::BoolLiteral(bool value) : Literal(value) {
-
-    }
-
-    StringLiteral::StringLiteral(std::string value) : Literal(std::move(value)) {
-
-    }
-
-    CharLiteral::CharLiteral(char value) : Literal(value) {
-
-    }
-
-
-    FunctionDeclaration::FunctionDeclaration(const char*name, const char*returnType)
-        : name(name), returnType(returnType) {
-
-    }
-
-    GeneratedElementType FunctionDeclaration::getElementType() const{
-        return GeneratedElementType::FunctionDeclaration;
-    }
-
-    GeneratedElement::GeneratedElement(int fromNode) : fromNode(fromNode) {
-
-    }
-
-    void GeneratedElement::reset() {
-        this->fromNode = 0;
-    }
-
-    GeneratedElementType GeneratedBlock::getElementType() const{
-        return GeneratedElementType::GeneratedBlock;
-    }
-
-    GeneratedElementType FieldOrParameter::getElementType() const {
-        return GeneratedElementType::FieldOrParameter;
-    }
-
-    GeneratedElementType BinaryExpr::getElementType() const {
-        return GeneratedElementType::BinaryExpr;
-    }
-
-    BinaryExpr::BinaryExpr(GeneratedElement *left, GeneratedElement *symbol, GeneratedElement *right) : left(left),
-                                                                                                        symbol(symbol),
-                                                                                                        right(right) {}
-
-
-    bool GeneratedCodeVisitor::visit(GeneratedElement *element) {
-        if (element == nullptr) {
+    bool DefLanguage::operator<(DefLanguage const& rhs) const {
+        if (this->type < rhs.type) {
+            return true;
+        } else if (this->type == rhs.type) {
+            return this->version < rhs.version;
+        } else {
             return false;
         }
-
-        switch (element->getElementType()) {
-            case GeneratedElementType::Token:
-                return visit((Token*) element);
-            case GeneratedElementType::IntLiteral:
-                return visit((IntLiteral*) element);
-            case GeneratedElementType::StringLiteral:
-                break;
-            case GeneratedElementType::BoolLiteral:
-                break;
-            case GeneratedElementType::CharLiteral:
-                break;
-            case GeneratedElementType::GeneratedBlock:
-                break;
-            case GeneratedElementType::FunctionDeclaration:
-                break;
-            case GeneratedElementType::FieldOrParameter:
-                break;
-            case GeneratedElementType::BinaryExpr:
-                return visit((BinaryExpr*) element);
-            case GeneratedElementType::AssignValueStmt:
-                return visit((AssignValueStmt*) element);
-        }
-
-        return false;
     }
 
-    GeneratedCodeVisitor::GeneratedCodeVisitor(GeneratedCode* generatedCode) : generatedCode(generatedCode) {
-
-    }
-
-    bool GeneratedCodeVisitor::visit(AssignValueStmt *assignValueStmt) {
-        logDebug("AssignValueStmt");
-
-        visit(assignValueStmt->left);
-        visit(assignValueStmt->right);
-        return false;
-    }
-
-    bool GeneratedCodeVisitor::visit(BinaryExpr *binaryExpr) {
-        logDebug("BinaryExpr");
-
-        visit(binaryExpr->left);
-        visit(binaryExpr->symbol);
-        visit(binaryExpr->right);
-        return true;
-    }
-
-    bool GeneratedCodeVisitor::visit(IntLiteral *intLiteral) {
-        logDebug("IntLiteral", intLiteral->value);
-        return true;
-    }
-
-    bool GeneratedCodeVisitor::visit(Token *token) {
-        logDebug("Token", token->word);
-        return true;
-    }
-
-
-    GeneratedElementType AssignValueStmt::getElementType() const {
-        return GeneratedElementType::AssignValueStmt;
-    }
-
-    AssignValueStmt::AssignValueStmt(GeneratedElement *left, GeneratedElement *right) : left(left), right(right) {}
-
-
-    FloatLiteral::FloatLiteral(float value) : Literal(value) {
-
-    }
-
-    FloatLiteral::~FloatLiteral() {
-
-    }
-
-    GeneratedElementType FloatLiteral::getElementType() const {
-        return GeneratedElementType::FloatLiteral;
-    }
 }

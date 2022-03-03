@@ -119,10 +119,13 @@ namespace sight {
 
     void showPortOptions(SightNodePortOptions& options);
 
+    void showGraphSettings();
+
     /**
      * @brief reload current graph.
      * 
      */
     void uiReloadGraph();
+
 
 }

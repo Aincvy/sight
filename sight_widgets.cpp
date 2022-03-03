@@ -7,6 +7,7 @@
 #include "sight_undo.h"
 #include "sight_util.h"
 #include "sight_colors.h"
+#include "sight_log.h"
 
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -16,7 +17,10 @@
 #include <cstdio>
 #include <cstdint>
 #include <cstdlib>
+#include <initializer_list>
+#include <iterator>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 #include <random>
@@ -238,20 +242,33 @@ namespace sight {
         window->DrawList->AddText(pos, color, text);
         return r;
     }
+    
+    std::string openFileDialog(const char* basePath, int* status){
+        return openFileDialog(basePath, status, {});
+    }
 
-    std::string openFileDialog(const char* basePath, int* status) {
+    std::string openFileDialog(const char* basePath, int* status, std::vector<std::pair<const char*, const char*>> filter) {
         // initialize NFD
         NFD::Guard nfdGuard;
         // auto-freeing memory
         NFD::UniquePath outPath;
 
         // prepare filters for the dialog
-        nfdfilteritem_t filterItem[2] = { { "Source code", "c,cpp,cc" }, { "Graphs", "yaml" } };
+        std::pair<const char*, const char*> a = {"", ""};
+        auto size = std::size(filter);
+        nfdnfilteritem_t data[size];
+        if (size > 0) {
+            int i = -1;
+            for( const auto& item: filter){
+                i++;
+                data[i] = {.name = item.first, .spec = item.second};
+            }
+        }
 
         // show the dialog
         std::string pathResult{};
 
-        nfdresult_t result = NFD::OpenDialog(outPath, filterItem, 2, basePath);
+        nfdresult_t result = NFD::OpenDialog(outPath, data, size, basePath);
         if (result == NFD_OKAY) {
             SET_CODE(status, CODE_OK);
             pathResult = outPath.get();
@@ -287,15 +304,20 @@ namespace sight {
         return {};
     }
 
-    std::string saveFileDialog(const char* basePath) {
+    std::string saveFileDialog(const char* basePath, int* status, std::string_view defaultName) {
         // initialize NFD
         NFD::Guard nfdGuard;
         // auto-freeing memory
         NFD::UniquePath outPath;
 
-        auto result = NFD::SaveDialog(outPath, nullptr, 0, basePath, "graph");
+        auto result = NFD::SaveDialog(outPath, nullptr, 0, basePath, defaultName.data());
         if (result == NFD_OKAY) {
+            SET_CODE(status, CODE_OK);
             return outPath.get();
+        } else if (result == NFD_CANCEL) {
+            SET_CODE(status, CODE_USER_CANCELED)
+        } else {
+            SET_CODE(status, CODE_ERROR);
         }
 
         return {};
@@ -543,16 +565,27 @@ namespace sight {
         return *this;
     }
 
-    bool ToastController::toast(std::string title, std::string content, float showTime) {
+    bool ToastController::toast(std::string_view title, std::string_view content, float showTime) {
         auto now = ImGui::GetTime();
-        elements.emplace_back(getRuntimeId(), title, content, showTime > 0 ? now + showTime : showTime);
+        elements.emplace_back(getRuntimeId(), title.data(), content.data(), showTime > 0 ? now + showTime : showTime);
         
         // apply next args..
         auto& element = elements.back();
         element.toastType = nextToastType;
+
+        switch (element.toastType) {
+        case ToastType::Info:
+            logInfo("$0, $1", title, content);
+            break;
+        case ToastType::Warning:
+            logWarning("$0, $1", title, content);
+            break;
+        case ToastType::Error:
+            logError("$0, $1", title, content);
+            break;
+        }
         
         resetNextArgs();
-
         return true;
     }
 

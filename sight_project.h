@@ -338,6 +338,9 @@ namespace sight {
          */
         bool isAnyGraphHasTemplate(std::string_view templateAddress, std::string* pathOut = nullptr);
 
+        std::string pathSrcFolder() const;
+        std::string pathTargetFolder() const;
+
     private:
         std::string baseDir;
         bool createIfNotExist;
@@ -360,9 +363,6 @@ namespace sight {
         std::string pathConfigFile() const;
         std::string pathStyleConfigFile() const;
         std::string pathEntitiesConfigFile() const;
-
-        std::string pathSrcFolder() const;
-        std::string pathTargetFolder() const;
 
 
         void initTypeMap();

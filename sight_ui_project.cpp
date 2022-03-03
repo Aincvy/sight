@@ -3,6 +3,9 @@
 #include "sight_project.h"
 #include <algorithm>
 
+#include "IconsMaterialDesign.h"
+#include "sight_ui.h"
+
 namespace sight {
 
     namespace {
@@ -82,4 +85,42 @@ namespace sight {
         return p->updateEntity(entity, createEntityData.editingEntity) ? CODE_OK : CODE_FAIL;
     }
 
+    void uiDeleteEntity(std::string_view delFullName) {
+        auto p = currentProject();
+        // check if used.
+        if (!checkTemplateNodeIsUsed(p, delFullName)) {
+            // delete ask
+            std::string str{ "! You only can delete the NOT-USED entity !\nYou will delete: " };
+            str += delFullName;
+            openAskModal("Delete entity", str.c_str(), [p, delFullName](bool f) {
+                logDebug(f);
+                if (f) {
+                    p->delEntity(delFullName);
+                    currentUIStatus()->toastController.info().toast("Delete success!", delFullName);
+                }
+            });
+        } 
+    }
+
+
+    bool checkTemplateNodeIsUsed(Project* p, std::string_view templateAddress, bool alert) {
+        std::string pathOut;
+        if (p->isAnyGraphHasTemplate(templateAddress, &pathOut)) {
+            // used, cannot be deleted.
+            if (alert) {
+                std::string contentString{ "Used in graph: " };
+                contentString += pathOut;
+                // if (out) {
+                //     // question
+                //     contentString += "\nAre you still want to do that?";
+                //     openAskModal(ICON_MD_QUESTION_MARK, contentString, [](bool f){});
+                // } else {
+                // }
+                openAlertModal(ICON_MD_WARNING " Operation denied", contentString);
+            }
+            return true;
+        }
+
+        return false;
+    }
 }

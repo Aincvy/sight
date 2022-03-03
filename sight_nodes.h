@@ -17,6 +17,7 @@
 #include "sight_colors.h"
 #include "sight_defines.h"
 #include "sight_memory.h"
+#include "sight_js_parser.h"
 
 #include "v8.h"
 #include "v8pp/convert.hpp"
@@ -681,6 +682,12 @@ namespace sight {
         
     };
 
+    struct SightNodeGraphSettings {
+        DefLanguage language;
+
+        std::string outputFilePath;
+    };
+
     /**
      * A graph contains many nodes.
      */
@@ -782,6 +789,7 @@ namespace sight {
 
         void setFilePath(const char* path);
         const char* getFilePath() const;
+        std::string getFileName(std::string_view replaceExt = {}) const;
 
         SightArray <SightNode> & getNodes();
         const SightArray <SightNode> & getNodes() const;
@@ -822,6 +830,13 @@ namespace sight {
         bool isBroken() const;
         std::string const& getBrokenReason() const;
 
+        SightNodeGraphSettings& getSettings();
+
+        /**
+         * @brief send parse command to js-thread.
+         * 
+         */
+        void asyncParse() const;
 
     private:
 
@@ -838,7 +853,7 @@ namespace sight {
         std::map<uint, SightAnyThingWrapper> idMap;
 
         SightNodeGraphExternalData externalData;
-
+        SightNodeGraphSettings settings;
 
         /**
          * Dispose graph.

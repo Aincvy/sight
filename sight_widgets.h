@@ -142,7 +142,7 @@ namespace sight {
         ToastController& warning();
         ToastController& error();
 
-        bool toast(std::string title, std::string content, float showTime = 5);
+        bool toast(std::string_view title, std::string_view content, float showTime = 5);
 
         void render();
         void resetNextArgs();
@@ -200,6 +200,7 @@ namespace sight {
      * @param basePath 
      * @return std::string 
      */
+    std::string openFileDialog(const char* basePath, int* status, std::vector<std::pair<const char*, const char*>> filter);
     std::string openFileDialog(const char* basePath, int* status);
 
     /**
@@ -218,7 +219,7 @@ namespace sight {
      * @param basePath 
      * @return std::string 
      */
-    std::string saveFileDialog(const char* basePath);
+    std::string saveFileDialog(const char* basePath, int* status = nullptr, std::string_view defaultName = "");
 
     void openUrlWithDefaultBrowser(std::string const& urlString);
 
