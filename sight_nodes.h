@@ -463,6 +463,7 @@ namespace sight {
         void operator()(Isolate* isolate, SightNodePort* thisNodePort, JsEventType eventType = JsEventType::Default, void* pointer = nullptr) const;
         v8::MaybeLocal<v8::Value> operator()(Isolate* isolate, SightNode* node, v8::Local<v8::Value> arg1, v8::Local<v8::Value> arg2) const;
         v8::MaybeLocal<v8::Value> operator()(Isolate* isolate, SightEntity* entity) const;
+        v8::MaybeLocal<v8::Value> operator()(Isolate* isolate, int index, const char* graphName) const;
 
         operator bool() const;
 
@@ -686,6 +687,8 @@ namespace sight {
         DefLanguage language;
 
         std::string outputFilePath;
+        std::string codeTemplate;
+        char graphName[LITTLE_NAME_BUF_SIZE] = {0};
     };
 
     /**
@@ -837,6 +840,9 @@ namespace sight {
          * 
          */
         void asyncParse() const;
+
+        void setName(std::string_view name);
+        std::string_view getName() const;
 
     private:
 

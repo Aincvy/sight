@@ -1,4 +1,8 @@
-#include "sight_js_parser.h"
+#include "IconsMaterialDesign.h"
+
+#include <algorithm>
+#include <math.h>
+
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
 #include "imgui_canvas.h"
@@ -15,6 +19,9 @@
 #include "sight_project.h"
 #include "sight_undo.h"
 #include "sight_widgets.h"
+#include "sight_js.h"
+#include "sight_js_parser.h"
+#include "sight_ui.h"
 
 #include <cassert>
 #include <iostream>
@@ -678,6 +685,38 @@ namespace sight {
                 ImGui::TextColored(uiStatus.uiColors->errorText, "Graph Broken: %s" , graph->getBrokenReason().c_str());
                 return CODE_FAIL;
             }
+            ImGui::SameLine();
+
+            static float zoomValue = 1;
+            constexpr const float zoomStep = 0.25f;
+            constexpr const float zoomMin = 0.25f;
+            constexpr const float zoomMax = 3.25f;
+
+            if (ImGui::Button(ICON_MD_ZOOM_IN)) {
+                if ((zoomValue += zoomStep) > zoomMax) {
+                    zoomValue = zoomMax;
+                    toast("Zoom value max", "");
+                }
+                ed::SetCurrentZoom(zoomValue);
+                trace("$0, $1", ed::GetCurrentZoom(), zoomValue);
+            }
+            helpMarker("Zoom In");
+            ImGui::SameLine();
+            if (ImGui::Button(ICON_MD_ZOOM_OUT)) {
+                if ((zoomValue -= zoomStep) < zoomMin) {
+                    zoomValue = zoomMin;
+                    toast("Zoom value min", "");
+                }
+                ed::SetCurrentZoom(zoomValue);
+                trace("$0, $1", ed::GetCurrentZoom(), zoomValue);
+            }
+            helpMarker("Zoom Out");
+            ImGui::SameLine();
+            if (ImGui::Button(ICON_MD_CROP_FREE)) {
+                ed::SetCurrentZoom( zoomValue = 1);
+                trace("Reset Zoom: $0, $1", ed::GetCurrentZoom(), zoomValue);
+            }
+            helpMarker("Reset Zoom");
             ImGui::Separator();
 
             // Start interaction with editor.
@@ -1488,6 +1527,12 @@ namespace sight {
         auto graph = currentGraph();
         auto& settings = graph->getSettings();
 
+        ImGui::Text(fmt, "Name");
+        ImGui::SameLine();
+        if (ImGui::InputText("##graphName", settings.graphName, std::size(settings.graphName))) {
+            graph->markDirty();
+        }
+
         ImGui::Text("Language Info");
         ImGui::Text(fmt, "Type");
         ImGui::SameLine();
@@ -1530,6 +1575,20 @@ namespace sight {
         helpMarker("The file to save graph-parse-result.\nClick to select file.");
         if (!settings.outputFilePath.empty()) {
             ImGui::TextWrapped("%s", settings.outputFilePath.data());
+        }
+
+        // code template
+        ImGui::Text(fmt, "CodeTemplate");
+        ImGui::SameLine();
+        if (ImGui::BeginCombo("##code-template", settings.codeTemplate.c_str())) {
+            auto names = getCodeTemplateNames();
+            for( const auto& item: names){
+                if (ImGui::Selectable(item.c_str(), item == settings.codeTemplate)) {
+                    settings.codeTemplate = item;
+                    graph->markDirty();
+                }
+            }
+            ImGui::EndCombo();
         }
 
     }

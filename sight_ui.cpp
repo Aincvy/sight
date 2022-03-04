@@ -280,7 +280,7 @@ for(const item of a) {
             }
             if (ImGui::MenuItem("Test1")) {
                 auto g = currentGraph();
-                
+
             }
         }
 
@@ -2038,6 +2038,9 @@ for(const item of a) {
         showOrFocusWindow(g_UIStatus->windowStatus.entityInfoWindow, WINDOW_LANGUAGE_KEYS.entityInfo);
     }
 
+    void toast(std::string_view title, std::string_view content, float time) {
+        g_UIStatus->toastController.info().toast(title, content, time);        
+    }
 
     void UICreateEntity::addField() {
         fields.push_back({});     //  .editing = true

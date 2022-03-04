@@ -6,11 +6,13 @@
 
 #include <future>
 #include <map>
+#include <string_view>
 #include <vector>
 #include <string>
 
 #include "sight.h"
 #include "shared_queue.h"
+#include "sight_js_parser.h"
 #include "sight_nodes.h"
 
 #include "v8.h"
@@ -153,6 +155,24 @@ namespace sight{
         std::vector<SightNode> cachedNodes; 
     };
 
+    struct CodeTemplateFunc : public CommonOperation{
+        constexpr static const auto QueryIndex = 0;
+        constexpr static const auto HeaderIndex = 1;
+        constexpr static const auto FooterIndex = 2;
+
+        DefLanguage language;
+        bool enableHeader = true;
+        bool enableFooter = true;
+
+        CodeTemplateFunc() = default;
+        CodeTemplateFunc(DefLanguage* lang, std::string_view name, std::string_view desc, v8::Local<v8::Function> func);
+
+        std::string getHeader(std::string_view graphName) const;
+        std::string getFooter(std::string_view graphName) const;
+
+        std::string operator()(int index, std::string_view graphName) const;
+    };
+
     /**
      *
      * @param type
@@ -254,6 +274,8 @@ namespace sight{
     void registerGlobals(v8::Local<v8::Value> value);
     
     SightJsNode& registerEntityFunctions(SightJsNode& node);
+
+    std::vector<std::string> & getCodeTemplateNames();
 
     inline bool isValid(v8::Local<v8::Value> value){
         return !value.IsEmpty() && !value->IsNullOrUndefined();

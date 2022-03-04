@@ -441,7 +441,7 @@ function addCodeTemplate(lang, name, desc, callback){
 };
 
 addCodeTemplate(DefLanguage(), 'rws-graph', 'Generate a graph class', function ({ index, graphName }) {
-    // index: 0=header, 1=footer. 
+    // index: 0=query, 1=header, 2=footer. 
     // this function will be called twice.
     // return a string.
     return '';

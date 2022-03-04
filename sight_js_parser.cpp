@@ -7,6 +7,7 @@
 #include "sight_defines.h"
 #include "sight_log.h"
 
+#include <cstring>
 #include <iterator>
 #include <ostream>
 #include <sstream>
@@ -49,6 +50,7 @@ namespace sight {
             TSFieldId right;
             TSFieldId argument;
             TSFieldId body;
+            TSFieldId kind;
         };
 
         TreeSitterFields jsLangFields;
@@ -68,13 +70,14 @@ namespace sight {
             constexpr const char* fieldRight = "right";
             constexpr const char* fieldArgument = "argument";
             constexpr const char* fieldBody = "body";
+            constexpr const char* fieldKind = "kind";
 
             jsLangFields._operator = ts_language_field_id_for_name(language, fieldOperator, strlen(fieldOperator));
             jsLangFields.left = ts_language_field_id_for_name(language, fieldLeft, strlen(fieldLeft));
             jsLangFields.right = ts_language_field_id_for_name(language, fieldRight, strlen(fieldRight));
             jsLangFields.argument = ts_language_field_id_for_name(language, fieldArgument, strlen(fieldArgument));
             jsLangFields.body = ts_language_field_id_for_name(language, fieldBody, strlen(fieldBody));
-
+            jsLangFields.kind = ts_language_field_id_for_name(language, fieldKind, strlen(fieldKind));
         }
 
 
@@ -95,7 +98,7 @@ namespace sight {
             // logDebug("s: $0, e: $1, ",startPos, endPos);
         };
 
-        void defaultAction(GeneratedCode& code, std::ostream& out, TSNode& tsNode) {
+        void defaultAction(GeneratedCode& code, std::ostream& out, TSNode tsNode) {
             uint count = 0;
             auto source = code.source;
             if ((count = ts_node_child_count(tsNode)) <= 0) {
@@ -121,13 +124,17 @@ namespace sight {
             if (iter != nodeHandlerMap.end()) {
                 iter->second(code, out, node);
             } else {
-                defaultAction(code, out, node);
+                // try find *
+                iter = nodeHandlerMap.find("*");
+                if (iter != nodeHandlerMap.end()) {
+                    iter->second(code, out, node);
+                } else {
+                    defaultAction(code, out, node);
+                }
             }
-            // logDebug("do not handle $0", nodeType);
 
             return;
         }
-
 
         /**
          * 
@@ -154,8 +161,9 @@ namespace sight {
             nodeHandlerMap["identifier"] = plainAction;
 
             nodeHandlerMap["for_in_statement"] = [](GeneratedCode& code, std::ostream& out, TSNode tsNode) {
+                // logDebug(" for_in_statement");
+
                 auto source = code.source;
-                logDebug(" for_in_statement");
                 out << "foreach( var ";
                 auto left = ts_node_child_by_field_id(tsNode, jsLangFields.left);
                 generate(code, out, left);
@@ -168,6 +176,38 @@ namespace sight {
                 out << "}\n";
             };
 
+            // variable_declaration
+            nodeHandlerMap["lexical_declaration"] = [](GeneratedCode& code, std::ostream& out, TSNode tsNode) {
+                // logDebug("lexical_declaration");
+                
+                auto kind = ts_node_child_by_field_id(tsNode, jsLangFields.kind);
+                bool isConst = false;
+                constexpr const auto strConst = "const";
+                if (strncmp(code.source.begin() + ts_node_start_byte(kind), strConst, strlen(strConst)) == 0) {
+                    // const
+                    isConst = true;
+                } 
+
+                // append source.
+                if (isConst) {
+                    out << "const ";
+                }
+                out << "var ";
+
+                // next node
+                generate(code, out, ts_node_next_named_sibling(kind));
+                out << ";\n";
+            };
+
+        }
+
+        void initJavaScriptHandlerMap(){
+            DefLanguage lang;
+            lang.setType(DefLanguageType::JavaScript);
+            lang.version = 0;
+
+            auto& nodeHandlerMap = langNodeHandlerMap[lang];
+            nodeHandlerMap["*"] = defaultAction;
 
         }
 
@@ -176,6 +216,7 @@ namespace sight {
 
 
             initCShaprHandlerMap();
+            initJavaScriptHandlerMap();
 
         }
 
@@ -269,10 +310,23 @@ namespace sight {
     }
 
     bool DefLanguage::operator==(DefLanguage const& rhs) const {
-        return this->type == rhs.type && this->version == rhs.version;
+        if (this->type != rhs.type) {
+            return false;
+        }
+
+        // let 0 = any version
+        if (this->version == 0 || rhs.version == 0) {
+            return true;
+        }
+
+        return this->version == rhs.version;
     }
 
     bool DefLanguage::operator<(DefLanguage const& rhs) const {
+        if (*this == rhs) {
+            return false;
+        }
+
         if (this->type < rhs.type) {
             return true;
         } else if (this->type == rhs.type) {

@@ -86,13 +86,15 @@ globals.require = function require(path, module = null, extraData = null){
 
 globals.execute = function execute(path = ''){
     if (!path || typeof path !== 'string') {
-        return;
+        return undefined;
     }
 
     if (path.endsWith(".js")) {
         // js file 
         return v8Include(path, null, 1);
     }
+
+    return undefined;
 }
 
 module.exportCommon = true;

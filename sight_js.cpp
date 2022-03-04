@@ -322,6 +322,7 @@ namespace sight {
          * 
          */
         struct ParsingLink {
+            int index = 0;
             std::vector<SightNode*> link;
             std::stringstream sourceStream{};
         };
@@ -422,8 +423,8 @@ namespace sight {
             SharedQueue<JsCommand> commandQueue;
             ParsingGraphData parsingGraphData;
             SightEntityFunctions entityFunctions;
-            
-            std::vector<CommonOperation> codeTemplates;
+            // key: name, 
+            std::map<std::string, CodeTemplateFunc> codeTemplateMap;
         };
 
         struct GenerateFunctionStatus {
@@ -806,17 +807,24 @@ namespace sight {
             auto context = isolate->GetCurrentContext();
             auto stackTrace = v8::StackTrace::CurrentStackTrace(isolate, 10, v8::StackTrace::kOverview);
             std::stringstream ss;
+
+            std::string fileName;
+            int lineNumber = 0;
+            std::string functionName;
             if (stackTrace->GetFrameCount() > 0) {
                 auto frame = stackTrace->GetFrame(isolate, 0);
                 ss << "[";
                 if (!frame->GetScriptName().IsEmpty()) {
                     ss << v8pp::from_v8<std::string>(isolate, frame->GetScriptName());
+                    fileName = v8pp::from_v8<std::string>(isolate, frame->GetScriptName());
                 }
                 ss << ":";
                 ss << frame->GetLineNumber();
+                lineNumber = frame->GetLineNumber();
                 ss << " (";
                 if (!frame->GetFunctionName().IsEmpty()) {
                     ss << v8pp::from_v8<std::string>(isolate, frame->GetFunctionName());
+                    functionName = v8pp::from_v8<std::string>(isolate, frame->GetFunctionName());
                 }
                 ss << ")] ";
             }
@@ -827,7 +835,8 @@ namespace sight {
 
                 if (IS_V8_STRING(arg)) {
                     std::string msg = v8pp::from_v8<std::string>(isolate, arg);
-                    printf("%s%s\n", traceMsg.c_str(), msg.c_str());
+                    // printf("%s%s\n", traceMsg.c_str(), msg.c_str());
+                    LogConstructor(fileName.c_str(), lineNumber, functionName.c_str(), LogLevel::Info).print(msg);
                 } else if (IS_V8_NUMBER(arg)) {
                     if (arg->IsInt32() ) {
                         int msg = arg->Int32Value(context).ToChecked();
@@ -1484,7 +1493,7 @@ namespace sight {
      * @return
      */
     int destroyJsEngine() {
-
+        logDebug("start destroy js engine..");
         freeParser();
 
         if (!g_V8Runtime) {
@@ -1492,7 +1501,8 @@ namespace sight {
         }
 
         clearJsNodeCache();
-        logDebug("destroy js engine..");
+        g_V8Runtime->codeTemplateMap.clear();
+        
         g_V8Runtime->isolateScope.reset();
         g_V8Runtime->entityFunctions.reset();
         if (g_V8Runtime->isolate) {
@@ -1510,7 +1520,7 @@ namespace sight {
 
         delete g_V8Runtime;
         g_V8Runtime = nullptr;
-        return 0;
+        return CODE_OK;
     }
 
     void bindTinyData(Isolate* isolate, const v8::Local<v8::Context>& context) {
@@ -1671,6 +1681,19 @@ namespace sight {
         auto global = context->Global();
         auto addCodeTemplate = [](DefLanguage* lang, const char* name, const char* desc, Local<Function> callback){
             logDebug(name);
+            if (!lang) {
+                return false;
+            }
+            auto& map = g_V8Runtime->codeTemplateMap;
+            auto iter = map.find(name);
+            if (iter != map.end()) {
+                logWarning("replace code template: $0. New description: $1", name, desc);
+                iter->second = {lang, name, desc, callback};
+            } else {
+                map[name] = { lang, name, desc, callback };
+            }
+
+            return true;
         };
         global->Set(context, v8pp::to_v8(isolate, "addCodeTemplate"), 
             v8pp::wrap_function(isolate, "addCodeTemplate", addCodeTemplate)).ToChecked();
@@ -2191,6 +2214,7 @@ namespace sight {
             nodeFunc(node->fields);
 
             nodeFunc(node->outputPorts, true);
+            
         }
 
         if (!status || status->need$$) {
@@ -2366,6 +2390,11 @@ namespace sight {
                     auto& item = *iter;
                     data.addNewLink(SightNodePortConnection(g, item, node).target->node);
                 }
+
+                // move parsingLink to last
+                auto it = data.list.begin() + data.lastUsedIndex;
+                std::rotate(it, it + 1, data.list.end());
+                data.lastUsedIndex = data.list.size() - 1;
             }
         }
     }
@@ -2493,7 +2522,7 @@ namespace sight {
                 break;
             case JsCommandType::ParseGraph:{
                 // std::string source;
-                parseGraph(command.args.argString);
+                parseGraph(command.args.argString, true, false);
                 break;
             }
             case JsCommandType::InitPluginManager:
@@ -2855,12 +2884,25 @@ namespace sight {
         return CODE_OK;
     }
 
-
     /**
      *
      * @param filename
      * @return
      */
+    std::vector<std::string> & getCodeTemplateNames() {
+        static std::vector<std::string> names;
+        
+        auto& map = g_V8Runtime->codeTemplateMap;
+        if (names.size() != map.size()) {
+            names.clear();
+            for( const auto& item: map){
+                names.push_back(item.first);
+            }
+        }
+
+        return names;
+    }
+
     int parseGraph(const char* filename, bool generateTargetLang, bool writeToOutFile) {
         logDebug(filename);
         SightNodeGraph graph;
@@ -2889,6 +2931,25 @@ namespace sight {
             return i;
         }
 
+        // apply code template
+        auto const& codeTemplateName = graph.getSettings().codeTemplate;
+        if (!codeTemplateName.empty()) {
+            auto codeTemplateIter = g_V8Runtime->codeTemplateMap.find(codeTemplateName);
+            if (codeTemplateIter == g_V8Runtime->codeTemplateMap.end()) {
+                logWarning("Unable to find code-template: $0, jump it.", codeTemplateName);
+            } else {
+                auto codeTemplate = codeTemplateIter->second;
+                std::string_view graphName = graph.getName();
+                auto tmp = codeTemplate.getHeader(graphName);
+                if (!tmp.empty()) {
+                    source = tmp + source;
+                }
+
+                source += codeTemplate.getFooter(graphName);
+            }
+        }
+
+        logInfo(source);
         if (writeToOutFile) {
             if (settings.outputFilePath.empty()) {
                 logWarning("graph $0 do not have a output path.", graph.getFilePath());
@@ -2896,8 +2957,51 @@ namespace sight {
                 std::ofstream out(settings.outputFilePath.data(), std::ios::trunc);
                 out << source;
             }
+        } else {
+            logDebug("source do not to write to file");
         }
 
         return CODE_OK;
     }
+
+
+    std::string unpackToString(v8::Isolate* isolate, v8::MaybeLocal<v8::Value> value){
+        if (value.IsEmpty()) {
+            return {};
+        }
+
+        auto o = value.ToLocalChecked();
+        if (IS_V8_STRING(o)) {
+            return v8pp::from_v8<std::string>(isolate, o);
+        }
+        return {};
+    }
+
+    CodeTemplateFunc::CodeTemplateFunc(DefLanguage* lang, std::string_view name, std::string_view desc, v8::Local<v8::Function> func)
+        : CommonOperation(std::string{ name }, std::string{ desc }, PersistentFunction{ func->GetIsolate(), func })
+        , language(*lang) {
+    }
+
+    std::string sight::CodeTemplateFunc::operator()(int index, std::string_view graphName) const {
+        auto isolate = g_V8Runtime->isolate;
+        auto result = this->function(isolate, index, graphName.data());
+        return unpackToString(isolate, result);
+    }
+
+    std::string sight::CodeTemplateFunc::getFooter(std::string_view graphName) const {
+        if (!enableFooter) {
+            return {};
+        }
+
+        return (*this)(FooterIndex, graphName);
+    }
+
+    std::string sight::CodeTemplateFunc::getHeader(std::string_view graphName) const {
+        if (!enableHeader) {
+            return {};
+        }
+
+        return (*this)(HeaderIndex, graphName);
+    }
+
 }

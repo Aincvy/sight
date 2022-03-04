@@ -383,6 +383,7 @@ namespace sight {
 
     void openEntityInfoWindow(std::string_view entityName);
 
+    void toast(std::string_view title, std::string_view content, float time = 5.0f);
 
     void inline showOrFocusWindow(bool& flag, std::string_view windowName){
         if (flag) {

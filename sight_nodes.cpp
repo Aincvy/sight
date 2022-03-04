@@ -35,6 +35,7 @@
 
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_split.h"
+#include "v8pp/object.hpp"
 
 
 // node editor status
@@ -748,6 +749,8 @@ namespace sight {
         out << YAML::Key << "lang.type" << YAML::Value << settings.language.type;
         out << YAML::Key << "lang.version" << YAML::Value << settings.language.version;
         out << YAML::Key << "outputFilePath" << YAML::Value << settings.outputFilePath;
+        out << YAML::Key << "codeTemplate" << YAML::Value << settings.codeTemplate;
+        out << YAML::Key << "graphName" << YAML::Value << settings.graphName;
         out << YAML::EndMap;
 
         out << YAML::EndMap;       // end of 1st begin map
@@ -812,6 +815,12 @@ namespace sight {
                 settings.language.type = settingsNode["lang.type"].as<int>();
                 settings.language.version = settingsNode["lang.version"].as<int>();
                 settings.outputFilePath = settingsNode["outputFilePath"].as<std::string>();
+                if (settingsNode["codeTemplate"]) {
+                    settings.codeTemplate = settingsNode["codeTemplate"].as<std::string>();
+                }
+                if (settingsNode["graphName"]) {
+                    snprintf(settings.graphName, std::size(settings.graphName) - 1, "%s", settingsNode["graphName"].as<std::string>().c_str());
+                }
             }
 
             this->editing = false;
@@ -1279,6 +1288,14 @@ namespace sight {
     void SightNodeGraph::asyncParse() const {
         addJsCommand(JsCommandType::ParseGraph, CommandArgs::copyFrom(filepath));
         logInfo("use js-thread to start parsing.");
+    }
+
+    void SightNodeGraph::setName(std::string_view name) {
+        snprintf(settings.graphName, std::size(settings.graphName) - 1, "%s", name.data());
+    }
+
+    std::string_view SightNodeGraph::getName() const {
+        return settings.graphName;
     }
 
     SightNode *SightAnyThingWrapper::asNode() const {
@@ -2209,6 +2226,13 @@ namespace sight {
         return result;
     }
 
+    v8::MaybeLocal<v8::Value> ScriptFunctionWrapper::operator()(Isolate* isolate, int index, const char* graphName) const {
+        auto obj = v8::Object::New(isolate);
+        v8pp::set_const(isolate, obj, "index", index);
+        v8pp::set_const(isolate, obj, "graphName", graphName);
+        return v8pp::call_v8(isolate, function.Get(isolate), v8::Object::New(isolate), obj);
+    }
+
     ScriptFunctionWrapper::operator bool() const {
         return !function.IsEmpty() || !sourceCode.empty();
     }
@@ -2299,6 +2323,7 @@ namespace sight {
             // }
 
             // create one.
+            graph->setName(graph->getFileName());
             graph->save();
         }
 
