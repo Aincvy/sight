@@ -132,7 +132,11 @@ namespace sight {
                 } 
                 normalCount = 0;
             } else if (isspace(c)) {
-                // ss << c;
+                ss << c;
+                // if (normalCount > 0) {
+                //     ss << c;
+                // }
+                // normalCount = 0;
             }
             else {
                 if (c == '}' && indentLevel > 0) {

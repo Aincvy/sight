@@ -114,3 +114,7 @@ sight.entity.addOperation('templateNode', 'generate addTemplateNode() function c
     }});
     return result;
 });
+
+
+// java 
+execute('part-java.js');

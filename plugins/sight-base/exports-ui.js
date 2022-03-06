@@ -31,3 +31,5 @@ sight.entityFieldClass.prototype.typedValue = function(){
     }
     return v;
 }
+
+include('exports-tools.js', module);
