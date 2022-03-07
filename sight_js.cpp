@@ -806,67 +806,57 @@ namespace sight {
             auto isolate = args.GetIsolate();            
             auto context = isolate->GetCurrentContext();
             auto stackTrace = v8::StackTrace::CurrentStackTrace(isolate, 10, v8::StackTrace::kOverview);
-            std::stringstream ss;
 
             std::string fileName;
             int lineNumber = 0;
             std::string functionName;
             if (stackTrace->GetFrameCount() > 0) {
                 auto frame = stackTrace->GetFrame(isolate, 0);
-                ss << "[";
                 if (!frame->GetScriptName().IsEmpty()) {
-                    ss << v8pp::from_v8<std::string>(isolate, frame->GetScriptName());
                     fileName = v8pp::from_v8<std::string>(isolate, frame->GetScriptName());
                 }
-                ss << ":";
-                ss << frame->GetLineNumber();
                 lineNumber = frame->GetLineNumber();
-                ss << " (";
                 if (!frame->GetFunctionName().IsEmpty()) {
-                    ss << v8pp::from_v8<std::string>(isolate, frame->GetFunctionName());
                     functionName = v8pp::from_v8<std::string>(isolate, frame->GetFunctionName());
                 }
-                ss << ")] ";
             }
-            auto traceMsg = ss.str();
-
+            LogConstructor tmpLog(fileName.c_str(), lineNumber, functionName.c_str(), LogLevel::Info);
             for( int i = 0; i < args.Length(); i++){
                 auto arg = args[i];
 
                 if (IS_V8_STRING(arg)) {
                     std::string msg = v8pp::from_v8<std::string>(isolate, arg);
-                    // printf("%s%s\n", traceMsg.c_str(), msg.c_str());
-                    LogConstructor(fileName.c_str(), lineNumber, functionName.c_str(), LogLevel::Info).print(msg);
+                    tmpLog.print(msg);
                 } else if (IS_V8_NUMBER(arg)) {
                     if (arg->IsInt32() ) {
                         int msg = arg->Int32Value(context).ToChecked();
-                        printf("%s%d\n", traceMsg.c_str(), msg);
+                        tmpLog.print(msg);
                     } else if (arg->IsUint32()) {
                         uint msg = arg->Uint32Value(context).ToChecked();
-                        printf("%s%d\n", traceMsg.c_str(), msg);
+                        tmpLog.print(msg);
                     } else {
                         auto msg = arg->NumberValue(context).ToChecked();
-                        printf("%s%f\n", traceMsg.c_str(), msg);
+                        tmpLog.print(msg);
                     }
                 } else if (arg->IsObject()) {
                     auto str = v8pp::json_str(isolate, arg);
                     auto msg = str.c_str();
-                    printf("%s%s\n", traceMsg.c_str(), msg);
+                    tmpLog.print(msg);
                 } else if (arg->IsUndefined()) {
                     constexpr const char* msg = "undefined";
-                    printf("%s%s\n", traceMsg.c_str(), msg);
+                    tmpLog.print(msg);
                 } else if (arg->IsNull()) {
                     constexpr const char* msg = "null";
-                    printf("%s%s\n", traceMsg.c_str(), msg);
+                    tmpLog.print(msg);
                 } else if (arg->IsExternal()) {
                     constexpr const char* msg = "external";
-                    printf("%s%s\n", traceMsg.c_str(), msg);
+                    tmpLog.print(msg);
                 } else if (arg->IsBoolean() || arg->IsBooleanObject()) {
                     const char* msg = arg->BooleanValue(isolate) ? "true" : "false";
-                    printf("%s%s\n", traceMsg.c_str(), msg);
+                    tmpLog.print(msg);
                 }
                 else {
-                    logDebug("no-handled-type");
+                    logError("no-handled-type");
                 }
             }
         }
@@ -2165,6 +2155,7 @@ namespace sight {
                         // reverseActive this port.
                         //
                         if (!item.isConnect()) {
+                            logError("ReverseActive Error, no connection: $1, $0", item.portName, item.getId());
                             return "";      // maybe need throw sth ?
                         }
 
@@ -2174,7 +2165,7 @@ namespace sight {
                             auto c = connections.front();
                             SightNodePortConnection connection(node->graph, c, node);
                             if (connection.bad()) {
-                                logDebug("bad connection");
+                                logError("bad connection");
                                 return "";
                             }
 
@@ -2184,12 +2175,12 @@ namespace sight {
                                 return runGenerateFunction(targetJsNode->onReverseActive,isolate, targetNode, connection.target->getId());
                             }
                         } else {
-
+                            logError("multiple connections, do not support yet.");
                         }
                         return "";
                     };
 
-                    auto useEmptyFunc = isOutput || item.getType() == IntTypeProcess;
+                    auto useEmptyFunc = isOutput;    // || item.getType() == IntTypeProcess;   ? 这里当初为什么这么写？ 
                     auto functionObject = useEmptyFunc ? v8pp::wrap_function(isolate, name, emptyFunc) : v8pp::wrap_function(isolate, name, t);
                     auto realType = item.getType();
                     if (realType != IntTypeProcess && realType != IntTypeObject) {
@@ -2430,7 +2421,7 @@ namespace sight {
                 logDebug("append source, delete last list..");
                 logDebug(list.sourceStream.str());
 #endif
-                finalSourceStream << list.sourceStream.str();
+                finalSourceStream << list.sourceStream.str() << std::endl;     // append 1 \n
                 outerList.erase(outerList.end() - 1);
             }
             // list maybe invalid.
@@ -2490,7 +2481,6 @@ namespace sight {
         } else {
             std::string finalSource = finalSourceStream.str();
             trim(finalSource);
-            logDebug(finalSource);
             source = finalSource;
             return CODE_OK;
         }
@@ -2921,6 +2911,8 @@ namespace sight {
             return CODE_FAIL;
         }
 
+        trace("generated js code: ");
+        trace(source);
         if (!generateTargetLang) {
             return CODE_OK;
         }

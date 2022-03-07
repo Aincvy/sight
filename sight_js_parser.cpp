@@ -92,7 +92,7 @@ namespace sight {
             for (auto i = startPos; i < endPos; i++) {
                 out << source[i];
             }
-            // out << " ";   // insert 1 space.
+            out << " ";   // insert 1 space.
 
             // out << std::endl;
             // logDebug("s: $0, e: $1, ",startPos, endPos);

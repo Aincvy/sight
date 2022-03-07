@@ -99,15 +99,15 @@ function springBootService(entity) {
  */
 public interface <%=entity.simpleName%>Service {
 
-    public long create(<%=entity.simpleName%> entity);
+    long create(<%=entity.simpleName%> entity);
 
-    public void update(<%=entity.simpleName%> entity);
+    void update(<%=entity.simpleName%> entity);
 
-    public <%=entity.simpleName%> select(long id);
+    <%=entity.simpleName%> select(long id);
 
-    public void delete(long id);
+    void delete(long id);
 
-    public void delete(<%=entity.simpleName%> entity);
+    void delete(<%=entity.simpleName%> entity);
 
 }
 `;

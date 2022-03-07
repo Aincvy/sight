@@ -526,6 +526,7 @@ namespace sight {
         typeMap["string"] = IntTypeString;
         typeMap["object"] = IntTypeObject;
         typeMap["number"] = IntTypeFloat;
+        typeMap["Flow"] = IntTypeProcess;
     }
 
     uint Project::getIntType(const std::string &str, bool addIfNotFound) {

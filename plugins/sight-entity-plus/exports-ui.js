@@ -66,7 +66,7 @@ sight.entity.addOperation('imgui', 'create, list, info windows.', imgui);
 sight.entity.addOperation('templateNode', 'generate addTemplateNode() function call', function(entity){
     let portTemplateText = 
 `<%= port.name%> : {
-    type: '<%= port.type%>'
+    type: '<%= port.type%>',
     <% if(port.defaultValue){ %>defaultValue: <%=port.typedValue()%>, <% } %>
     <% let options = port.options.portOptions; %>
     <% if(!options.show){ %>show: <%=options.show%>, <% } %>
