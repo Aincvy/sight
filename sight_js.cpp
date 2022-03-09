@@ -327,6 +327,13 @@ namespace sight {
             std::stringstream sourceStream{};
         };
 
+        struct SightNodeGenerateHelper {
+            std::string varName;
+            uint nodeId;
+
+            const char* getTemplateNodeName() const;
+        };
+
         struct ParsingGraphData {
             SightNode* currentNode = nullptr;
             SightNodeGraph* graph = nullptr;
@@ -334,6 +341,8 @@ namespace sight {
             std::vector<ParsingLink> list;
             uint lastUsedIndex = 0;
             std::map<uint, SightNodeGenerateInfo> generateInfoMap{};
+            std::string connectionCodeTemplate;
+
             struct {
                 std::string msg{};
                 uint nodeId = 0;
@@ -350,6 +359,7 @@ namespace sight {
             void addNewLink(SightNode* node);
 
             std::stringstream& currentUsedSourceStream();
+
         };
 
         void ParsingGraphData::reset() {
@@ -423,8 +433,10 @@ namespace sight {
             SharedQueue<JsCommand> commandQueue;
             ParsingGraphData parsingGraphData;
             SightEntityFunctions entityFunctions;
-            // key: name, 
+            // key: name,
             std::map<std::string, CodeTemplateFunc> codeTemplateMap;
+            // key: name
+            std::map<std::string, CommonOperation> connectionCodeTemplateMap;
         };
 
         struct GenerateFunctionStatus {
@@ -439,17 +451,8 @@ namespace sight {
          * 
          */
         struct GenerateArg$$ {
-
-            void __let(const char* varName, const char* value) {
-                auto& ss = g_V8Runtime->parsingGraphData.currentUsedSourceStream();
-                ss << "let " << varName << " = " << value << ";" << std::endl;
-            }
-
-            void __constFunc(const char* varName, const char* value) {
-                auto& ss = g_V8Runtime->parsingGraphData.currentUsedSourceStream();
-                ss << "const " << varName << " = " << value << ";" << std::endl;
-            }
-
+            Local<Object> helper;
+            
             void errorReport(const char* msg, uint nodeId, uint portId){
                 auto& errorInfo = g_V8Runtime->parsingGraphData.errorInfo;
                 errorInfo.msg = msg;
@@ -471,13 +474,42 @@ namespace sight {
             void parseAllGraphs() const {
                 project->parseAllGraphs();
             }
-
         };
+
+        inline const char* SightNodeGenerateHelper::getTemplateNodeName() const {
+            auto& data = g_V8Runtime->parsingGraphData;
+            auto node = data.graph->findNode(this->nodeId);
+            if (node && node->templateNode) {
+                return node->templateNode->nodeName.c_str();
+            }
+            return "";
+        }
 
         //
         //    some util functions.
         //
 
+        Local<Object> getNodeHelper(SightNode* node, Isolate* isolate) {
+            uint nodeId = node->getNodeId();
+            auto& map = g_V8Runtime->parsingGraphData.generateInfoMap;
+            auto iter = map.find(nodeId);
+            if (iter == map.end()) {
+                map[nodeId] = {};
+            }
+
+            auto& info = map[nodeId];
+            if (!info.helper.IsEmpty()) {
+                return info.helper;
+            }
+
+            // make new one
+            SightNodeGenerateHelper* helper = new SightNodeGenerateHelper();
+            helper->varName = node->nodeName;
+            helper->nodeId = node->getNodeId();
+            info.helper = v8pp::class_<SightNodeGenerateHelper>::import_external(isolate, helper);
+            return info.helper;
+        }
+        
         /**
          * @brief same as jsFunctionToString
          * 
@@ -1440,8 +1472,24 @@ namespace sight {
             v.setValue(field->defaultValue);
             args.GetReturnValue().Set(getPortValue(isolate, v.getType(), v));
         }
-    }
 
+        void v8AddConnectionCodeTemplate(const char* name, const char* description, Local<Function> f) {
+            auto isolate = f->GetIsolate();
+            
+            g_V8Runtime->connectionCodeTemplateMap.try_emplace(name, name, description, PersistentFunction(isolate,f));
+        }
+
+        void v8GetNodeHelper(FunctionCallbackInfo<Value> const& args) {
+            auto isolate = args.GetIsolate();
+            auto node = v8pp::class_<SightNode>::unwrap_object(isolate, args.This());
+            if (node == nullptr) {
+                return args.GetReturnValue().SetUndefined();
+            }
+
+            args.GetReturnValue().Set(getNodeHelper(node, isolate));
+        }
+
+    }
 
     /**
      * init js engine (v8)
@@ -1492,6 +1540,7 @@ namespace sight {
 
         clearJsNodeCache();
         g_V8Runtime->codeTemplateMap.clear();
+        g_V8Runtime->connectionCodeTemplateMap.clear();
         
         g_V8Runtime->isolateScope.reset();
         g_V8Runtime->entityFunctions.reset();
@@ -1569,8 +1618,11 @@ namespace sight {
             .set("portName", v8pp::property(&SightNodePort::getPortName))
             .set("name", v8pp::property(&SightNodePort::getPortName))
             .set("id", v8pp::property(&SightNodePort::getId))
+            .set("node", v8pp::property(&SightNodePort::getNode))
+            .set("nodeId", &SightNodePort::getNodeId)
             .set("setKind", &SightNodePort::setKind)
             .set("options", &SightNodePort::options);
+        nodePortClass.auto_wrap_objects(true);
         module.set("SightNodePort", nodePortClass);
 
         v8pp::class_<SightNode> nodeClass(isolate);
@@ -1584,7 +1636,9 @@ namespace sight {
             .set("templateAddress", &v8NodeTemplateAddress)
             .set("portValue", &v8NodePortValue)
             .set("getPorts", &v8NodeGetPorts)
-            .set("getOtherSideValue", &v8GetOtherSideValue);
+            .set("getOtherSideValue", &v8GetOtherSideValue)
+            .set("helper", &v8GetNodeHelper)
+            ;
         nodeClass.auto_wrap_objects(true);
         module.set("SightNode", nodeClass);
 
@@ -1609,8 +1663,30 @@ namespace sight {
             .set("updateNodeData", &SightNodeGraphWrapper::updateNodeData)
             .set("findNodeWithId", &SightNodeGraphWrapper::findNodeWithId)
             .set("findNodeWithFilter", &SightNodeGraphWrapper::findNodeWithFilter)
-            ;
+            .set("findNodePort", &SightNodeGraphWrapper::findNodePort)
+            .set("findNodeByPortId", &SightNodeGraphWrapper::findNodeByPortId);
         module.set("SightNodeGraphWrapper", nodeGraphWrapperClass);
+
+        v8pp::module connectionModule(isolate);
+        connectionModule.set("addCodeTemplate", v8AddConnectionCodeTemplate);
+        module.set("connection", connectionModule);
+
+        // connection class
+        v8pp::class_<SightNodeConnection> connectionClass(isolate);
+        connectionClass.ctor<>()
+            .set("priority", &SightNodeConnection::priority)
+            .set("connectionId", &SightNodeConnection::connectionId)
+            .set("id", &SightNodeConnection::connectionId)
+            .set("left", &SightNodeConnection::left)
+            .set("right", &SightNodeConnection::right);
+        module.set("SightNodeConnection", connectionClass);
+
+        v8pp::class_<SightNodeGenerateHelper> nodeGenerateHelperClass(isolate);
+        nodeGenerateHelperClass.ctor()
+            .set("varName", &SightNodeGenerateHelper::varName)
+            .set("templateName", v8pp::property(&SightNodeGenerateHelper::getTemplateNodeName))
+            ;
+        module.set("SightNodeGenerateHelper", nodeGenerateHelperClass);
     }
 
     void bindUIThreadFunctions(const v8::Local<v8::Context>& context, v8pp::module& module) {
@@ -1737,8 +1813,7 @@ namespace sight {
 
         v8pp::class_<GenerateArg$$> generateArg$$(isolate);
         generateArg$$
-            .set("__let", &GenerateArg$$::__let)
-            .set("__const", &GenerateArg$$::__constFunc)
+            .set("helper", &GenerateArg$$::helper)
             .set("errorReport", &GenerateArg$$::errorReport)
             .set("insertSource", &v8InsertSource)
             .set("ensureNodeGenerated", &v8EnsureNodeGenerated);
@@ -1862,72 +1937,6 @@ namespace sight {
     void clearJsNodeCache(){
         g_NodeCache.clear();
         g_TemplateNodeCache.clear();
-    }
-
-    std::string serializeJsNode(SightJsNode const& node) {
-        // generate a function call.
-        std::stringstream ss;
-        ss << "addTemplateNode({\n";
-
-        // name, address, nodes
-        ss << "    __meta_name: \"" << node.nodeName << "\",\n";
-        ss << "    __meta_address: \"" << node.fullTemplateAddress << "\",\n";
-
-        ss << "    __meta_inputs: { \n";
-        std::string spaces = "        ";
-        std::string intervalSpaces = "    ";
-        for (const auto & item : node.inputPorts) {
-            ss << spaces << item->portName << ": '";
-            ss << getTypeName(item->type);
-            ss << "',\n";
-        }
-
-        spaces.erase(0, intervalSpaces.size());
-        ss << spaces << "},\n";
-
-        ss << "    __meta_outputs: { \n";
-        spaces += intervalSpaces;
-        for (const auto& item : node.outputPorts) {
-            ss << spaces << item->portName << ": {\n";
-            spaces += intervalSpaces;
-
-            ss << spaces << "type: '" << getTypeName(item->type) << "',\n";
-            ss << spaces << "showValue: true,\n";
-
-            spaces.erase(0, intervalSpaces.size());
-            ss  << spaces << "},\n";
-        }
-        spaces.erase(0, intervalSpaces.size());
-        ss << spaces << "},\n";
-
-        // functions
-        auto writeFunction = [&ss, spaces,intervalSpaces](std::string const& name, v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function>> p) {
-            if (!p.IsEmpty()) {
-                auto code = jsFunctionToString(p.Get(g_V8Runtime->isolate));
-                if (!code.empty()) {
-                    ss << spaces << intervalSpaces << name << ": ";
-                    ss << code;
-                    ss << spaces << intervalSpaces << ",";
-                }
-            }
-        };
-
-        ss << spaces << "__meta_func: { \n";
-        writeFunction("generateCodeWork", node.generateCodeWork);
-        if (node.onReverseActive != node.generateCodeWork) {
-            //
-            writeFunction("onReverseActive", node.onReverseActive);
-        }
-        ss << spaces << "}, \n";
-
-        for (const auto& item : node.fields) {
-            ss << spaces << item->portName << ": '";
-            ss << getTypeName(item->type);
-            ss << "',\n";
-        }
-
-        ss << "});";
-        return ss.str();
     }
 
     /**
@@ -2140,7 +2149,9 @@ namespace sight {
 
         // build args.
         auto arg$ = Object::New(isolate);
-        auto arg$$ = v8pp::class_<GenerateArg$$>::import_external(isolate, new GenerateArg$$);
+        auto tmpArg$$ = new GenerateArg$$;
+        tmpArg$$->helper = getNodeHelper(node, isolate);
+        auto arg$$ = v8pp::class_<GenerateArg$$>::import_external(isolate, tmpArg$$);
 
         if (!status || status->need$) {
             auto nodeFunc = [node, isolate, &context, &arg$, graphObject](std::vector<SightNodePort> & list, bool isOutput = false) {
@@ -2217,6 +2228,7 @@ namespace sight {
             if (reverseActivePort > 0) {
                 v8pp::set_const(isolate, arg$$, "reverseActivePort", reverseActivePort);
             }
+            
         }
 
         Local<Object> recv = v8pp::class_<SightNode>::reference_external(isolate, node);
@@ -2341,6 +2353,67 @@ namespace sight {
 
         return "";
     }
+    
+    std::string parseConnection(Isolate* isolate, SightNodeConnection* connection) {
+        auto& data = g_V8Runtime->parsingGraphData;
+        if (data.connectionCodeTemplate.empty() || !connection->generateCode) {
+            return {};
+        }
+        
+        auto leftNode = connection->findLeftPort()->node;
+        auto rightNode = connection->findRightPort()->node;
+
+        auto isLeftHasGenerated = data.getGenerateInfo(leftNode->getNodeId()).hasGenerated();
+        auto isRightHasGenerated = data.getGenerateInfo(rightNode->getNodeId()).hasGenerated();
+
+        if (!isLeftHasGenerated || !isRightHasGenerated) {
+            return {};
+        }
+
+        // both has generated, generate connection code.
+        auto& codeTemplate = g_V8Runtime->connectionCodeTemplateMap[data.connectionCodeTemplate];
+
+        auto func = codeTemplate.function.function.Get(isolate);
+        auto connectionObject = v8pp::class_<SightNodeConnection>::reference_external(isolate, connection);
+        auto result =  v8pp::call_v8(isolate, func, connectionObject, data.graphObject);
+        v8pp::class_<SightNodeConnection>::unreference_external(isolate, connection);
+
+        if (result.IsEmpty() || result->IsNullOrUndefined()) {
+            return {};
+        }
+        if (IS_V8_STRING(result)) {
+            std::string code = v8pp::from_v8<std::string>(isolate, result);
+            return code;
+        }
+
+        return {};
+    }
+
+
+    void parseAllConnectionsOfNode(Isolate* isolate, std::stringstream& finalSource) {
+        auto& data = g_V8Runtime->parsingGraphData;
+        if (data.connectionCodeTemplate.empty() || data.currentNode == nullptr) {
+            return;
+        }
+
+        auto func = [&finalSource, isolate](std::vector<SightNodePort>& list) {
+            for (auto& item : list) {
+                if (!item.isConnect()) {
+                    continue;
+                }
+
+                for (auto& conn : item.connections) {
+                    auto code = parseConnection(isolate, conn);
+                    if (!code.empty()) {
+                        finalSource << code;
+                    }
+                }
+            }
+        };
+
+        func(data.currentNode->inputPorts);
+        func(data.currentNode->outputPorts);
+    }
 
     void parseNode(Isolate* isolate, Local<Object> graphObject){
         auto& data = g_V8Runtime->parsingGraphData;
@@ -2391,6 +2464,9 @@ namespace sight {
     }
 
     int parseGraphToJs(SightNodeGraph& graph, std::string& source, std::string& errorMsg) {
+        auto& data = g_V8Runtime->parsingGraphData;
+        data.reset();
+
         // get enter node.
         int status = -1;
         auto node = graph.findNode(SightNodeProcessType::Enter, &status);
@@ -2400,12 +2476,12 @@ namespace sight {
         }
 
         // parse the enter node.
-        auto& data = g_V8Runtime->parsingGraphData;
         auto isolate = g_V8Runtime->isolate;
         TryCatch tryCatch(isolate);
         v8::HandleScope handle_scope(isolate);
         data.graphObject = v8pp::class_<SightNodeGraphWrapper>::import_external(isolate, new SightNodeGraphWrapper(&graph));
         data.graph = &graph;
+        data.connectionCodeTemplate = graph.getSettings().connectionCodeTemplate;
 
         data.addNewLink(node);
         auto& outerList = data.list;
@@ -2423,6 +2499,9 @@ namespace sight {
 #endif
                 finalSourceStream << list.sourceStream.str() << std::endl;     // append 1 \n
                 outerList.erase(outerList.end() - 1);
+
+                // try parse connection.  (parse current node's all connection)
+                parseAllConnectionsOfNode(isolate, finalSourceStream);
             }
             // list maybe invalid.
             if (data.hasError()) {
@@ -2485,7 +2564,6 @@ namespace sight {
             return CODE_OK;
         }
 
-        data.reset();
         return CODE_FAIL;
     }
 
@@ -2798,6 +2876,24 @@ namespace sight {
         buildNodeCache();
     }
 
+    SightNode sight::SightNodeGraphWrapper::findNodeByPortId(uint id) {
+        auto p = graph->findPort(id);
+        if (p) {
+            return *(p->node);
+        }
+
+        return {};
+    }
+
+    SightNodePort sight::SightNodeGraphWrapper::findNodePort(uint id) {
+        auto p = graph->findPort(id);
+        if (p) {
+            return *p;
+        }
+
+        return {};
+    }
+
     bool sight::SightNodeGraphWrapper::updateNodeData(uint nodeId, v8::Local<v8::Function> f) {
         if (f.IsEmpty()) {
             return false;
@@ -2886,6 +2982,20 @@ namespace sight {
         if (names.size() != map.size()) {
             names.clear();
             for( const auto& item: map){
+                names.push_back(item.first);
+            }
+        }
+
+        return names;
+    }
+
+    std::vector<std::string>& getConnectionCodeTemplateNames() {
+        static std::vector<std::string> names;
+
+        auto& map = g_V8Runtime->connectionCodeTemplateMap;
+        if (names.size() != map.size()) {
+            names.clear();
+            for (const auto& item : map) {
                 names.push_back(item.first);
             }
         }

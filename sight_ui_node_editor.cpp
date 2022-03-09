@@ -1591,6 +1591,22 @@ namespace sight {
             ImGui::EndCombo();
         }
 
+        // connection code template
+        ImGui::Text(fmt, "Connection");
+        ImGui::Text(fmt, "  CodeTemplate");
+        ImGui::SameLine();
+        if (ImGui::BeginCombo("##connection-code-template", settings.connectionCodeTemplate.c_str())) {
+            auto names = getConnectionCodeTemplateNames();
+            for (const auto& item : names) {
+                if (ImGui::Selectable(item.c_str(), item == settings.connectionCodeTemplate)) {
+                    settings.connectionCodeTemplate = item;
+                    graph->markDirty();
+                }
+            }
+            ImGui::EndCombo();
+        }
+
+
     }
 
     void uiReloadGraph() {

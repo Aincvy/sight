@@ -167,6 +167,14 @@ namespace sight {
 
     }
 
+    SightNode* SightNodePort::getNode() {
+        return this->node;
+    }
+
+    uint SightNodePort::getNodeId() const {
+        return node->getNodeId();
+    }
+
     const char *SightNodePort::getDefaultValue() const {
         return this->value.u.string;
     }
@@ -453,6 +461,10 @@ namespace sight {
 
     void SightNode::callEventOnInstantiate() {
         templateNode->callEventOnInstantiate(this);
+    }
+
+    bool SightNode::checkAsComponent() const {
+        return true;
     }
 
     SightJsNode::SightJsNode() {
@@ -751,6 +763,7 @@ namespace sight {
         out << YAML::Key << "outputFilePath" << YAML::Value << settings.outputFilePath;
         out << YAML::Key << "codeTemplate" << YAML::Value << settings.codeTemplate;
         out << YAML::Key << "graphName" << YAML::Value << settings.graphName;
+        out << YAML::Key << "connectionCodeTemplate" << YAML::Value << settings.connectionCodeTemplate;
         out << YAML::EndMap;
 
         out << YAML::EndMap;       // end of 1st begin map
@@ -807,6 +820,7 @@ namespace sight {
                 auto connectionId = item.first.as<int>();
                 item.second >> tmpConnection;
                 createConnection(tmpConnection.left, tmpConnection.right, connectionId, tmpConnection.priority);
+                findConnection(connectionId)->generateCode = tmpConnection.generateCode;
             }
 
             // settings
@@ -820,6 +834,9 @@ namespace sight {
                 }
                 if (settingsNode["graphName"]) {
                     snprintf(settings.graphName, std::size(settings.graphName) - 1, "%s", settingsNode["graphName"].as<std::string>().c_str());
+                }
+                if (settingsNode["connectionCodeTemplate"]) {
+                    settings.connectionCodeTemplate = settingsNode["connectionCodeTemplate"].as<std::string>();
                 }
             }
 
@@ -1695,6 +1712,7 @@ namespace sight {
         out << YAML::Key << "left" << YAML::Value << connection.leftPortId();
         out << YAML::Key << "right" << YAML::Value << connection.rightPortId();
         out << YAML::Key << "priority" << YAML::Value << connection.priority;
+        out << YAML::Key << "generateCode" << YAML::Value << connection.generateCode;
         out << YAML::EndMap;
         return out;
     }
@@ -1727,6 +1745,9 @@ namespace sight {
         auto priorityNode = node["priority"];
         if (priorityNode.IsDefined()) {
             connection.priority = priorityNode.as<int>(0);
+        }
+        if (node["generateCode"]) {
+            connection.generateCode = node["generateCode"].as<bool>();
         }
         return true;
     }

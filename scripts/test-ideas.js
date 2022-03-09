@@ -446,3 +446,9 @@ addCodeTemplate(DefLanguage(), 'rws-graph', 'Generate a graph class', function (
     // return a string.
     return '';
 });
+
+// connection code template 
+// config on graph.
+sight.connection.addCodeTemplate('name', 'description', function (c) {
+    
+});

@@ -148,3 +148,12 @@ sight.buildTarget('Default', function (project) {
     project.parseAllGraphs();
     print('building over!');
 });
+
+addCodeTemplate(sight.DefLanguage(0, 0) , 'Empty Template', '', function () {
+    
+});
+
+sight.connection.addCodeTemplate('Empty Template', '', function () {
+    
+});
+

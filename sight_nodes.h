@@ -229,6 +229,9 @@ namespace sight {
          */
         void sortConnections();
 
+        SightNode* getNode();
+        uint getNodeId() const;
+
         SightNodeGraph* getGraph();
         const SightNodeGraph* getGraph() const;
 
@@ -248,6 +251,8 @@ namespace sight {
         // priority for generate code.
         // number bigger, priority higher.
         int priority = 10;
+        // should this connection generate code ?
+        bool generateCode = true;
 
         /**
          * Remove from left and right port.
@@ -409,6 +414,14 @@ namespace sight {
          * 
          */
         void callEventOnInstantiate();
+
+        /**
+         * @brief Does this node component compatible?
+         * 
+         * @return true 
+         * @return false 
+         */
+        bool checkAsComponent() const;
 
     protected:
         enum class CopyFromType {
@@ -688,6 +701,7 @@ namespace sight {
 
         std::string outputFilePath;
         std::string codeTemplate;
+        std::string connectionCodeTemplate;
         char graphName[LITTLE_NAME_BUF_SIZE] = {0};
     };
 

@@ -492,9 +492,12 @@ for(const item of a) {
                 ImGui::SetNextWindowSize(ImVec2(300, 300));
             }
 
-            ImGui::Begin(WINDOW_LANGUAGE_KEYS.inspector);
-            // what's here?
-            // it's should be show what user selected.
+            if (!ImGui::Begin(WINDOW_LANGUAGE_KEYS.inspector)) {
+                ImGui::End();
+                return;
+            }
+
+            auto graph = currentGraph();
             auto & selection = g_UIStatus->selection;
             if (selection.selectedNodeOrLinks.empty()) {
                 // show settings
@@ -533,7 +536,15 @@ for(const item of a) {
                     ImGui::TextColored(g_UIStatus->uiColors->nodeIdText, "%d ", connection->connectionId);
 
                     leftText("priority: ");
-                    ImGui::InputInt("## connection.priority", &connection->priority);
+                    if (ImGui::InputInt("## connection.priority", &connection->priority)) {
+                        graph->markDirty();
+                        connection->findLeftPort()->sortConnections();
+                        connection->findRightPort()->sortConnections();
+                    }
+                    leftText("generateCode: ");
+                    if (ImGui::Checkbox("##generateCode", &connection->generateCode)) {
+                        graph->markDirty();
+                    }
                 }
             }
 

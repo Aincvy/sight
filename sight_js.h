@@ -101,6 +101,7 @@ namespace sight{
     struct SightNodeGenerateInfo  {
         // the times of generate code function called .
         u_char generateCodeCount = 0;
+        v8::Local<v8::Object> helper;
 
         SightNodeGenerateInfo() = default;
         ~SightNodeGenerateInfo() = default;
@@ -138,6 +139,10 @@ namespace sight{
          * @return SightNode 
          */
         SightNode findNodeWithFilter(std::string const& templateAddress, v8::Local<v8::Function> filter);
+
+        SightNode findNodeByPortId(uint id);
+        
+        SightNodePort findNodePort(uint id);
 
         /**
          * @brief 
@@ -227,14 +232,6 @@ namespace sight{
      */
     void clearJsNodeCache();
 
-    /**
-     * @brief convert SightJsNode to `addTemplateNode` call
-     * todo 
-     * @param node 
-     * @return std::string 
-     */
-    std::string serializeJsNode(SightJsNode const& node);
-
     int parseGraph(const char* filename, bool generateTargetLang = true, bool writeToOutFile = true);
 
     /**
@@ -275,7 +272,9 @@ namespace sight{
     
     SightJsNode& registerEntityFunctions(SightJsNode& node);
 
-    std::vector<std::string> & getCodeTemplateNames();
+    std::vector<std::string>& getCodeTemplateNames();
+    
+    std::vector<std::string>& getConnectionCodeTemplateNames();
 
     inline bool isValid(v8::Local<v8::Value> value){
         return !value.IsEmpty() && !value->IsNullOrUndefined();

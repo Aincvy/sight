@@ -39,7 +39,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping(IndexController.API_PREFIX )
 public class <%=entity.simpleName%>Controller {
 
-    private <%=entity.simpleName%>Service <%=serviceName%>;
+    private final <%=entity.simpleName%>Service <%=serviceName%>;
 
     public <%=entity.simpleName%>Controller(<%=entity.simpleName%>Service <%=serviceName%>){
         this.<%=serviceName%> = <%=serviceName%>;
