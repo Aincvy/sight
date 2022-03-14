@@ -157,3 +157,15 @@ sight.connection.addCodeTemplate('Empty Template', '', function () {
     
 });
 
+sight.SightNodeGenerateHelper.prototype.quickVarName = function (code) {
+    let varName = this.varName;
+    print(varName);
+    print(this.templateName);
+    if (varName != this.templateName) {
+        // var declare 
+        let tmp = `let ${varName} = ` + code;
+        return tmp;
+    } else {
+        return code;
+    }
+}

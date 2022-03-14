@@ -299,15 +299,7 @@ namespace sight {
         
     };
 
-    enum class SightNodeProcessType {
-        Enter = 100,
-        Exit,
-
-        Normal = 200,
-    };
-
     struct SightJsNodeOptions{
-        SightNodeProcessType processFlag = SightNodeProcessType::Normal;
         uint titleBarPortType = IntTypeProcess;
     };
 
@@ -491,6 +483,17 @@ namespace sight {
         bool checkFunction(Isolate* isolate) const;
     };
 
+    /**
+     * @brief 
+     * 
+     */
+    struct SightComponent {
+        bool active = false;
+        bool activeOnReverse = false;     // call functions on `onReverseActive` ?
+        ScriptFunctionWrapper beforeGenerate;
+        ScriptFunctionWrapper afterGenerate;
+    };
+
     struct CommonOperation{
         std::string name;
         std::string description;
@@ -588,7 +591,8 @@ namespace sight {
         ScriptFunctionWrapper onMsg;
 
         SightNodeStyle nodeStyle;
-
+        SightComponent component;
+        
         SightJsNode();
         ~SightJsNode() = default;
 
@@ -698,6 +702,7 @@ namespace sight {
 
     struct SightNodeGraphSettings {
         DefLanguage language;
+        int enterNode = 0;
 
         std::string outputFilePath;
         std::string codeTemplate;
@@ -760,13 +765,7 @@ namespace sight {
          */
         SightNode* findNode(uint id);
 
-        /**
-         *
-         * @param processType
-         * @param status   0 = success, 1 multiple enter nodes. 2 no type nodes.
-         * @return
-         */
-        SightNode* findNode(SightNodeProcessType processType, int* status = nullptr);
+        SightNode* findEnterNode(int* status = nullptr);
 
         /**
          *

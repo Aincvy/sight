@@ -72,7 +72,7 @@ namespace sight {
         CODE_PLUGIN_NO_DESCRIPTION,
         CODE_PLUGIN_FILE_ERROR,
         CODE_PLUGIN_DISABLED,
-        CODE_PLUGIN_NO_RELOAD,                    // not reload-able
+        CODE_PLUGIN_NO_RELOAD,     // not reload-able
 
         CODE_SCRIPT_NO_RESULT = 250,
 
@@ -81,6 +81,8 @@ namespace sight {
         CODE_NO_TEMPLATE_ADDRESS,
         CODE_GRAPH_BROKEN,
         CODE_NODE_HAS_CONNECTIONS,
+        CODE_GRAPH_NO_ENTER_NODE,
+        CODE_GRAPH_ERROR_ENTER_NODE,
     };
 
     enum TypeIntValues {

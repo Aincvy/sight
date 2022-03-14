@@ -519,6 +519,7 @@ for(const item of a) {
                     ImGui::InputText("## node.name", nameBuf, std::size(nameBuf));
                     if (ImGui::IsItemDeactivatedAfterEdit()) {
                         node->nodeName = nameBuf;
+                        node->graph->markDirty();
                     }
             
                     // fields

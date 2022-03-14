@@ -46,7 +46,7 @@
 #include "v8pp/object.hpp"
 #include "v8pp/json.hpp"
 
-#define GENERATE_CODE_DETAILS 0
+#define GENERATE_CODE_DETAILS 1
 
 using namespace v8;
 
@@ -1256,22 +1256,7 @@ namespace sight {
                         auto optionValue = optionsRoot->Get(context, optionKey).ToLocalChecked();
 
                         // 
-                        if (keyString == "processFlag") {
-                            if (IS_V8_STRING(optionValue)) {
-                                auto processFlag = v8pp::from_v8<std::string>(isolate, optionValue);
-                                if (processFlag == "enter") {
-                                    templateNode->options.processFlag = SightNodeProcessType::Enter;
-                                } else if (processFlag == "exit") {
-                                    templateNode->options.processFlag = SightNodeProcessType::Exit;
-                                } else {
-                                    templateNode->options.processFlag = SightNodeProcessType::Normal;
-                                }
-                            }
-                        }
-
-                        else {
-                            logDebug("unknown option key: $0", keyString);
-                        }
+                        logDebug("unknown option key: $0", keyString);
                     }
                 } else if (key == "__meta_events") {
                     // events 
@@ -1949,20 +1934,21 @@ namespace sight {
             return CODE_FAIL;
         }
         logDebug(filepath);
-
+        
+        
         v8::HandleScope handle_scope(isolate);
         auto context = isolate->GetCurrentContext();
 
         TryCatch tryCatch(isolate);
 
-        auto maySource = readFile(isolate, filepath).ToLocalChecked();
+        auto maySource = readFile(isolate, filepath);
         if (maySource.IsEmpty()) {
             logDebug("file path error: $0", filepath);
             return CODE_FILE_NOT_EXISTS;
         }
 
         //
-        v8::Local<v8::String> sourceCode = maySource;
+        v8::Local<v8::String> sourceCode = maySource.ToLocalChecked();
         Local<Integer> lineOffset = Integer::New(isolate, 0);
         ScriptOrigin scriptOrigin(v8pp::to_v8(isolate, filepath), lineOffset, lineOffset);
         v8::ScriptCompiler::Source source(sourceCode, scriptOrigin);
@@ -2356,6 +2342,7 @@ namespace sight {
     
     std::string parseConnection(Isolate* isolate, SightNodeConnection* connection) {
         auto& data = g_V8Runtime->parsingGraphData;
+        trace(connection->connectionId);
         if (data.connectionCodeTemplate.empty() || !connection->generateCode) {
             return {};
         }
@@ -2366,6 +2353,10 @@ namespace sight {
         auto isLeftHasGenerated = data.getGenerateInfo(leftNode->getNodeId()).hasGenerated();
         auto isRightHasGenerated = data.getGenerateInfo(rightNode->getNodeId()).hasGenerated();
 
+#if GENERATE_CODE_DETAILS == 1
+        trace("left: $0, right: $1", leftNode->getNodeId(), rightNode->getNodeId());
+        trace("left: $0, right: $1", isLeftHasGenerated, isRightHasGenerated);
+#endif
         if (!isLeftHasGenerated || !isRightHasGenerated) {
             return {};
         }
@@ -2411,6 +2402,7 @@ namespace sight {
             }
         };
 
+        trace(data.currentNode->getNodeId());
         func(data.currentNode->inputPorts);
         func(data.currentNode->outputPorts);
     }
@@ -2426,7 +2418,16 @@ namespace sight {
         auto jsNode = findTemplateNode(node);
         list.erase(list.begin());
         data.currentNode = node;
-        data.getGenerateInfo(node->getNodeId()).generateCodeCount++;
+        trace(node->getNodeId());
+        if (++(data.getGenerateInfo(node->getNodeId()).generateCodeCount) >= 25) {
+            //
+            data.errorInfo = {
+                .msg = "Generate times is over limit!",
+                .nodeId = node->getNodeId(),
+                .hasError = true,
+            };
+            return;
+        }
 
         // generateCodeWork
         // after call runGenerateFunction function, the ref `list` maybe invalid.
@@ -2469,9 +2470,9 @@ namespace sight {
 
         // get enter node.
         int status = -1;
-        auto node = graph.findNode(SightNodeProcessType::Enter, &status);
+        auto node = graph.findEnterNode(&status);
         if (status != CODE_OK) {
-            // logDebug("error graph: $0, $1", filename, status);
+            logDebug("cannot find the enter node, graph: $0, $1", graph.getFilePath(), status);
             return CODE_FAIL;
         }
 
@@ -2488,21 +2489,23 @@ namespace sight {
         std::stringstream finalSourceStream;
 
         while (!data.empty()) {
-            auto& list = outerList.back();
             data.lastUsedIndex = outerList.size() - 1;
             parseNode(isolate, data.graphObject);
 
-            if (data.lastUsedIndex == outerList.size() - 1 && list.link.empty()) {
+            auto& list = outerList.back();
+
+            // try parse connection.  (parse current node's all connection)
+            parseAllConnectionsOfNode(isolate, list.sourceStream);
+
+            if (list.link.empty()) {
 #if GENERATE_CODE_DETAILS == 1
                 logDebug("append source, delete last list..");
                 logDebug(list.sourceStream.str());
 #endif
                 finalSourceStream << list.sourceStream.str() << std::endl;     // append 1 \n
                 outerList.erase(outerList.end() - 1);
-
-                // try parse connection.  (parse current node's all connection)
-                parseAllConnectionsOfNode(isolate, finalSourceStream);
             }
+
             // list maybe invalid.
             if (data.hasError()) {
                 break;
@@ -2511,7 +2514,8 @@ namespace sight {
 
         if (tryCatch.HasCaught()) {
             reportException(isolate, &tryCatch, errorMsg);
-        } else if (data.hasError()) {
+        }
+        if (data.hasError()) {
             // report error
             auto& errorInfo = data.errorInfo;
             std::stringstream tmpErrorMsg;
@@ -2590,7 +2594,7 @@ namespace sight {
                 break;
             case JsCommandType::ParseGraph:{
                 // std::string source;
-                parseGraph(command.args.argString, true, false);
+                parseGraph(command.args.argString, true, true);
                 break;
             }
             case JsCommandType::InitPluginManager:

@@ -1606,7 +1606,23 @@ namespace sight {
             ImGui::EndCombo();
         }
 
-
+        // enterNode
+        ImGui::Text(fmt, "EnterNode");
+        ImGui::SameLine();
+        if (ImGui::InputInt("##enter-node", &settings.enterNode)) {
+            graph->markDirty();
+        }
+        if (settings.enterNode > 0) {
+            // show name
+            ImGui::Text(fmt, "EnterNodeName");
+            ImGui::SameLine();
+            auto n = graph->findNode(settings.enterNode);
+            if (n) {
+                ImGui::TextColored(currentUIStatus()->uiColors->nodeIdText, "%s", n->nodeName.c_str());
+            } else {
+                ImGui::TextColored(currentUIStatus()->uiColors->errorText, "Bad Node Id");
+            }
+        }
     }
 
     void uiReloadGraph() {

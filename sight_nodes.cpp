@@ -764,6 +764,7 @@ namespace sight {
         out << YAML::Key << "codeTemplate" << YAML::Value << settings.codeTemplate;
         out << YAML::Key << "graphName" << YAML::Value << settings.graphName;
         out << YAML::Key << "connectionCodeTemplate" << YAML::Value << settings.connectionCodeTemplate;
+        out << YAML::Key << "enterNode" << YAML::Value << settings.enterNode;
         out << YAML::EndMap;
 
         out << YAML::EndMap;       // end of 1st begin map
@@ -838,6 +839,9 @@ namespace sight {
                 if (settingsNode["connectionCodeTemplate"]) {
                     settings.connectionCodeTemplate = settingsNode["connectionCodeTemplate"].as<std::string>();
                 }
+                if (settingsNode["enterNode"]) {
+                    settings.enterNode = settingsNode["enterNode"].as<int>();
+                }
             }
 
             this->editing = false;
@@ -903,31 +907,18 @@ namespace sight {
         return findSightAnyThing(id).asNode();
     }
 
-    SightNode* SightNodeGraph::findNode(SightNodeProcessType processType, int* status /* = nullptr */){
-        int count = 0;
-
-        SightNode* p = nullptr;
-        for (auto &n : nodes){
-            if (findTemplateNode(&n)->options.processFlag == processType){
-                count++;
-                if (!p) {
-                    p = &n;
-                }
-            }
-        }
-
-        if (count == 0) {
-            SET_INT_VALUE(status, 2);
-            return nullptr;
-        } else if (count == 1) {
-            SET_INT_VALUE(status, 0);
-            return p;
+    SightNode* SightNodeGraph::findEnterNode(int* status) {
+        if (settings.enterNode <= 0) {
+            SET_INT_VALUE(status, CODE_GRAPH_NO_ENTER_NODE);
         } else {
-            SET_INT_VALUE(status, 1);
-            return p;
+            auto n = findNode(settings.enterNode);
+            if (n) {
+                SET_INT_VALUE(status, CODE_OK);
+                return n;
+            }
+            SET_INT_VALUE(status, CODE_GRAPH_ERROR_ENTER_NODE);
         }
-
-//        return nullptr;
+        return nullptr;
     }
 
     SightNodeConnection *SightNodeGraph::findConnection(int id) {

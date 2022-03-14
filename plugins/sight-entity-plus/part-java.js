@@ -101,6 +101,8 @@ public interface <%=entity.simpleName%>Service {
 
     long create(<%=entity.simpleName%> entity);
 
+    long save(<%=entity.simpleName%> entity);
+
     void update(<%=entity.simpleName%> entity);
 
     <%=entity.simpleName%> select(long id);
@@ -134,6 +136,11 @@ public class <%=entity.simpleName%>ServiceImpl implements <%=entity.simpleName%>
 
         EntityKeys.<%=entity.simpleName%>.save(entity);
         return entity.getId();
+    }
+
+    @Override
+    public long save(<%=entity.simpleName%> entity){
+        return create(entity);
     }
 
     @Override
