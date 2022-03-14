@@ -343,6 +343,8 @@ namespace sight {
             std::map<uint, SightNodeGenerateInfo> generateInfoMap{};
             std::string connectionCodeTemplate;
 
+            SightNode* component = nullptr;
+
             struct {
                 std::string msg{};
                 uint nodeId = 0;
@@ -452,6 +454,7 @@ namespace sight {
          */
         struct GenerateArg$$ {
             Local<Object> helper;
+            Local<Object> component;
             
             void errorReport(const char* msg, uint nodeId, uint portId){
                 auto& errorInfo = g_V8Runtime->parsingGraphData.errorInfo;
@@ -1284,6 +1287,25 @@ namespace sight {
                             templateNode->onReload = sourceCode;
                         } else if (keyString == "onMsg") {
                             templateNode->onMsg = sourceCode;
+                        }
+                    }
+                } else if (key == "__meta_component") {
+                    auto& component = templateNode->component;
+                    component.active = true;
+
+                    auto tmpRoot = localVal.As<Object>();
+                    auto tmpKeys = tmpRoot->GetOwnPropertyNames(context).ToLocalChecked();
+                    for( int j = 0; j < tmpKeys->Length(); j++){
+                        auto tmpKey = tmpKeys->Get(context, j).ToLocalChecked();
+                        std::string keyString = v8pp::from_v8<std::string>(isolate, tmpKey);
+                        auto tmpValue = tmpRoot->Get(context, tmpKey).ToLocalChecked();
+
+                        if (keyString == "activeOnReverse") {
+                            component.activeOnReverse = tmpValue->BooleanValue(isolate);
+                        } else if (keyString == "beforeGenerate") {
+                            component.beforeGenerate = ScriptFunctionWrapper::Function(isolate, tmpValue.As<Function>());
+                        } else if (keyString == "afterGenerate") {
+                            component.afterGenerate = ScriptFunctionWrapper::Function(isolate, tmpValue.As<Function>());
                         }
                     }
                 }
@@ -2205,6 +2227,7 @@ namespace sight {
             
         }
 
+        auto component = g_V8Runtime->parsingGraphData.component;
         if (!status || status->need$$) {
             if (options) {
                 auto jsOptions = v8pp::class_<GenerateOptions>::reference_external(isolate, options);
@@ -2214,7 +2237,10 @@ namespace sight {
             if (reverseActivePort > 0) {
                 v8pp::set_const(isolate, arg$$, "reverseActivePort", reverseActivePort);
             }
-            
+
+            if (component) {
+                v8pp::set_const(isolate, arg$$, "component", v8pp::class_<SightNode>::reference_external(isolate, component));
+            }
         }
 
         Local<Object> recv = v8pp::class_<SightNode>::reference_external(isolate, node);
@@ -2227,12 +2253,15 @@ namespace sight {
             v8pp::class_<GenerateOptions>::unreference_external(isolate, options);
         }
         v8pp::class_<SightNode>::unreference_external(isolate, node);
-
+        if (component) {
+            v8pp::class_<SightNode>::unreference_external(isolate, component);
+        }
         return result;
     }
 
 
-    std::string runGenerateFunction(PersistentFunction const& persistent, Isolate* isolate, SightNode* node, int reverseActivePort) {
+    std::string runGenerateFunction(PersistentFunction const& persistent, Isolate* isolate, SightNode* node,
+                                    int reverseActivePort) {
         if (persistent.IsEmpty()) {
             // no function ?
             logDebug("no function");
@@ -2407,6 +2436,36 @@ namespace sight {
         func(data.currentNode->outputPorts);
     }
 
+    /**
+     * @brief 
+     * 
+     * @param func 
+     * @param isolate 
+     * @param node 
+     * @param type 1=before, 2=after
+     * @return std::string 
+     */
+    std::string runComponentGenerateFunction(v8::Isolate* isolate, SightNode* node, int type) {
+        if (node->components.empty()) {
+            return {};
+        }
+
+        auto& data = g_V8Runtime->parsingGraphData;
+        std::string source = {};
+        for( const auto& item: node->components){
+            auto c = item->templateNode->component;
+
+            data.component = item;
+            if (type == 1) {
+                source += runGenerateFunction(c.beforeGenerate.function, isolate, node);
+            } else if (type == 2) {
+                source += runGenerateFunction(c.afterGenerate.function, isolate, node);
+            }
+        }
+
+        return source;
+    }
+    
     void parseNode(Isolate* isolate, Local<Object> graphObject){
         auto& data = g_V8Runtime->parsingGraphData;
         auto& list = data.list[data.lastUsedIndex].link;
@@ -2430,12 +2489,14 @@ namespace sight {
         }
 
         // generateCodeWork
-        // after call runGenerateFunction function, the ref `list` maybe invalid.
-        std::string tmp = runGenerateFunction(jsNode->generateCodeWork, isolate, node);
+        // call before, generate, after..
+        std::string source = runComponentGenerateFunction(isolate, node, 1);
+        source += runGenerateFunction(jsNode->generateCodeWork, isolate, node);
+        source += runComponentGenerateFunction(isolate, node, 2);
 
         auto& parsingLink = data.list[data.lastUsedIndex]; 
-        if (!tmp.empty()) {
-            parsingLink.sourceStream << tmp;
+        if (!source.empty()) {
+            parsingLink.sourceStream << source;
         }
 
         if (data.hasError()) {
@@ -2472,7 +2533,7 @@ namespace sight {
         int status = -1;
         auto node = graph.findEnterNode(&status);
         if (status != CODE_OK) {
-            logDebug("cannot find the enter node, graph: $0, $1", graph.getFilePath(), status);
+            logError("cannot find the enter node, graph: $0, $1", graph.getFilePath(), status);
             return CODE_FAIL;
         }
 

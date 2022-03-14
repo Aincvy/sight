@@ -394,6 +394,12 @@ namespace sight {
             }
         }
 
+        //
+        // auto& t = graph->getComponents();
+        for(auto& item: components){
+            delete item;
+        }
+        components.clear();
     }
 
     SightNodePortHandle SightNode::findPort(const char* name, int orderSize, int order[]) {
@@ -464,6 +470,36 @@ namespace sight {
     }
 
     bool SightNode::checkAsComponent() const {
+        return templateNode->component.active;
+    }
+
+    bool SightNode::addComponent(SightJsNode* templateNode) {
+        if (!templateNode || !templateNode->checkAsComponent()) {
+            return false;
+        }
+
+        // if (templateNode == this->templateNode) {
+        //     return false;
+        // }
+        
+        auto p = templateNode->instantiate();
+        addComponent(p);
+        return true;
+    }
+
+    bool SightNode::addComponent(SightNode* p) {
+        if (!p || p == this) {
+            return false;
+        }
+
+        p->graph = this->graph;
+        auto nodeFunc = [p](std::vector<SightNodePort>& list) {
+            for (auto& item : list) {
+                item.node = p;
+            }
+        };
+        CALL_NODE_FUNC(p);
+        components.push_back(p);
         return true;
     }
 
@@ -689,6 +725,10 @@ namespace sight {
 
     void SightJsNode::callEventOnInstantiate(SightNode* p) const {
         onInstantiate(currentUIStatus()->isolate, p);
+    }
+
+    bool SightJsNode::checkAsComponent() const {
+        return component.active;
     }
 
     void SightNodeConnection::removeRefs(SightNodeGraph *graph) {
@@ -1151,6 +1191,10 @@ namespace sight {
         return this->connections;
     }
 
+    SightArray<SightNode> & SightNodeGraph::getComponents() {
+        return components;
+    }
+
     SightNodePort* SightNodeGraph::findPort(uint id) {
         return findSightAnyThing(id).asPort();
     }
@@ -1369,6 +1413,26 @@ namespace sight {
     SightNodeTemplateAddress::SightNodeTemplateAddress(std::string name, SightJsNode* templateNode)
         : name(std::move(name))
         , templateNode(templateNode) {
+    }
+
+    bool SightNodeTemplateAddress::isAnyItemCanShow(bool createComponent) const {
+        if (createComponent) {
+            if (children.empty()) {
+                if (templateNode && templateNode->checkAsComponent()) {
+                    return true;
+                }
+            } else {
+                for (const auto& item : children) {
+                    if (item.isAnyItemCanShow(createComponent)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        } else {
+            // todo create node filter.
+        }
+        return true;
     }
 
     SightNodeTemplateAddress::~SightNodeTemplateAddress() {
@@ -1691,7 +1755,14 @@ namespace sight {
         }
         out << YAML::EndMap;   // end of fields
 
-        //
+        // components
+        out << YAML::Key << "components" << YAML::Value << YAML::BeginMap;
+        for (const auto& item : node.components) {
+            out << YAML::Key << item->nodeId;
+            out << YAML::Value << *item;
+        }
+        out << YAML::EndMap;
+        
         out << YAML::EndMap;   // end of node data.
 
         return out;
@@ -1889,6 +1960,15 @@ namespace sight {
         for (const auto& field : fields) {
             if (loadPortInfo(field, NodePortType::Field, sightNode.fields, useOldId) != CODE_OK) {
                 status = CODE_GRAPH_BROKEN;
+            }
+        }
+
+        auto components = yamlNode["components"];
+        for (const auto& item : components) {
+            SightNode* tmp = nullptr;
+
+            if (loadNodeData(item.second, tmp) == CODE_OK) {
+                nodePointer->addComponent(tmp);
             }
         }
 

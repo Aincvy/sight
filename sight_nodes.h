@@ -323,7 +323,9 @@ namespace sight {
         // no input/output ports.
         std::vector<SightNodePort> fields;
 
+        std::vector<SightNode*> components;
         Vector2 position;
+
 
         /**
          *
@@ -414,6 +416,17 @@ namespace sight {
          * @return false 
          */
         bool checkAsComponent() const;
+
+        /**
+         * @brief 
+         * 
+         * @param node 
+         * @return true 
+         * @return false 
+         */
+        bool addComponent(SightJsNode* templateNode);
+        
+        bool addComponent(SightNode* sightNode);
 
     protected:
         enum class CopyFromType {
@@ -592,7 +605,7 @@ namespace sight {
 
         SightNodeStyle nodeStyle;
         SightComponent component;
-        
+
         SightJsNode();
         ~SightJsNode() = default;
 
@@ -622,6 +635,7 @@ namespace sight {
 
         void callEventOnInstantiate(SightNode* p) const;
 
+        bool checkAsComponent() const;
     };
 
     enum class SightAnyThingType {
@@ -677,7 +691,16 @@ namespace sight {
         /**
          * If has children, then show them, otherwise, show self.
          */
-        void showContextMenu();
+        void showContextMenu(bool createComponent);
+
+        /**
+         * @brief 
+         * 
+         * @param createComponent 
+         * @return true 
+         * @return false 
+         */
+        bool isAnyItemCanShow(bool createComponent) const;
 
         /**
          * @brief Free external memory.
@@ -809,7 +832,8 @@ namespace sight {
 
         SightArray <SightNode> & getNodes();
         const SightArray <SightNode> & getNodes() const;
-        const SightArray <SightNodeConnection> & getConnections() const;
+        const SightArray<SightNodeConnection>& getConnections() const;
+        SightArray<SightNode> & getComponents();
 
         SightNodeGraphExternalData& getExternalData();
 
@@ -867,7 +891,9 @@ namespace sight {
         // real nodes
         SightArray<SightNode> nodes;
         // real connections.
-        SightArray<SightNodeConnection> connections{BIG_ARRAY_SIZE};
+        SightArray<SightNodeConnection> connections{ BIG_ARRAY_SIZE };
+
+        SightArray<SightNode> components;
         // key: node/port/connection id, value: the pointer of the instance.
         std::map<uint, SightAnyThingWrapper> idMap;
 

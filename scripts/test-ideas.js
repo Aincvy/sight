@@ -452,3 +452,16 @@ addCodeTemplate(DefLanguage(), 'rws-graph', 'Generate a graph class', function (
 sight.connection.addCodeTemplate('name', 'description', function (c) {
     
 });
+
+addTemplateNode({
+    __meta_name: 'TestComponent',
+    __meta_component: {
+        activeOnReverse: false,
+        beforeGenerate($, $$) {
+            
+        },
+        afterGenerate($, $$) {
+            
+        },
+    }
+});

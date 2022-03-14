@@ -526,6 +526,8 @@ for(const item of a) {
                     ImGui::Text("Ports");
                     ImGui::Separator();
                     showNodePorts(node);
+                    showNodeComponents(node, true);
+                    showComponentContextMenu();
                 }  
                 if ((connection = selection.getSelectedConnection())) {
                     if (node) {

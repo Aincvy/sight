@@ -37,6 +37,7 @@
 #define LINK_CONTEXT_MENU "LinkContextMenu"
 #define PIN_CONTEXT_MENU "PinContextMenu"
 #define NODE_CONTEXT_MENU "NodeContextMenu"
+#define COMPONENT_CONTEXT_MENU "ComponentContextMenu"
 
 static struct {
     ed::EditorContext* context = nullptr;
@@ -49,6 +50,8 @@ static struct {
     ImVec2 nextNodePosition{0,0};
 
     float lastSyncPositionTime = 0;
+    bool createComponents = false;
+    uint componentForWhich = 0;        // which node? 
 
     bool isNextNodePositionEmpty(){
         return nextNodePosition.x == 0 && nextNodePosition.y == 0;
@@ -58,6 +61,7 @@ static struct {
         contextMenuCreateNodeOpen = false;
         nextNodePosition = {0,0};
         portForCreateNode = {};
+        createComponents = false;
     }
 
 }* g_ContextStatus;
@@ -216,7 +220,7 @@ namespace sight {
                     g_ContextStatus->nextNodePosition = ImGui::GetMousePos();
                 }
                 for (auto& item : currentNodeStatus()->templateAddressList) {
-                    item.showContextMenu();
+                    item.showContextMenu(g_ContextStatus->createComponents);
                 }
 
                 ImGui::Separator();
@@ -447,80 +451,34 @@ namespace sight {
             // ImGui::Dummy(ImVec2(1,1));
         }
 
-        /**
-         * render a node
-         * @param node
-         * @param syncPositionTo  sync position to node editor ?
-         * @param syncPositionFrom sync position from node editor ?
-         * @return
-         */
-        int showNode(SightNode* node, bool syncPositionTo = false, bool syncPositionFrom = false) {
-            if (!node) {
-                return CODE_FAIL;
-            }
-
-            auto color = ImColor(0, 99, 160, 255);
-            auto project = currentProject();
-            auto templateNode = node->templateNode;
-            if (!templateNode->isStyleInitialized()) {
-                const_cast<SightJsNode*>(templateNode)->updateStyle();     // try to optimization, but ... 
-            }
-            auto& nodeStyle = templateNode->nodeStyle;
-
-            // filter
-            auto getAlpha = [](SightNodePort const& port) {
-                constexpr int invalidAlpha = 48;
-                constexpr int fullAlpha = 255;
-                if (g_ContextStatus->portForCreateNode) {
-                    auto filterPort = g_ContextStatus->portForCreateNode.get();
-                    if (filterPort->kind == port.kind) {
-                        return fullAlpha;
-                    }
-
-                    // check type
-                    auto filterType = filterPort->getType();
-                    uint portType = port.getType();
-                    if (filterType > 0) {
-                        auto leftType = filterType;
-                        auto rightType = portType;
-                        if (filterPort->kind == NodePortType::Input) {
-                            std::swap(leftType, rightType);
-                        }
-                        return checkTypeCompatibility(leftType, rightType) ? fullAlpha : invalidAlpha;
-                    }
+        int getAlpha(SightNodePort const& port) {
+            constexpr int invalidAlpha = 48;
+            constexpr int fullAlpha = 255;
+            if (g_ContextStatus->portForCreateNode) {
+                auto filterPort = g_ContextStatus->portForCreateNode.get();
+                if (filterPort->kind == port.kind) {
+                    return fullAlpha;
                 }
 
-                return fullAlpha;
-            };
-
-            if (syncPositionTo && !node->position.isZero()) {
-                ed::SetNodePosition(node->nodeId, getNodePos(node));
-            }
-            ed::BeginNode(node->nodeId);
-            // ImGui::Dummy(ImVec2(7,5));
-            auto chainInPort = node->chainInPort;
-            auto [typeProcess, _] = project->findTypeInfo(chainInPort->type);
-
-            if (chainInPort) {
-                ed::BeginPin(chainInPort->id, ed::PinKind::Input);
-                showNodePortIcon(typeProcess.style->iconType, typeProcess.style->color, chainInPort->isConnect(),
-                                 getAlpha(*chainInPort));
-                ed::EndPin();
-                ImGui::SameLine();
+                // check type
+                auto filterType = filterPort->getType();
+                uint portType = port.getType();
+                if (filterType > 0) {
+                    auto leftType = filterType;
+                    auto rightType = portType;
+                    if (filterPort->kind == NodePortType::Input) {
+                        std::swap(leftType, rightType);
+                    }
+                    return checkTypeCompatibility(leftType, rightType) ? fullAlpha : invalidAlpha;
+                }
             }
 
-            ImGui::TextColored(ImVec4(0, 106, 113, 255), "%s", node->nodeName.c_str());
-
-            auto chainOutPort = node->chainOutPort;
-            if (chainOutPort) {
-                ImGui::SameLine(templateNode->nodeStyle.width - SightNodeFixedStyle::iconSize);
-                // ImGui::SameLine(0);
-                ed::BeginPin(chainOutPort->id, ed::PinKind::Output);
-                showNodePortIcon(typeProcess.style->iconType, typeProcess.style->color, chainOutPort->isConnect(),
-                                 getAlpha(*chainOutPort));
-                ed::EndPin();
-            }
-            ImGui::Dummy(ImVec2(0, SightNodeFixedStyle::iconTitlePadding));
+            return fullAlpha;
+        }
+        
+        void showNodePortsWithEd(SightNode* node, SightNodeStyle const& nodeStyle) {
+            auto project = currentProject();
+            auto color = ImColor(0, 99, 160, 255);
 
             // fields
             for (auto& item : node->fields) {
@@ -645,6 +603,62 @@ namespace sight {
             }
 
             ImGui::EndGroup();
+        }
+
+        /**
+         * render a node
+         * @param node
+         * @param syncPositionTo  sync position to node editor ?
+         * @param syncPositionFrom sync position from node editor ?
+         * @return
+         */
+        int showNode(SightNode* node, bool syncPositionTo = false, bool syncPositionFrom = false) {
+            if (!node) {
+                return CODE_FAIL;
+            }
+
+            auto color = ImColor(0, 99, 160, 255);
+            auto project = currentProject();
+            auto templateNode = node->templateNode;
+            if (!templateNode->isStyleInitialized()) {
+                const_cast<SightJsNode*>(templateNode)->updateStyle();     // try to optimization, but ... 
+            }
+            auto& nodeStyle = templateNode->nodeStyle;
+
+            // filter
+
+            if (syncPositionTo && !node->position.isZero()) {
+                ed::SetNodePosition(node->nodeId, getNodePos(node));
+            }
+            ed::BeginNode(node->nodeId);
+            // ImGui::Dummy(ImVec2(7,5));
+            auto chainInPort = node->chainInPort;
+            auto [typeProcess, _] = project->findTypeInfo(chainInPort->type);
+
+            if (chainInPort) {
+                ed::BeginPin(chainInPort->id, ed::PinKind::Input);
+                showNodePortIcon(typeProcess.style->iconType, typeProcess.style->color, chainInPort->isConnect(),
+                                 getAlpha(*chainInPort));
+                ed::EndPin();
+                ImGui::SameLine();
+            }
+
+            ImGui::TextColored(ImVec4(0, 106, 113, 255), "%s", node->nodeName.c_str());
+
+            auto chainOutPort = node->chainOutPort;
+            if (chainOutPort) {
+                ImGui::SameLine(templateNode->nodeStyle.width - SightNodeFixedStyle::iconSize);
+                // ImGui::SameLine(0);
+                ed::BeginPin(chainOutPort->id, ed::PinKind::Output);
+                showNodePortIcon(typeProcess.style->iconType, typeProcess.style->color, chainOutPort->isConnect(),
+                                 getAlpha(*chainOutPort));
+                ed::EndPin();
+            }
+            ImGui::Dummy(ImVec2(0, SightNodeFixedStyle::iconTitlePadding));
+
+            showNodePortsWithEd(node, nodeStyle);
+
+            showNodeComponents(node);
             ed::EndNode();
             if (syncPositionFrom) {
                 setNodePos(node, ed::GetNodePosition(node->nodeId));
@@ -1303,44 +1317,61 @@ namespace sight {
         ed::SetCurrentEditor(nullptr);
     }
 
-    void SightNodeTemplateAddress::showContextMenu() {
+    void SightNodeTemplateAddress::showContextMenu(bool createComponent) {
         if (children.empty()) {
-            if (ImGui::MenuItem(name.c_str())) {
-                //
-                auto node = this->templateNode->instantiate();
-                auto nodeId = node->getNodeId();
-                node->position = convert(g_ContextStatus->nextNodePosition);
-                ed::SetNodePosition(nodeId, g_ContextStatus->nextNodePosition);
-                if (uiAddNode(node) == CODE_OK) {
-                    node = nullptr;
-                    // check port
-                    auto graph = currentGraph();
-                    if (g_ContextStatus->portForCreateNode) {
-                        node = graph->findNode(nodeId);
-                        auto port = g_ContextStatus->portForCreateNode.get();
-                        SightNodePort* tmp = nullptr;
-                        if (port->isTitleBarPort()) {
-                            // connect next title bar
-                            tmp = node->getOppositeTitleBarPort(port->kind);
-                        } else {
-                            // match the type
-                            tmp = node->getOppositePortByType(port->kind, port->getType());
-                        }
+            if (createComponent && !this->templateNode->checkAsComponent()) {
+                return;
+            }
 
-                        if (tmp) {
-                            // create connection
-                            auto connectionId = graph->createConnection(port->getId(), tmp->getId());
-                            if (connectionId > 0) {
-                                recordUndo(UndoRecordType::Create, connectionId);
+            if (ImGui::MenuItem(name.c_str())) {
+                auto graph = currentGraph();
+                //
+                if (createComponent) {
+                    //
+                    auto n = graph->findNode(g_ContextStatus->componentForWhich);
+                    // n->components.push_back(node);
+                    n->addComponent(this->templateNode);
+                    
+                } else {
+                    // create node
+                    auto node = this->templateNode->instantiate();
+                    auto nodeId = node->getNodeId();
+                    node->position = convert(g_ContextStatus->nextNodePosition);
+                    ed::SetNodePosition(nodeId, g_ContextStatus->nextNodePosition);
+                    if (uiAddNode(node) == CODE_OK) {
+                        node = nullptr;
+                        // check port
+                        if (g_ContextStatus->portForCreateNode) {
+                            node = graph->findNode(nodeId);
+                            auto port = g_ContextStatus->portForCreateNode.get();
+                            SightNodePort* tmp = nullptr;
+                            if (port->isTitleBarPort()) {
+                                // connect next title bar
+                                tmp = node->getOppositeTitleBarPort(port->kind);
+                            } else {
+                                // match the type
+                                tmp = node->getOppositePortByType(port->kind, port->getType());
+                            }
+
+                            if (tmp) {
+                                // create connection
+                                auto connectionId = graph->createConnection(port->getId(), tmp->getId());
+                                if (connectionId > 0) {
+                                    recordUndo(UndoRecordType::Create, connectionId);
+                                }
                             }
                         }
                     }
                 }
+                
             }
         } else {
+            
             if (ImGui::BeginMenu(name.c_str())) {
                 for (auto& item : children) {
-                    item.showContextMenu();
+                    if (item.isAnyItemCanShow(createComponent)) {
+                        item.showContextMenu(createComponent);
+                    }
                 }
 
                 ImGui::EndMenu();
@@ -1623,6 +1654,61 @@ namespace sight {
                 ImGui::TextColored(currentUIStatus()->uiColors->errorText, "Bad Node Id");
             }
         }
+    }
+
+    int showComponentContextMenu() {
+        if (ImGui::BeginPopup(COMPONENT_CONTEXT_MENU)) {
+            for (auto& item : currentNodeStatus()->templateAddressList) {
+                if (item.isAnyItemCanShow(true)) {
+                    item.showContextMenu(true);
+                }
+            }
+            
+            ImGui::EndPopup();
+        }
+        return CODE_OK;
+    }
+    
+    int showNodeComponents(SightNode* node, bool fromInspector /* = false */) {
+
+        int delIndex = -1;
+        int index = -1;
+        for (const auto& item : node->components) {
+            index++;
+
+            if (fromInspector) {
+                ImGui::Separator();
+                ImGui::TextColored(currentUIStatus()->uiColors->nodeIdText, "%s", item->nodeName.c_str());
+                ImGui::SameLine();
+                if (ImGui::Button(ICON_MD_DELETE "##del-component")) {
+                    delIndex = index;
+                }
+                showNodePorts(item);
+            } else {
+                ImGui::Text("---------");
+                ImGui::TextColored(currentUIStatus()->uiColors->nodeIdText, "%s", item->nodeName.c_str());
+
+                auto& nodeStyle = node->templateNode->nodeStyle;
+                showNodePortsWithEd(item, nodeStyle);
+            }
+        }
+        if (delIndex >= 0) {
+            node->components.erase(node->components.begin() + delIndex);
+            node->graph->markDirty();
+        }
+
+        if (fromInspector) {
+            if (ImGui::Button("Add Component...")) {
+                g_ContextStatus->createComponents = true;
+                g_ContextStatus->componentForWhich = node->getNodeId();
+
+                // g_ContextStatus->nextNodePosition = ImGui::GetMousePos();
+                // g_ContextStatus->contextMenuCreateNodeOpen = true;
+                ImGui::OpenPopup(COMPONENT_CONTEXT_MENU);
+            }
+        }
+
+        return CODE_OK;
     }
 
     void uiReloadGraph() {

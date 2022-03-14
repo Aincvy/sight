@@ -121,11 +121,14 @@ namespace sight {
 
     void showGraphSettings();
 
+    int showComponentContextMenu();
+    
+    int showNodeComponents(SightNode* node, bool fromInspector = false);
+
     /**
      * @brief reload current graph.
      * 
      */
     void uiReloadGraph();
-
 
 }
