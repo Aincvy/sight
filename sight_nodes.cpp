@@ -484,6 +484,7 @@ namespace sight {
         
         auto p = templateNode->instantiate();
         addComponent(p);
+        this->graph->markDirty();
         return true;
     }
 

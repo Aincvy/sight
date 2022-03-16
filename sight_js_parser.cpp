@@ -261,7 +261,7 @@ namespace sight {
         );
 
         TSNode rootNode = ts_tree_root_node(tree);
-        showNodeHierarchy(rootNode);
+        // showNodeHierarchy(rootNode);
 
         GeneratedCode code{
             .fail = false,

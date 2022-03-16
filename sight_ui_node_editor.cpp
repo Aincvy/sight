@@ -1685,7 +1685,7 @@ namespace sight {
                 }
                 showNodePorts(item);
             } else {
-                ImGui::Text("---------");
+                // ImGui::Text("---------");
                 ImGui::TextColored(currentUIStatus()->uiColors->nodeIdText, "%s", item->nodeName.c_str());
 
                 auto& nodeStyle = node->templateNode->nodeStyle;

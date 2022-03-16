@@ -2371,7 +2371,6 @@ namespace sight {
     
     std::string parseConnection(Isolate* isolate, SightNodeConnection* connection) {
         auto& data = g_V8Runtime->parsingGraphData;
-        trace(connection->connectionId);
         if (data.connectionCodeTemplate.empty() || !connection->generateCode) {
             return {};
         }
@@ -2390,6 +2389,13 @@ namespace sight {
             return {};
         }
 
+        // check connection parse count
+        auto& connectionParseInfo = data.getGenerateInfo(connection->connectionId);
+        if (connectionParseInfo.generateCodeCount > 0) {
+            return {};
+        }
+        connectionParseInfo.generateCodeCount++;
+        
         // both has generated, generate connection code.
         auto& codeTemplate = g_V8Runtime->connectionCodeTemplateMap[data.connectionCodeTemplate];
 
@@ -2431,7 +2437,9 @@ namespace sight {
             }
         };
 
+        #if GENERATE_CODE_DETAILS == 1
         trace(data.currentNode->getNodeId());
+        #endif
         func(data.currentNode->inputPorts);
         func(data.currentNode->outputPorts);
     }
@@ -2463,6 +2471,7 @@ namespace sight {
             }
         }
 
+        data.component = nullptr;
         return source;
     }
     

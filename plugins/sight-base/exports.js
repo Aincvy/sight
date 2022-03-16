@@ -91,6 +91,14 @@ sight.GenerateArg$$.prototype.error = function(msg = '', node = undefined, port 
     this.errorReport(msg, nodeId, portId);
 }
 
+sight.GenerateArg$$.prototype.oppositeOrValue = function (portFunc) {
+    if (portFunc.isConnect) {
+        return portFunc();
+    } else {
+        return portFunc.value;
+    }
+}
+
 sight.entity.generateCodeWork = function($, $$) {
     
     let selfName = this.getOtherSideValue('', 'VarDeclare', 'name');
@@ -159,8 +167,8 @@ sight.connection.addCodeTemplate('Empty Template', '', function () {
 
 sight.SightNodeGenerateHelper.prototype.quickVarName = function (code) {
     let varName = this.varName;
-    print(varName);
-    print(this.templateName);
+    // print(varName);
+    // print(this.templateName);
     if (varName != this.templateName) {
         // var declare 
         let tmp = `let ${varName} = ` + code;
