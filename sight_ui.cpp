@@ -500,7 +500,9 @@ for(const item of a) {
 
             auto graph = currentGraph();
             auto & selection = g_UIStatus->selection;
-            if (selection.selectedNodeOrLinks.empty()) {
+            if(graph == nullptr) {
+                // 
+            } else if (selection.selectedNodeOrLinks.empty()) {
                 // show settings
                 showGraphSettings();
             } else if (selection.selectedNodeOrLinks.size() > 1) {
@@ -1034,9 +1036,12 @@ for(const item of a) {
 
         void showAboutWindow(){
             if (ImGui::Begin(WINDOW_LANGUAGE_KEYS.about, &g_UIStatus->windowStatus.aboutWindow)) {
+                ImGui::Text("ImGui version: %s", ImGui::GetVersion());
+                ImGui::Text("v8 version: %s", v8::V8::GetVersion());
+                ImGui::Separator();
+
                 ImGui::Text("Sight WIP v0.1");
                 ImGui::Text("Author: aincvy(aincvy@gmail.com)");
-                
                 ImGui::Dummy(ImVec2(0,15));
                 if (ImGui::Button("Close")) {
                     g_UIStatus->windowStatus.aboutWindow = false;
@@ -1399,7 +1404,7 @@ for(const item of a) {
         showMainMenuBar(uiStatus);
         showProjectWindow();
 
-        // windows
+        // // windows
         showHierarchyWindow();
         showInspectorWindow();
         showNodeEditorGraph(uiStatus);
