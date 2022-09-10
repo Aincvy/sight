@@ -38,6 +38,7 @@
 #include <stdio.h>
 #include <future>
 #include <atomic>
+#include <thread>
 
 #include <filesystem>
 

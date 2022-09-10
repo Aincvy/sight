@@ -32,11 +32,18 @@ target_link_libraries(
         imgui PUBLIC
         glfw
         OpenGL::GL
-        "-framework IOKit"
-        "-framework CoreVideo"
-        "-framework Cocoa"
-        "-framework AppKit"
 )
+
+# macos  
+if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+        target_link_libraries(
+                imgui PUBLIC
+                "-framework IOKit"
+                "-framework CoreVideo"
+                "-framework Cocoa"
+                "-framework AppKit"
+        )
+endif()
 
 # imgui-node-editor
 SET(

@@ -138,6 +138,12 @@ namespace sight {
             SightArray const* arrayPointer;
             size_t current;
 
+            using iterator_category = std::forward_iterator_tag;
+            using difference_type   = std::ptrdiff_t;
+            using value_type        = T;
+            using pointer           = T*;  // or also value_type*
+            using reference         = T&;  // or also value_type&
+
             SightArrayConstIterator(SightArray const* arrayPointer, size_t current) : arrayPointer(arrayPointer), current(current) {}
 
             T const & operator*() const { return *arrayPointer->obtainAddress(current); }

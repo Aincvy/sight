@@ -53,7 +53,6 @@ namespace sight {
     //          Begin Of Keys
     //////////////////////////////////////////////////////////////////////////////////
     /* spellchecker: disable */
-#ifdef __APPLE__
     
     void initKeys() {
         
@@ -156,11 +155,6 @@ namespace sight {
         keyMap["backspace"] = keyArray.add(SightKey(GLFW_KEY_BACKSPACE));
     }
 
-#elif _WIN32
-    // windows key
-    void initKeys() {
-    }
-#endif
 
     /* spell-checker: enable */
     //////////////////////////////////////////////////////////////////////////////////

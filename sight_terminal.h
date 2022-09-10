@@ -5,6 +5,8 @@
 #pragma once
 
 #include <system_error>
+#include <memory>
+#include <cstring>
 #include "imterm/misc.hpp"
 #include "imterm/terminal.hpp"
 #include "imterm/terminal_helpers.hpp"

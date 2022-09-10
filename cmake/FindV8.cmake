@@ -74,15 +74,15 @@ if(NOT UNIX)
 	)
 else()
 	set(V8_PATHS_DEBUG
-		${V8_DIR}/out/ia32.debug
-		${V8_DIR}/out/x64.debug
-		${V8_DIR}/out/native
+		${V8_DIR}/out.gn/ia32.debug
+		${V8_DIR}/out.gn/x64.debug
+		${V8_DIR}/out.gn/native
 	)
 
 	set(V8_PATHS_RELEASE
-		${V8_DIR}/out/ia32.release
-		${V8_DIR}/out/x64.release
-		${V8_DIR}/out/native
+		${V8_DIR}/out.gn/ia32.release
+		${V8_DIR}/out.gn/x64.release
+		${V8_DIR}/out.gn/native
 	)
 endif()
 

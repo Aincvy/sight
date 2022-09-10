@@ -2,6 +2,7 @@
 // Created by Aincvy(aincvy@gmail.com) on 2021/7/20.
 //
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -45,6 +46,10 @@
 #include "v8pp/property.hpp"
 #include "v8pp/object.hpp"
 #include "v8pp/json.hpp"
+
+#ifdef __linux__
+#define isnumber isdigit
+#endif
 
 #define GENERATE_CODE_DETAILS 1
 

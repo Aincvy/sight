@@ -53,7 +53,7 @@ target_sources(sight PRIVATE
         )
 
 # V8
-SET(V8_DIR "/usr/local/opt/v8/libexec/")
+SET(V8_DIR "/opt/v8")
 find_package(V8 REQUIRED)
 target_include_directories(sight PRIVATE ${V8_INCLUDE_DIR})
 target_compile_definitions(sight PRIVATE V8_COMPRESS_POINTERS V8_31BIT_SMIS_ON_64BIT_ARCH)
