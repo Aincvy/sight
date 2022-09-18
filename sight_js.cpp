@@ -34,6 +34,7 @@
 #include "sight_js_parser.h"
 #include "sight_project.h"
 #include "sight_plugin.h"
+#include "sight_code_set.h"
 
 #include "v8.h"
 #include "libplatform/libplatform.h"
@@ -2721,6 +2722,9 @@ namespace sight {
             case JsCommandType::ProjectRebuild:
                 currentProject()->rebuild();
                 break;
+            case JsCommandType::ProjectCodeSetBuild:
+                currentProject()->codeSetBuild();
+                break;
             }
 
             command.args.dispose();
@@ -2734,6 +2738,9 @@ namespace sight {
     void jsThreadRun(const char *exeName) {
         initJsEngine(exeName);
 
+        logDebug("init code set");
+        initCodeSet();
+
         {
             auto isolate = g_V8Runtime->isolate;
             v8::HandleScope handle_scope(isolate);
@@ -2745,6 +2752,8 @@ namespace sight {
             runJsCommands();
         }
 
+        logDebug("destroy code set and js engine.");
+        destroyCodeSet();
         destroyJsEngine();
     }
 

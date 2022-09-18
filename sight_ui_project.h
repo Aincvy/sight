@@ -31,5 +31,10 @@ namespace sight {
     void uiDeleteEntity(std::string_view fullName);
 
     bool checkTemplateNodeIsUsed(Project* p, std::string_view templateAddress, bool alert = true);
+
+    /**
+     * 
+     */
+    void showCodeSetSettingsWindow();
     
 }

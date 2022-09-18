@@ -47,7 +47,7 @@ namespace sight{
         ProjectBuild,
         ProjectClean,
         ProjectRebuild,
-
+        ProjectCodeSetBuild,
     };
 
     struct JsCommand {

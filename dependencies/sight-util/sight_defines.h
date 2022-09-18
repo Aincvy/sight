@@ -6,7 +6,7 @@
 #include <string>
 
 // used for name string
-#define FILENAME_BUF_SIZE 256
+#define FILENAME_BUF_SIZE 512
 #define NAME_BUF_SIZE 64
 #define LITTLE_NAME_BUF_SIZE 32
 #define TINY_NAME_BUF_SIZE 16

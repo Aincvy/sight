@@ -18,6 +18,7 @@
 #include "sight.h"
 
 #include "sight_nodes.h"
+#include "sight_code_set.h"
 
 namespace sight {
 
@@ -196,7 +197,8 @@ namespace sight {
     /**
      * project class.
      * todo add thread safe guard.
-     * Consider change data by js thread, use data by ui thread.
+     * The ui thread read/write data. 
+     * The js thread only read data.
      */
     class Project {
     public:
@@ -205,6 +207,7 @@ namespace sight {
         Project() = default;
         Project(const char* baseDir, bool createIfNotExist);
 
+        int codeSetBuild();
         int build(const char* target);
         int clean();
         int rebuild();
@@ -341,11 +344,15 @@ namespace sight {
         std::string pathSrcFolder() const;
         std::string pathTargetFolder() const;
 
+        SightCodeSetSettings& getSightCodeSetSettings();
+        SightCodeSetSettings const& getSightCodeSetSettings() const;
+
     private:
         std::string baseDir;
         bool createIfNotExist;
         ProjectConfig projectConfig;
         ProjectFile fileCache;
+        SightCodeSetSettings codeSetSettings;
 
         std::atomic<uint> typeIdIncr;
         absl::btree_map<std::string, uint> typeMap;

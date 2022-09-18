@@ -393,4 +393,10 @@ namespace sight {
         }
     }
 
+    void showEntityOperations(SightEntity* sightEntity = nullptr, UICreateEntity* createEntityData = nullptr);
+
+    void checkEntityOperations(EntityOperations& );
+
+    void showEntityOperationList(UIStatus* );
+
 }

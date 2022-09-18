@@ -5,12 +5,14 @@
 #include "sight_project.h"
 #include "sight_js.h"
 #include "sight_js_parser.h"
+#include "sight_log.h"
 #include "sight_ui_node_editor.h"
 #include "sight_util.h"
 #include "sight.h"
 #include "sight_nodes.h"
 #include "sight_memory.h"
 #include "sight_widgets.h"
+#include "sight_code_set.h"
 
 #include "yaml-cpp/yaml.h"
 
@@ -27,6 +29,7 @@
 #include <tuple>
 #include <utility>
 #include <vector>
+#include <yaml-cpp/emittermanip.h>
 
 #include "absl/strings/substitute.h"
 
@@ -250,6 +253,13 @@ namespace sight {
         fileCache.fileType = ProjectFileType::Directory;
     }
 
+    int Project::codeSetBuild() {
+        logDebug("start code set build.");
+
+        logDebug("end code set build.");
+        return CODE_OK;
+    }
+
     uint Project::nextNodeOrPortId() {
         return projectConfig.nodeOrPortId++;
     }
@@ -290,6 +300,7 @@ namespace sight {
 
     int Project::saveConfigFile() {
         std::string path = pathConfigFile();
+        logDebug("save project config file: $0", path.c_str());
 
         YAML::Emitter out;
 
@@ -309,6 +320,9 @@ namespace sight {
             out << YAML::Key << item.first << YAML::Value << item.second;
         }
         out << YAML::EndMap;
+
+        // code settings
+        out << YAML::Key << "codeSetSettings" << codeSetSettings;
 
         out << YAML::EndMap;
 
@@ -396,6 +410,11 @@ namespace sight {
                 for (const auto & item : temp) {
                     addType(item.first.as<std::string>(), item.second.as<uint>());
                 }
+            }
+
+            temp = root["codeSetSettings"];
+            if(temp.IsDefined()) {
+                temp >> this->codeSetSettings;
             }
 
         } catch (const YAML::BadConversion & e){
@@ -505,6 +524,7 @@ namespace sight {
     void Project::initTypeMap() {
 
         ImU32 color = IM_COL32(0, 99, 160, 255);
+        addTypeInfo({ .name = "void", .intValue = IntTypeVoid }, { IM_COL32(255,255,255,255), IconType::Circle });
         addTypeInfo({ .name = "Process", .intValue = IntTypeProcess }, { color, IconType::Flow });
         addTypeInfo({ .name = "int", .intValue = IntTypeInt}, { color, IconType::Circle });
         addTypeInfo({ .name = "float", .intValue = IntTypeFloat }, { color, IconType::Circle });
@@ -640,6 +660,14 @@ namespace sight {
 
     std::string Project::pathTargetFolder() const {
         return baseDir + "target/";
+    }
+
+    SightCodeSetSettings& Project::getSightCodeSetSettings() {
+        return this->codeSetSettings;
+    }
+
+    SightCodeSetSettings const& Project::getSightCodeSetSettings() const {
+        return this->codeSetSettings;
     }
 
     std::string Project::pathPluginsFolder() const {
@@ -959,6 +987,7 @@ namespace sight {
         project->buildFilesCache();
         project->updateEntitiesToTemplateNode();
         project->checkOpenLastGraph();
+
     }
 
     int openProject(const char* baseDir, bool createIfNotExist, bool callLoadSuccess) {

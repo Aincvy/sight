@@ -167,6 +167,9 @@ namespace sight {
                 if (ImGui::MenuItem("Terminal")) {
                     g_UIStatus->windowStatus.terminalWindow = true;
                 }
+                if (ImGui::MenuItem("CodeSetSettings")) {
+                    g_UIStatus->windowStatus.codeSetSettingsWindow = true;
+                }
 
                 ImGui::EndMenu();
             }
@@ -184,6 +187,9 @@ namespace sight {
                 }
 
                 ImGui::EndMenu();
+            }
+            if(ImGui::MenuItem("codeSetBuild")) {
+                addJsCommand(JsCommandType::ProjectCodeSetBuild);
             }
             if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.rebuild)) {
                 // currentProject()->rebuild();
@@ -660,70 +666,6 @@ for(const item of a) {
 
             }
             ImGui::End();
-        }
-
-        void showEntityOperations(SightEntity* sightEntity = nullptr, UICreateEntity* createEntityData = nullptr) {
-            auto& entityOperations = g_UIStatus->entityOperations;
-            const auto& operationNames = entityOperations.names;
-            if (!entityOperations.init) {
-                entityOperations.init = true;
-                auto lastUse = getSightSettings()->lastUseEntityOperation;
-                if (!lastUse.empty()) {
-                    auto iter = std::find(operationNames.begin(), operationNames.end(), lastUse);
-                    if (iter != operationNames.end()) {
-                        entityOperations.selected = iter - operationNames.begin();
-                    }
-                }
-            }
-            
-            if (!operationNames.empty()) {
-                const auto width = ImGui::GetWindowWidth();
-                constexpr const auto comboWidth = 110;
-                const char* comboLabel = "##Operations";
-                const auto comboLabelWidth = ImGui::CalcTextSize(comboLabel).x;
-                const char* generateStr = "Generate";
-                const auto generateWidth = ImGui::CalcTextSize(generateStr).x + 15;
-                auto selectedOperationName = operationNames[entityOperations.selected].c_str();
-
-                ImGui::SameLine(width - generateWidth);
-                if (ImGui::Button(generateStr)) {
-                    // call generate
-                    auto& o = entityOperations.map[selectedOperationName];
-
-                    std::string text{};
-                    if (!sightEntity) {
-                        assert(createEntityData);
-                        SightEntity tmpSightEntity;
-                        convert(tmpSightEntity, *createEntityData);
-                        sightEntity = &tmpSightEntity;
-                        text = o.function.getString(currentUIStatus()->isolate, sightEntity);
-                    } else {
-                        text = o.function.getString(currentUIStatus()->isolate, sightEntity);
-                    }
-                    
-                    text = removeExcessSpaces(text);
-                    openGenerateResultWindow(generateStr, text);     // todo more info about source
-                }
-                ImGui::SameLine(width - comboWidth - generateWidth - 5);
-                ImGui::SetNextItemWidth(comboWidth);
-                if (ImGui::BeginCombo(comboLabel, selectedOperationName)) {
-                    int tmpIndex = -1;
-                    for (const auto& item : operationNames) {
-                        bool isSelected = (++tmpIndex) == entityOperations.selected;
-                        if (ImGui::Selectable(item.c_str(), isSelected)) {
-                            entityOperations.selected = tmpIndex;
-                            
-                            getSightSettings()->lastUseEntityOperation = item;
-                        }
-
-                        if (isSelected) {
-                            ImGui::SetItemDefaultFocus();
-                        }
-                    }
-                    ImGui::EndCombo();
-                }
-                helpMarker(entityOperations.map[selectedOperationName].description.c_str());
-            }
         }
 
         void showCreateEntityWindow(){
@@ -1436,7 +1378,10 @@ for(const item of a) {
 
             terminal->use_default_size();
             windowStatus.terminalWindow = terminal->show();
-        }   
+        }
+        if(windowStatus.codeSetSettingsWindow){
+            showCodeSetSettingsWindow();
+        }
 
         nodeEditorFrameEnd();
 
@@ -2304,6 +2249,76 @@ for(const item of a) {
         createEntityData.editingEntity = info;
 
         activeWindowCreateEntity();
+    }
+
+    void showEntityOperations(SightEntity* sightEntity /* = nullptr */, UICreateEntity* createEntityData /* = nullptr */) {
+        auto& entityOperations = g_UIStatus->entityOperations;
+        checkEntityOperations(entityOperations);
+        const auto& operationNames = entityOperations.names;
+        
+        if (!operationNames.empty()) {
+            const auto width = ImGui::GetWindowWidth();
+            constexpr const auto comboWidth = 110;
+            const char* comboLabel = "##Operations";
+            const auto comboLabelWidth = ImGui::CalcTextSize(comboLabel).x;
+            const char* generateStr = "Generate";
+            const auto generateWidth = ImGui::CalcTextSize(generateStr).x + 15;
+            auto selectedOperationName = operationNames[entityOperations.selected].c_str();
+
+            ImGui::SameLine(width - generateWidth);
+            if (ImGui::Button(generateStr)) {
+                // call generate
+                auto& o = entityOperations.map[selectedOperationName];
+
+                std::string text{};
+                if (!sightEntity) {
+                    assert(createEntityData);
+                    SightEntity tmpSightEntity;
+                    convert(tmpSightEntity, *createEntityData);
+                    sightEntity = &tmpSightEntity;
+                    text = o.function.getString(currentUIStatus()->isolate, sightEntity);
+                } else {
+                    text = o.function.getString(currentUIStatus()->isolate, sightEntity);
+                }
+                
+                text = removeExcessSpaces(text);
+                openGenerateResultWindow(generateStr, text);     // todo more info about source
+            }
+            ImGui::SameLine(width - comboWidth - generateWidth - 5);
+            ImGui::SetNextItemWidth(comboWidth);
+            if (ImGui::BeginCombo(comboLabel, selectedOperationName)) {
+                int tmpIndex = -1;
+                for (const auto& item : operationNames) {
+                    bool isSelected = (++tmpIndex) == entityOperations.selected;
+                    if (ImGui::Selectable(item.c_str(), isSelected)) {
+                        entityOperations.selected = tmpIndex;
+                        
+                        getSightSettings()->lastUseEntityOperation = item;
+                    }
+
+                    if (isSelected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            helpMarker(entityOperations.map[selectedOperationName].description.c_str());
+        }
+    }
+
+    void checkEntityOperations(EntityOperations& entityOperations) {
+        const auto& operationNames = entityOperations.names;
+        if (!entityOperations.init) {
+            entityOperations.init = true;
+            // auto lastUse = getSightSettings()->lastUseEntityOperation;
+            auto lastUse = currentProject()->getSightCodeSetSettings().entityTemplateFuncName;
+            if (!lastUse.empty()) {
+                auto iter = std::find(operationNames.begin(), operationNames.end(), lastUse);
+                if (iter != operationNames.end()) {
+                    entityOperations.selected = iter - operationNames.begin();
+                }
+            }
+        }
     }
 
 }

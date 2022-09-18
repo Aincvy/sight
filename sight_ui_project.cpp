@@ -2,9 +2,15 @@
 #include "sight.h"
 #include "sight_project.h"
 #include <algorithm>
+#include <cstdio>
+#include <cstring>
+#include <iterator>
 
 #include "IconsMaterialDesign.h"
 #include "sight_ui.h"
+
+#include "imgui.h"
+#include "sight_widgets.h"
 
 namespace sight {
 
@@ -123,4 +129,80 @@ namespace sight {
 
         return false;
     }
+
+    void showCodeSetSettingsWindow() {
+        auto uiStatus = currentUIStatus();
+        auto project = currentProject();
+        if(ImGui::Begin("CodeSetSettings", &(uiStatus->windowStatus.codeSetSettingsWindow))){
+            auto& settings = project->getSightCodeSetSettings();
+
+            ImGui::Text("EntityTemplate: ");
+            ImGui::SameLine();
+            showEntityOperationList(uiStatus);
+
+            ImGui::Dummy(ImVec2(0,10));
+            ImGui::Text("Output path");
+            ImGui::Separator();
+            ImGui::Text("Entity: ");
+            helpMarker("entity class output path.");
+            ImGui::SameLine();
+            static char entityClassOutputPath[FILENAME_BUF_SIZE] = {0};
+            if(strlen(entityClassOutputPath) == 0 && !settings.entityClzOutputPath.empty()) {
+                sprintf(entityClassOutputPath, "%s", settings.entityClzOutputPath.c_str());
+            }
+            if(ImGui::InputText("##entityClassOutputPath", entityClassOutputPath, std::size(entityClassOutputPath))){
+                settings.entityClzOutputPath = entityClassOutputPath;    
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(ICON_MD_FOLDER_OPEN "##open_entity_class_output_path"))
+            {
+                // select folder
+                auto baseDir = strlen(entityClassOutputPath) <= 0 ? "./" : entityClassOutputPath;
+                int folderOpenStatus = 0;
+                std::string path = openFolderDialog(baseDir, &folderOpenStatus);
+                if(folderOpenStatus == CODE_OK) {
+                    // 
+                    sprintf(entityClassOutputPath, "%s", path.c_str());
+                    settings.entityClzOutputPath = path;
+                }
+            }
+
+        }
+        ImGui::End();
+    }
+
+    /**
+     * Most copy from sight_ui.cpp showEntityOperations()
+     */
+    void showEntityOperationList(UIStatus* uiStatus){
+        auto& entityOperations = uiStatus->entityOperations;
+        checkEntityOperations(entityOperations);
+        const auto& operationNames = entityOperations.names;
+
+        if(!operationNames.empty()) {
+            const char* comboLabel = "##Operations";
+            auto selectedOperationName = operationNames[entityOperations.selected].c_str();
+
+            if (ImGui::BeginCombo(comboLabel, selectedOperationName)) {
+                int tmpIndex = -1;
+                for (const auto& item : operationNames) {
+                    bool isSelected = (++tmpIndex) == entityOperations.selected;
+                    if (ImGui::Selectable(item.c_str(), isSelected)) {
+                        entityOperations.selected = tmpIndex;
+                        
+                        auto p = currentProject();
+                        p->getSightCodeSetSettings().entityTemplateFuncName = item;
+                        p->saveConfigFile();
+                    }
+
+                    if (isSelected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            helpMarker(entityOperations.map[selectedOperationName].description.c_str());
+        }
+    }
+
 }

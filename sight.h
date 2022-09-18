@@ -85,7 +85,16 @@ namespace sight {
         CODE_GRAPH_ERROR_ENTER_NODE,
     };
 
+    /**
+     * unset type
+     */
+    constexpr int TypeUnSet = -1;
+
+    /**
+     * 
+     */
     enum TypeIntValues {
+        IntTypeVoid = 0,
         IntTypeProcess = 1,
 
         IntTypeInt = 100,
@@ -117,6 +126,7 @@ namespace sight {
         bool entityInfoWindow = false;
         bool generateResultWindow = false;
         bool terminalWindow = false;
+        bool codeSetSettingsWindow = false;
 
         bool layoutReset = false;
 
