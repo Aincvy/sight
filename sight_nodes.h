@@ -131,7 +131,26 @@ namespace sight {
         void stringFree();
     };
 
+    /**
+     * 
+     */
     struct SightNodePortOptions {
+        bool typeList = false;
+        char* varName = nullptr;
+        short varNameLength = 0;
+
+        ~SightNodePortOptions();
+
+        void initVarName(); 
+
+        SightNodePortOptions& operator=(SightNodePortOptions const& rhs);
+
+    private:
+        void freeVarName();
+
+    };
+
+    struct SightBaseNodePortOptions {
         bool showValue = false;
         // if false, this node port will be hidden.
         bool show = true;
@@ -139,6 +158,8 @@ namespace sight {
         std::string errorMsg;
         // render as a combo box 
         std::vector<std::string> alternatives;
+        // show as a type list
+        bool typeList = false;
     };
 
 
@@ -146,7 +167,7 @@ namespace sight {
         std::string portName;
         // input/output ...
         NodePortType kind;
-        SightNodePortOptions options;
+        SightBaseNodePortOptions options;
 
         uint type;
 
@@ -179,6 +200,8 @@ namespace sight {
         // last value.
         SightNodeValue oldValue;
         
+        SightNodePortOptions ownOptions;
+
         // connections
         std::vector<SightNodeConnection*> connections;
         SightNode* node = nullptr;

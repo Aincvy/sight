@@ -670,6 +670,19 @@ namespace sight {
         return this->codeSetSettings;
     }
 
+    void Project::resetTypeListCache() {
+        typeListCache.clear();
+        typeListCache.reserve(typeMap.size());
+        
+        for (auto const& item : typeMap) {
+            typeListCache.push_back(item.first);
+        }
+    }
+
+    std::vector<std::string> const& Project::getTypeListCache() const {
+        return typeListCache;
+    }
+
     std::string Project::pathPluginsFolder() const {
         return baseDir + "plugins/";
     }
@@ -934,6 +947,8 @@ namespace sight {
         }
         typeInfoMap[info.intValue] = info;
         typeMap[info.name] = info.intValue;
+
+        resetTypeListCache();
         return info.intValue;
     }
 

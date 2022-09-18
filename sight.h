@@ -94,8 +94,8 @@ namespace sight {
      * 
      */
     enum TypeIntValues {
-        IntTypeVoid = 0,
         IntTypeProcess = 1,
+        IntTypeVoid = 2,
 
         IntTypeInt = 100,
         IntTypeFloat,

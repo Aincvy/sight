@@ -124,7 +124,7 @@ namespace sight {
 
     struct SightEntityFieldOptions {
         NodePortType portType = NodePortType::Both;
-        SightNodePortOptions portOptions;
+        SightBaseNodePortOptions portOptions;
 
         int portTypeValue() const;
     };
@@ -347,6 +347,9 @@ namespace sight {
         SightCodeSetSettings& getSightCodeSetSettings();
         SightCodeSetSettings const& getSightCodeSetSettings() const;
 
+        void resetTypeListCache(); 
+        std::vector<std::string> const& getTypeListCache() const;
+
     private:
         std::string baseDir;
         bool createIfNotExist;
@@ -365,6 +368,9 @@ namespace sight {
         absl::btree_map<std::string, BuildTarget> buildTargetMap;
         // key: entity full name
         absl::btree_map<std::string, SightEntity> entitiesMap;
+
+        // cache for all type names 
+        std::vector<std::string> typeListCache;
 
         // file locations
         std::string pathConfigFile() const;

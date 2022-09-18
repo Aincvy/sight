@@ -393,6 +393,7 @@ for(const item of a) {
                 title += (c++);
                 g_UIStatus->toastController.toast(title, "Content");
             }
+
             ImGui::End();
 
         }
@@ -1910,12 +1911,36 @@ for(const item of a) {
         }
 
         auto nodeWork = [](std::vector<SightNodePort> & list, bool showValue, bool alwaysShow) {
-            for( auto& item: list){
-                if (alwaysShow || (showValue && item.options.showValue)) {
+            for( auto& item: list){                
+                if (alwaysShow || (showValue && item.options.showValue) || item.options.typeList) {
                     ImGui::Text("%7s: ", item.portName.c_str());
                     ImGui::SameLine();
-                    showNodePortValue(&item);
+                    if (item.options.typeList)
+                    {
+                        // 
+                        // ImGui::InputText("##name", char *buf, size_t buf_size)
+                        // ImGui::SameLine();
+                        if (ImGui::Button(ICON_MD_SEARCH "##toggle_type_list"))
+                        {
+                            item.ownOptions.typeList = !item.ownOptions.typeList;
+                        }
+                    } else {
+                        showNodePortValue(&item);
+                    }
                 }
+
+                if(item.ownOptions.typeList) {
+                    std::string typeName = getTypeName(item.type);
+                    if (showTypeList(typeName))
+                    {
+                        auto tmpType = getIntType(typeName);
+                        if(tmpType != 0){
+                            logDebug("change port $0 type from $1 to $2, now type name: $3", item.id, item.type, tmpType, typeName);
+                            item.type = tmpType;
+                            item.ownOptions.typeList = false;
+                        }
+                    }
+                } 
             }
         };
 

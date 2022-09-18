@@ -117,7 +117,7 @@ namespace sight {
      */
     bool showNodePortType(NodePortType& portType);
 
-    void showPortOptions(SightNodePortOptions& options);
+    void showPortOptions(SightBaseNodePortOptions& options);
 
     void showGraphSettings();
 
@@ -130,5 +130,10 @@ namespace sight {
      * 
      */
     void uiReloadGraph();
+
+    /**
+     * show type list as a combo box.
+     */
+    bool showTypeList(std::string& currentValue); 
 
 }

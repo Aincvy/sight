@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <iterator>
@@ -2504,6 +2505,40 @@ namespace sight {
           function(f)
     {
         
+    }
+
+    SightNodePortOptions::~SightNodePortOptions()
+    {
+        freeVarName();
+    }
+
+    void SightNodePortOptions::initVarName() {
+        if(varNameLength > 0) {
+            return;
+        }
+
+        varNameLength = NAME_BUF_SIZE;
+        varName = (char*)calloc(1, sizeof(char) * varNameLength);
+    }
+
+    SightNodePortOptions& SightNodePortOptions::operator=(SightNodePortOptions const& rhs) {
+        if(this != &rhs) {
+            this->typeList = rhs.typeList;
+
+            if(this->typeList){
+                initVarName();
+                sprintf(varName, "%s", rhs.varName);
+            }
+        }
+        return *this;
+    }
+
+    void SightNodePortOptions::freeVarName() {
+        if(varNameLength > 0){
+            free(varName);
+            varName = nullptr;
+            varNameLength = 0;
+        }
     }
 
 

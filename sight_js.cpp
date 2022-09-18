@@ -1115,6 +1115,11 @@ namespace sight {
                         port.options.show = v8pp::from_v8<bool>(isolate, tempVal);
                     }
 
+                    temp = option->Get(context, v8pp::to_v8(isolate, "typeList"));
+                    if (!temp.IsEmpty() && ((tempVal = temp.ToLocalChecked())->IsBoolean())) {
+                        port.options.typeList = v8pp::from_v8<bool>(isolate, tempVal);
+                    }
+
                     temp = option->Get(context, v8pp::to_v8(isolate, "defaultValue"));
                     if (!temp.IsEmpty() && !(tempVal = temp.ToLocalChecked())->IsNullOrUndefined()) {
                         setPortValue(isolate, &port, tempVal);
@@ -1617,12 +1622,12 @@ namespace sight {
             .set_const("Field", static_cast<int>(NodePortType::Field));
         module.set("NodePortType", jsNodePortTypeEnum);
 
-        v8pp::class_<SightNodePortOptions> nodePortOptionsClass(isolate);
+        v8pp::class_<SightBaseNodePortOptions> nodePortOptionsClass(isolate);
         nodePortOptionsClass
             .ctor<>()
-            .set("show", &SightNodePortOptions::show)
-            .set("showValue", &SightNodePortOptions::showValue)
-            .set("errorMsg", &SightNodePortOptions::errorMsg);
+            .set("show", &SightBaseNodePortOptions::show)
+            .set("showValue", &SightBaseNodePortOptions::showValue)
+            .set("errorMsg", &SightBaseNodePortOptions::errorMsg);
         nodePortOptionsClass.auto_wrap_objects(true);
         module.set("SightNodePortOptions", nodePortOptionsClass);
 

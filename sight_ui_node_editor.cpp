@@ -1,6 +1,8 @@
 #include "IconsMaterialDesign.h"
+#include "sight_defines.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <math.h>
 
 #define IMGUI_DEFINE_MATH_OPERATORS
@@ -1104,6 +1106,8 @@ namespace sight {
     }
 
     void showNodePortValue(SightNodePort* port, bool fromGraph, int width, int type) {
+        // do not handle type-list-port
+        assert(!port->options.typeList);
         if (port->type > 0 && port->getType() != port->type) {
             // fake type, do not show it's value.
             return;
@@ -1536,7 +1540,7 @@ namespace sight {
         return f;
     }
 
-    void showPortOptions(SightNodePortOptions& options) {
+    void showPortOptions(SightBaseNodePortOptions& options) {
         ToggleButton("Show", &options.show);
         ImGui::SameLine();
         ImGui::Text("Show");
@@ -1718,6 +1722,23 @@ namespace sight {
             disposeGraph();
             uiChangeGraph(path);
         }
+    }
+
+    bool showTypeList(std::string& currentValue) {
+        bool flag = false;
+        if(ImGui::BeginCombo("##TypeList", currentValue.c_str())){
+            auto p = currentProject();
+            for(auto const&  item: p->getTypeListCache()) {
+                if(ImGui::Selectable(item.c_str(), item == currentValue)){
+                    currentValue = item;
+                    flag = true;
+                }
+            }
+
+            ImGui::EndCombo();
+        }
+
+        return flag;
     }
 
     bool isNodeEditorReady() {
