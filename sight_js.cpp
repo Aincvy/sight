@@ -1120,6 +1120,15 @@ namespace sight {
                         port.options.typeList = v8pp::from_v8<bool>(isolate, tempVal);
                     }
 
+                    temp = option->Get(context, v8pp::to_v8(isolate, "dynamic"));
+                    if (!temp.IsEmpty() && ((tempVal = temp.ToLocalChecked())->IsBoolean())) {
+                        port.options.dynamic = v8pp::from_v8<bool>(isolate, tempVal);
+                    }
+
+                    if(port.options.dynamic && nodePortType != NodePortType::Output) {
+                        logDebug("portName $0, it's nodePortType is $1, it cannot be dynamic, ignore.", portName, nodePortType);
+                    }
+
                     temp = option->Get(context, v8pp::to_v8(isolate, "defaultValue"));
                     if (!temp.IsEmpty() && !(tempVal = temp.ToLocalChecked())->IsNullOrUndefined()) {
                         setPortValue(isolate, &port, tempVal);

@@ -187,7 +187,6 @@ namespace sight {
         return this->type;
     }
 
-
     void SightNode::addPort(const SightNodePort &port) {
         if (port.kind == NodePortType::Input) {
             this->inputPorts.push_back(port);
@@ -203,6 +202,23 @@ namespace sight {
             this->fields.push_back(port);
         }
 
+    }
+
+    void SightNode::addNewPort(std::string_view name, NodePortType kind, uint type, const SightJsNodePort* templateNodePort) {
+        assert(kind != NodePortType::Both);
+
+        SightNodePort port(kind, type, templateNodePort);
+        port.portName = name;
+        port.id = nextNodeOrPortId();
+
+        addPort(port);
+        if(graph){
+            graph->addPortId(port);
+        }
+    }
+
+    void SightNode::addNewPort(std::string_view name, SightNodePort& from) {
+        addNewPort(name, from.kind, from.type, from.templateNodePort);
     }
 
     SightNodePort* SightNode::getOppositeTitleBarPort(NodePortType type) const {
@@ -1350,6 +1366,14 @@ namespace sight {
 
     std::string_view SightNodeGraph::getName() const {
         return settings.graphName;
+    }
+
+    void SightNodeGraph::addPortId(SightNodePort const& port) {
+        idMap[port.getId()] = {
+            SightAnyThingType::Port,
+            port.node,
+            port.getId()
+        };
     }
 
     SightNode *SightAnyThingWrapper::asNode() const {

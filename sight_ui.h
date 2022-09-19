@@ -3,6 +3,7 @@
 #pragma once
 #include "imgui.h"
 #include "sight_colors.h"
+#include "sight_defines.h"
 #include "sight_log.h"
 #include "uv.h"
 
@@ -192,6 +193,7 @@ namespace sight {
         char littleName[LITTLE_NAME_BUF_SIZE] {0};
         char name[NAME_BUF_SIZE]{0};
         char entityListSearch[TINY_NAME_BUF_SIZE]{ 0 };
+        char customPortName[NAME_BUF_SIZE] {0};
     };
 
     struct ModalAskData {

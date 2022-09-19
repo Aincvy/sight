@@ -548,6 +548,7 @@ namespace sight {
                 ImGui::SameLine();
             }
 
+            // outputs 
             ImGui::BeginGroup();
             for (SightNodePort& item : node->outputPorts) {
                 if (item.portName.empty() || !item.options.show) {
@@ -574,34 +575,40 @@ namespace sight {
                     }
                 }
 
-                if (isNodePortShowValue(item)) {
-                    showNodePortValue(&item, true, nodeStyle.outputStype.inputWidth);
-                    ImGui::SameLine();
-                }
-
-                ed::BeginPin(item.id, ed::PinKind::Output);
-                ed::PinPivotAlignment(ImVec2(1.0f, 0.5f));
-                ed::PinPivotSize(ImVec2(0, 0));
-                // if (!node->templateNode->bothPortList.contains(item.portName)) {
-                //     ImGui::Text("%8s", item.portName.c_str());
-                //     ImGui::SameLine();
-                // }
-                auto alpha = getAlpha(item);
-                ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha / 255.f);
-                ImGui::Text("%-*s", nodeStyle.outputStype.maxCharSize, item.portName.c_str());
-                ImGui::PopStyleVar();
-                ImGui::SameLine();
-
-                // port icon
-                // use fake type here
-                auto [tmpTypeInfo, find] = project->findTypeInfo(item.type);
-                if (!find || !tmpTypeInfo.style) {
-                    showNodePortIcon(IconType::Circle, color, item.isConnect(), alpha);
+                if(item.options.dynamic) {
+                    // dynamic port
+                    showDynamicRootPort(item, nodeStyle.outputStype.maxCharSize);
                 } else {
-                    showNodePortIcon(tmpTypeInfo.style->iconType, tmpTypeInfo.style->color, item.isConnect(), alpha);
-                }
+                    // common port 
+                    if (isNodePortShowValue(item)) {
+                        showNodePortValue(&item, true, nodeStyle.outputStype.inputWidth);
+                        ImGui::SameLine();
+                    }
 
-                ed::EndPin();
+                    ed::BeginPin(item.id, ed::PinKind::Output);
+                    ed::PinPivotAlignment(ImVec2(1.0f, 0.5f));
+                    ed::PinPivotSize(ImVec2(0, 0));
+                    // if (!node->templateNode->bothPortList.contains(item.portName)) {
+                    //     ImGui::Text("%8s", item.portName.c_str());
+                    //     ImGui::SameLine();
+                    // }
+                    auto alpha = getAlpha(item);
+                    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha / 255.f);
+                    ImGui::Text("%-*s", nodeStyle.outputStype.maxCharSize, item.portName.c_str());
+                    ImGui::PopStyleVar();
+                    ImGui::SameLine();
+
+                    // port icon
+                    // use fake type here
+                    auto [tmpTypeInfo, find] = project->findTypeInfo(item.type);
+                    if (!find || !tmpTypeInfo.style) {
+                        showNodePortIcon(IconType::Circle, color, item.isConnect(), alpha);
+                    } else {
+                        showNodePortIcon(tmpTypeInfo.style->iconType, tmpTypeInfo.style->color, item.isConnect(), alpha);
+                    }
+
+                    ed::EndPin();
+                }
             }
 
             ImGui::EndGroup();
@@ -1739,6 +1746,45 @@ namespace sight {
         }
 
         return flag;
+    }
+
+    void showDynamicRootPort(SightNodePort& item, int fmtCharSize) {
+        ImGui::Text("%-*s", fmtCharSize, item.portName.c_str());
+        ImGui::SameLine();
+        if(ImGui::Button(ICON_MD_ADD "##add-dynamic-port")){
+            if(item.ownOptions.showAddChild ) {
+                item.ownOptions.showAddChild = false;
+            } else {
+                hideAllAddChild(currentGraph());
+                item.ownOptions.showAddChild = true;
+                sprintf(currentUIStatus()->buffer.customPortName, "");
+            }
+        }
+        if(item.ownOptions.showAddChild) {
+            auto& buffer = currentUIStatus()->buffer;
+            ImGui::InputText("##add-dynamic-port-child", buffer.customPortName, std::size(buffer.customPortName));
+            ImGui::SameLine();
+            if (ImGui::Button(ICON_MD_DONE "##add-dynamic-port-done"))
+            {
+                item.node->addNewPort(buffer.customPortName, item);
+            }
+        }
+    }
+
+    void hideAllAddChild(SightNodeGraph* graph) {
+        if(!graph) {
+            return;
+        }
+
+        auto nodeFunc = [](std::vector<SightNodePort> & list) {
+            for(auto& item : list){
+                item.ownOptions.showAddChild = false;
+            }
+        };
+
+        for(auto & node : graph->getNodes()) {
+            CALL_NODE_FUNC(&node);
+        }
     }
 
     bool isNodeEditorReady() {

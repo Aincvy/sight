@@ -136,8 +136,12 @@ namespace sight {
      */
     struct SightNodePortOptions {
         bool typeList = false;
+        // if this is a dynamic port, showAddChild will show a input text
+        bool showAddChild = false;
         char* varName = nullptr;
         short varNameLength = 0;
+
+        std::string customPortName;
 
         ~SightNodePortOptions();
 
@@ -160,6 +164,8 @@ namespace sight {
         std::vector<std::string> alternatives;
         // show as a type list
         bool typeList = false;
+        // allow a port list? 
+        bool dynamic = false;
     };
 
 
@@ -351,11 +357,25 @@ namespace sight {
 
 
         /**
-         *
+         * this function do not record by id.
          * @param port
          */
         void addPort(const SightNodePort & port);
 
+        /**
+         * this is diff from `void addPort(const SightNodePort & port);`
+         * this will be generate new id for port and record it. (Which means user can find this port by it's id.)
+         */
+        void addNewPort(std::string_view name, NodePortType kind, uint type, const SightJsNodePort* templateNodePort = nullptr);
+
+        /**
+         * clone from @from
+         */
+        void addNewPort(std::string_view name, SightNodePort& from);
+
+        /**
+         * 
+         */
         SightNodePort* getOppositeTitleBarPort(NodePortType type) const;
 
         /**
@@ -903,6 +923,11 @@ namespace sight {
 
         void setName(std::string_view name);
         std::string_view getName() const;
+
+        /**
+         * add id to idMap
+         */
+        void addPortId(SightNodePort const& port);
 
     private:
 

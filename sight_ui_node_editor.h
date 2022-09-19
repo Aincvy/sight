@@ -136,4 +136,8 @@ namespace sight {
      */
     bool showTypeList(std::string& currentValue); 
 
+    void showDynamicRootPort(SightNodePort& item, int fmtCharSize);
+    
+    void hideAllAddChild(SightNodeGraph* graph);
+
 }
