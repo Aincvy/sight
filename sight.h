@@ -83,6 +83,7 @@ namespace sight {
         CODE_NODE_HAS_CONNECTIONS,
         CODE_GRAPH_NO_ENTER_NODE,
         CODE_GRAPH_ERROR_ENTER_NODE,
+        CODE_PORT_NAME_REPEAT,
     };
 
     /**

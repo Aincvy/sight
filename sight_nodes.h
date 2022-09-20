@@ -138,6 +138,8 @@ namespace sight {
         bool typeList = false;
         // if this is a dynamic port, showAddChild will show a input text
         bool showAddChild = false;
+        // is this port a dynamic port? 
+        bool dynamicPort = false;
         char* varName = nullptr;
         short varNameLength = 0;
 
@@ -208,6 +210,8 @@ namespace sight {
         
         SightNodePortOptions ownOptions;
 
+        // if this is a dynamic port, `parent` is which one current port fork from.
+        uint parent = 0;
         // connections
         std::vector<SightNodeConnection*> connections;
         SightNode* node = nullptr;
@@ -366,12 +370,12 @@ namespace sight {
          * this is diff from `void addPort(const SightNodePort & port);`
          * this will be generate new id for port and record it. (Which means user can find this port by it's id.)
          */
-        void addNewPort(std::string_view name, NodePortType kind, uint type, const SightJsNodePort* templateNodePort = nullptr);
+        int addNewPort(std::string_view name, NodePortType kind, uint type, const SightJsNodePort* templateNodePort = nullptr, uint parent = 0);
 
         /**
          * clone from @from
          */
-        void addNewPort(std::string_view name, SightNodePort& from);
+        int addNewPort(std::string_view name, SightNodePort& from);
 
         /**
          * 
@@ -592,7 +596,7 @@ namespace sight {
         constexpr static int numberTypeLength = 100;
         constexpr static int vector3TypeLength = 200;
         constexpr static int charTypeLength = 20;
-
+        constexpr static int minNameInputLen = 16;
     };
 
     struct SightNodeStyle{
@@ -789,7 +793,7 @@ namespace sight {
         ~SightNodeGraph();
 
         /**
-         *
+         * 
          * @param leftPortId
          * @param rightPortId
          * @return If create success, the connection's id.

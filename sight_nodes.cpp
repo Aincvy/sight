@@ -17,6 +17,7 @@
 #include <atomic>
 #include <algorithm>
 #include <fstream>
+#include <yaml-cpp/emittermanip.h>
 
 #include "sight_js_parser.h"
 #include "sight_nodes.h"
@@ -200,25 +201,55 @@ namespace sight {
             this->outputPorts.back().id = nextNodeOrPortId();
         } else if (port.kind == NodePortType::Field) {
             this->fields.push_back(port);
+        } else {
+            logError("unHandle port kind: $0", port.kind);
         }
 
     }
 
-    void SightNode::addNewPort(std::string_view name, NodePortType kind, uint type, const SightJsNodePort* templateNodePort) {
+    int SightNode::addNewPort(std::string_view name, NodePortType kind, uint type, const SightJsNodePort* templateNodePort, uint parent) {
         assert(kind != NodePortType::Both);
-
+        if (kind == NodePortType::Input) {
+            for(auto const& item: this->inputPorts){
+                if(item.portName == name){
+                    return CODE_PORT_NAME_REPEAT;
+                }
+            }
+        } else if (kind == NodePortType::Output) {
+            for(auto const& item: this->outputPorts){
+                if(item.portName == name){
+                    return CODE_PORT_NAME_REPEAT;
+                }
+            }
+        } else if (kind == NodePortType::Field) {
+            for(auto const& item: this->fields){
+                if(item.portName == name){
+                    return CODE_PORT_NAME_REPEAT;
+                }
+            }
+        } else {
+            assert(false);
+        }
+        
         SightNodePort port(kind, type, templateNodePort);
         port.portName = name;
+        logDebug("add new port: $0", port.portName);
+        port.node = this;
         port.id = nextNodeOrPortId();
+        port.parent = parent;
+        port.ownOptions.dynamicPort = true;
 
         addPort(port);
         if(graph){
             graph->addPortId(port);
+            graph->markDirty();
         }
+
+        return CODE_OK;
     }
 
-    void SightNode::addNewPort(std::string_view name, SightNodePort& from) {
-        addNewPort(name, from.kind, from.type, from.templateNodePort);
+    int SightNode::addNewPort(std::string_view name, SightNodePort& from) {
+        return addNewPort(name, from.kind, from.type, from.templateNodePort, from.getId());
     }
 
     SightNodePort* SightNode::getOppositeTitleBarPort(NodePortType type) const {
@@ -878,8 +909,11 @@ namespace sight {
             for (const auto &item : connectionRoot) {
                 auto connectionId = item.first.as<int>();
                 item.second >> tmpConnection;
-                createConnection(tmpConnection.left, tmpConnection.right, connectionId, tmpConnection.priority);
-                findConnection(connectionId)->generateCode = tmpConnection.generateCode;
+                auto code = createConnection(tmpConnection.left, tmpConnection.right, connectionId, tmpConnection.priority);
+                assert(code > 0);
+                auto con = findConnection(connectionId);
+                assert(con);
+                con->generateCode = tmpConnection.generateCode;
             }
 
             // settings
@@ -1257,7 +1291,7 @@ namespace sight {
             *copyTo = *result;
         }
         nodes.erase(result);
-        this->editing = true;
+        markDirty();
         return CODE_OK;
     }
 
@@ -1278,7 +1312,7 @@ namespace sight {
             *copyTo = *result;
         }
         connections.erase(result);
-        logDebug(id);
+        markDirty();
         return CODE_OK;
     }
 
@@ -1700,6 +1734,10 @@ namespace sight {
             out << YAML::Key << "name" << YAML::Value << item.portName;
             out << YAML::Key << "type" << YAML::Value << item.type;
 
+            if(item.parent){
+                out << YAML::Key << "parent" << YAML::Value << item.parent;
+            }
+
             auto type = item.getType();
             out << YAML::Key << "value" << YAML::Value;
             switch (type) {
@@ -1755,6 +1793,11 @@ namespace sight {
                 break;
             }
             }
+
+            out << YAML::Key << "options" << YAML::BeginMap;
+            out << YAML::Key << "customPortName" << YAML::Value << item.ownOptions.customPortName ;
+            out << YAML::Key << "dynamicPort" << YAML::Value << item.ownOptions.dynamicPort ;
+            out << YAML::EndMap;
 
             out << YAML::EndMap;
         };
@@ -1850,13 +1893,29 @@ namespace sight {
             type = typeNode.as<uint>();
         }
 
+        auto optionsYamlNode = values["options"];
+        auto dynamicPort = false;
+        std::string customPortName = "";
+        if (optionsYamlNode.IsDefined())
+        {
+            dynamicPort = optionsYamlNode["dynamicPort"].as<bool>();
+            customPortName = optionsYamlNode["customPortName"].as<std::string>();
+        }
+
         SightNodePort* pointer = nullptr;
-        for (auto& item : list) {
-            if (item.portName == portName) {
-                pointer = &item;
-                break;
+        if(dynamicPort) {
+            // 
+            list.push_back({});
+            pointer = & (list.back());
+        } else {
+            for (auto& item : list) {
+                if (item.portName == portName) {
+                    pointer = &item;
+                    break;
+                }
             }
         }
+        
         if (!pointer) {
             logDebug("$0 not found", portName);
             return CODE_FAIL;
@@ -1937,6 +1996,17 @@ namespace sight {
         }
 
         port.oldValue = port.value;
+
+        if(!customPortName.empty()){
+            port.ownOptions.customPortName = customPortName;
+        }
+        port.ownOptions.dynamicPort = dynamicPort;
+        auto parentNode = values["parent"];
+        if (parentNode.IsDefined())
+        {
+            port.parent = parentNode.as<uint>();
+        }
+
         return CODE_OK;
     }
 

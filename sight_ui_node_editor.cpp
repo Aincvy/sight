@@ -1,8 +1,10 @@
 #include "IconsMaterialDesign.h"
 #include "sight_defines.h"
+#include "sight_log.h"
 
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <math.h>
 
 #define IMGUI_DEFINE_MATH_OPERATORS
@@ -1056,7 +1058,12 @@ namespace sight {
     }
 
     void setNodePos(SightNode* node, ImVec2 pos) {
-        node->position = convert(pos);
+        auto target = convert(pos);
+        if(target.x == pos.x && target.y == pos.y) {
+            return;
+        }
+        node->position = target;
+        node->graph->markDirty();
     }
 
     void setNodePos(SightNode& node, ImVec2 pos) {
@@ -1468,6 +1475,7 @@ namespace sight {
     int uiAddConnection(uint left, uint right, uint id, int priority) {
         auto graph = currentGraph();
         auto connectionId = graph->createConnection(left, right, id, priority);
+        graph->markDirty();
         if (connectionId > 0) {
             auto connection = graph->findConnection(id);
             onConnect(connection);
@@ -1762,11 +1770,17 @@ namespace sight {
         }
         if(item.ownOptions.showAddChild) {
             auto& buffer = currentUIStatus()->buffer;
+            ImGui::SetNextItemWidth(ImGui::CalcTextSize("A").x * std::max(SightNodeFixedStyle::minNameInputLen, fmtCharSize));
             ImGui::InputText("##add-dynamic-port-child", buffer.customPortName, std::size(buffer.customPortName));
             ImGui::SameLine();
             if (ImGui::Button(ICON_MD_DONE "##add-dynamic-port-done"))
             {
-                item.node->addNewPort(buffer.customPortName, item);
+                if(strlen(buffer.customPortName) > 0) {
+                    item.node->addNewPort(buffer.customPortName, item);
+                    sprintf(buffer.customPortName, "");
+                }  else{
+                    toast("need a name", "");
+                }
             }
         }
     }
