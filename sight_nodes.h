@@ -475,6 +475,11 @@ namespace sight {
         
         bool addComponent(SightNode* sightNode);
 
+        /**
+         * find all children ports in this node.
+         */
+        std::vector<uint> findChildrenPorts(uint parentPortId) const;
+        
     protected:
         enum class CopyFromType {
             Clone,

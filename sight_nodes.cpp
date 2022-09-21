@@ -552,6 +552,20 @@ namespace sight {
         return true;
     }
 
+    std::vector<uint> SightNode::findChildrenPorts(uint parentPortId) const {
+        std::vector<uint> result;
+        auto nodeFunc = [&result, parentPortId](std::vector<SightNodePort> const& list) {
+            for(const auto& item: list) {
+                if(item.parent == parentPortId) {
+                    result.push_back(item.getId());
+                }
+            }
+        };
+
+        CALL_NODE_FUNC(this);
+        return result;
+    }
+
     SightJsNode::SightJsNode() {
 
     }
