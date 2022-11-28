@@ -118,3 +118,4 @@ sight.entity.addOperation('templateNode', 'generate addTemplateNode() function c
 
 // java 
 execute('part-java.js');
+execute('part-vue.js');

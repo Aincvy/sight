@@ -107,8 +107,7 @@ target_link_libraries(
         absl::hash
         absl::flat_hash_map
         absl::flat_hash_set
-        absl::btree
-        
+        absl::btree       
 )
 
 # nativefiledialog-extended
