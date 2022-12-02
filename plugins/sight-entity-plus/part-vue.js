@@ -35,6 +35,7 @@ export const FETCH_<%=constantName%> = "fetch<%=entity.simpleName%>";
 export const ADD_<%=constantName%> = "add<%=entity.simpleName%>";
 export const DEL_<%=constantName%> = "del<%=entity.simpleName%>";
 export const SET_<%=constantName%> = "set<%=entity.simpleName%>";
+export const QUERY_<%=constantName%> = "query<%=entity.simpleName%>";
 export const SET_<%=constantName%>_LIST = "set<%=entity.simpleName%>List";
 
 // put in <%=varName%>.module.js
@@ -49,7 +50,7 @@ import {
 import { <%=entity.simpleName%>Service } from "../common/api.service";
 import { methods } from "../common/constants";
 import ErrorCode from "../common/errorcode";
-
+import Vue from "vue";
 
 const state = {
     <%=varName%>List: []
@@ -100,6 +101,15 @@ const actions = {
             methods.callFunction(callback, data);
         });
     },
+    [QUERY_<%=constantName%>]({commit}, id){
+        <%=entity.simpleName%>Service.query<%=entity.simpleName%>(id, function(data){
+            if (typeof data.code !== 'undefined') {
+                console.log(JSON.stringify(data));
+            } else {
+                commit(SET_<%=constantName%>, data);
+            }
+        });
+    },
 }
 
 const mutations = {
@@ -121,7 +131,10 @@ const mutations = {
     [SET_<%=constantName%>](state, item) {
         let index = state.<%=varName%>List.findIndex(i => i.id === item.id);
         if(index >= 0) {
-            state[index] = item;
+            // state.<%=varName%>List[index] = item;
+            Vue.set(state.<%=varName%>List, index, item);
+        } else  {
+            state.<%=varName%>List.push(item);
         }
     }
 
@@ -193,12 +206,15 @@ function listVueComponents(entity) {
                     <% } %>
                     <td>
                         <div class="ui tiny icon buttons">
-                            <button class="ui button" @click="askDelete<%=entity.simpleName%>(item)">
+                            <button class="ui button" @click="askDelete<%=entity.simpleName%>(item)" title="delete">
                                 <i class="trash icon"></i>
                             </button>
 
-                            <button class="ui button" @click="routeToEdit(item)">
+                            <button class="ui button" @click="routeToEdit(item)" title="edit">
                                 <i class="edit icon"></i>
+                            </button>
+                            <button class="ui button" @click="duplicate(item)" title="duplicate">
+                                <i class="copy icon"></i>
                             </button>
                         </div>
                     </td>
@@ -215,7 +231,8 @@ function listVueComponents(entity) {
 
 import {
     FETCH_<%=constantName%>,
-    DEL_<%=constantName%>
+    DEL_<%=constantName%>,
+    ADD_<%=constantName%>, 
 } from "@/store/store.types";
 
 import CommonDialog from "@/components/modal/CommonDialog";
@@ -282,6 +299,16 @@ export default {
                 params: {
                     editId: item.id
                 }
+            });
+        },
+
+        duplicate(item) {
+            let copy = JSON.parse(JSON.stringify(item));
+            copy.id = 0;
+
+            this.$store.dispatch(ADD_<%=constantName%>, {
+                item: copy,
+                callback: undefined
             });
         },
 
@@ -400,6 +427,15 @@ export default {
             let status = this.status;
 
             let isEditItem = this.isEditItem;
+
+            <% for(const field of entity.fields) {  %>
+                if(!<%=varName%>.<%=field.name%>) {
+                    status.<%=field.name%> = true;
+                    return ;
+                }
+            <% } %>
+
+
             function callback(data) {
                 if (data.code === ErrorCode.OK) {
                     status.showSuccess = true;

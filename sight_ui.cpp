@@ -749,7 +749,7 @@ for(const item of a) {
                             bool oldSelected = createEntityData.selectedFieldIndex == index;
                             sprintf(buf, "##.%d", inputTextId++);
                             if (ImGui::Selectable(buf, oldSelected, ImGuiSelectableFlags_SpanAllColumns)) {
-                                if (!ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKeyModFlags_Ctrl))) {
+                                if (!ImGui::IsKeyDown(ImGui::GetKeyIndex(ImGuiKey_LeftCtrl))) {
                                     g_UIStatus->createEntityData.resetFieldsStatus(true, true);
                                 }
                                 createEntityData.selectedFieldIndex = index;
