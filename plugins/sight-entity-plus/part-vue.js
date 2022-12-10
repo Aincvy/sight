@@ -28,6 +28,10 @@ export const <%=entity.simpleName%>Service = {
         ApiService.query('/list/' + \`<%=varName%>/\${pageSize}/\${pageIndex}\` , callback);
     },
 
+    fetch<%=entity.simpleName%>(callback) {
+        ApiService.query(\`/list/all/<%=varName%>\`, callback);
+    },
+
 };
 
 // put in store.types.js
@@ -37,6 +41,7 @@ export const DEL_<%=constantName%> = "del<%=entity.simpleName%>";
 export const SET_<%=constantName%> = "set<%=entity.simpleName%>";
 export const QUERY_<%=constantName%> = "query<%=entity.simpleName%>";
 export const SET_<%=constantName%>_LIST = "set<%=entity.simpleName%>List";
+export const PAGE_<%=constantName%> = "page<%=entity.simpleName%>";
 
 // put in <%=varName%>.module.js
 
@@ -46,6 +51,8 @@ import {
     DEL_<%=constantName%>,
     SET_<%=constantName%>,
     SET_<%=constantName%>_LIST,
+    QUERY_<%=constantName%>,
+    PAGE_<%=constantName%>,
 } from "./store.types";
 import { <%=entity.simpleName%>Service } from "../common/api.service";
 import { methods } from "../common/constants";
@@ -53,22 +60,34 @@ import ErrorCode from "../common/errorcode";
 import Vue from "vue";
 
 const state = {
-    <%=varName%>List: []
+    <%=varName%>List: [],
+    <%=varName%>DataLoad: false,
+    <%=varName%>Page: [],
 }
 
 const getters = {
     <%=varName%>List: state => state.<%=varName%>List,
 
     find<%=entity.simpleName%>: state => id => {
+        id = parseInt(id);
         return state.<%=varName%>List.find( i => i.id === id);
-    }
+    },
 
+    <%=varName%>Page: state => state.<%=varName%>Page,
 }
 
 const actions = {
-    [FETCH_<%=constantName%>]({commit}, pageIndex) {
-        <%=entity.simpleName%>Service.list<%=entity.simpleName%>(pageIndex, function (data) {
+    [FETCH_<%=constantName%>]({commit, state}, pageIndex) {
+        if(state.<%=varName%>DataLoad){
+            return 
+        }
+        <%=entity.simpleName%>Service.fetch<%=entity.simpleName%>(function (data) {
             commit(SET_<%=constantName%>_LIST, data);
+        });
+    },
+    [PAGE_<%=constantName%>]({commit, state}, pageIndex){
+        <%=entity.simpleName%>Service.list<%=entity.simpleName%> (pageIndex, function (data) {
+            commit(PAGE_<%=constantName%>, data);
         });
     },
 
@@ -115,6 +134,7 @@ const actions = {
 const mutations = {
     [SET_<%=constantName%>_LIST](state, data) {
         state.<%=varName%>List = data;
+        state.<%=varName%>DataLoad = true;
     },
 
     [DEL_<%=constantName%>](state, id){
@@ -122,10 +142,16 @@ const mutations = {
         if(index >= 0) {
             state.<%=varName%>List.splice(index, 1);
         }
+
+        index = state.<%=varName%>Page.findIndex(i => i.id === id);
+        if (index >= 0) {
+            state.<%=varName%>Page.splice(index, 1);
+        }
     },
 
     [ADD_<%=constantName%>](state, item) {
         state.<%=varName%>List.push(item);
+        state.<%=varName%>Page.push(item);
     },
 
     [SET_<%=constantName%>](state, item) {
@@ -136,6 +162,10 @@ const mutations = {
         } else  {
             state.<%=varName%>List.push(item);
         }
+    },
+
+    [PAGE_<%=constantName%>](state, list) {
+        state.<%=varName%>Page = list;
     }
 
 }
@@ -167,6 +197,9 @@ export default {
         requiresAuth: true
     }
 }, 
+
+// put in store/index.js
+import <%=varName%> from './<%=varName%>.module'
 `;
 
     let func = _.template(str);
@@ -199,7 +232,7 @@ function listVueComponents(entity) {
                 </tr>
             </thead>
             <tbody>
-                <tr v-for="item in <%=varName%>List" :key="item.id">
+                <tr v-for="item in <%=varName%>Page" :key="item.id">
                     <td>{{ item.id }}</td>
                     <% for(const field of entity.fields) {  %>
                         <td>{{ item.<%=field.name%> }}</td>
@@ -221,6 +254,27 @@ function listVueComponents(entity) {
                 </tr>
             </tbody>
         </table>
+        
+        <div>
+            <div class="ui icon buttons" style="margin-right: 10px;">
+                <button class="ui button" title="prePage" :disabled="(pageIndex == 0)" @click="prePage">
+                    <i class="angle left icon"></i>
+                </button>
+                <button class="ui button">
+                    {{ pageIndex }}
+                </button>
+                <button class="ui button" title="nextPage" @click="nextPage">
+                    <i class="angle right icon"></i>
+                </button>
+            </div>
+
+            <div class="ui action input">
+                <input type="number" step="1" v-model="toPageIndex" placeholder="Input Page...">
+                <button class="ui button" @click="toPage">
+                    <i class="angle double right icon"></i>
+                </button>
+            </div>
+        </div>
 
         <CommonDialog :dialog-holder="initDialog" dialog-type="Remove">
         </CommonDialog>
@@ -233,6 +287,8 @@ import {
     FETCH_<%=constantName%>,
     DEL_<%=constantName%>,
     ADD_<%=constantName%>, 
+    PAGE_<%=constantName%>,
+
 } from "@/store/store.types";
 
 import CommonDialog from "@/components/modal/CommonDialog";
@@ -248,19 +304,26 @@ export default {
         return {
             dialogHolder: null,
             operatingItem: null,
+            pageIndex: 0,
+            toPageIndex: 0,
         }
     },
 
     mounted() {
-        this.$store.dispatch(FETCH_<%=constantName%>, 0);
+        // this.$store.dispatch(FETCH_<%=constantName%>, 0);
+        this.fetchPageData();
     },
 
     computed: {
-        ...mapGetters(['<%=varName%>List']),
+        ...mapGetters(['<%=varName%>Page']),
 
     },
 
     methods: {
+        fetchPageData() {
+            this.$store.dispatch(PAGE_<%=constantName%>, this.pageIndex);
+        },
+
         initDialog(dialog) {
             this.dialogHolder = dialog;
         },
@@ -312,6 +375,26 @@ export default {
             });
         },
 
+        nextPage() {
+            this.pageIndex++;
+            this.fetchPageData();
+        },
+
+        prePage() {
+            if (this.pageIndex > 0) {
+                this.pageIndex--;
+                this.fetchPageData();
+            }
+        },
+        toPage(){
+            if (this.toPageIndex < 0) {
+                this.toastError(this.toPageIndex + ' 不是一个有效的页码');
+                return;
+            }
+
+            this.pageIndex = this.toPageIndex;
+            this.fetchPageData();
+        },
     },
 
 };
@@ -383,6 +466,7 @@ export default {
     data() {
         return {
             <%=varName%>: {
+                id: 0,
                 <% for(const field of entity.fields) {  %>
                     <%=field.name%>: null, 
                 <% } %>
