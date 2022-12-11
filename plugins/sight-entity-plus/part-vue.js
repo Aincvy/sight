@@ -35,6 +35,7 @@ export const <%=entity.simpleName%>Service = {
 };
 
 // put in store.types.js
+export const MODULE_<%=constantName%> = "<%=entity.simpleName%>";
 export const FETCH_<%=constantName%> = "fetch<%=entity.simpleName%>";
 export const ADD_<%=constantName%> = "add<%=entity.simpleName%>";
 export const DEL_<%=constantName%> = "del<%=entity.simpleName%>";
@@ -42,6 +43,8 @@ export const SET_<%=constantName%> = "set<%=entity.simpleName%>";
 export const QUERY_<%=constantName%> = "query<%=entity.simpleName%>";
 export const SET_<%=constantName%>_LIST = "set<%=entity.simpleName%>List";
 export const PAGE_<%=constantName%> = "page<%=entity.simpleName%>";
+export const PAGE_INDEX_<%=constantName%> = "pageIndex<%=entity.simpleName%>";
+export const PAGE_HEAD_RECORD_<%=constantName%> = "pageHeadRecord<%=entity.simpleName%>";
 
 // put in <%=varName%>.module.js
 
@@ -53,6 +56,9 @@ import {
     SET_<%=constantName%>_LIST,
     QUERY_<%=constantName%>,
     PAGE_<%=constantName%>,
+    PAGE_INDEX_<%=constantName%>,
+    PAGE_HEAD_RECORD_<%=constantName%>,
+
 } from "./store.types";
 import { <%=entity.simpleName%>Service } from "../common/api.service";
 import { methods } from "../common/constants";
@@ -63,6 +69,9 @@ const state = {
     <%=varName%>List: [],
     <%=varName%>DataLoad: false,
     <%=varName%>Page: [],
+    // last page index,
+    <%=varName%>PageIndex: 0,
+    <%=varName%>PageHeadRecord: {},
 }
 
 const getters = {
@@ -74,10 +83,16 @@ const getters = {
     },
 
     <%=varName%>Page: state => state.<%=varName%>Page,
+    find<%=entity.simpleName%>InPage: state => id => {
+        id = parseInt(id);
+        return state.<%=varName%>Page.find( i => i.id === id);
+    },
+    <%=varName%>PageIndex: state => state.<%=varName%>PageIndex,
+    [PAGE_HEAD_RECORD_<%=constantName%>]: state => state.<%=varName%>PageHeadRecord,
 }
 
 const actions = {
-    [FETCH_<%=constantName%>]({commit, state}, pageIndex) {
+    [FETCH_<%=constantName%>]({commit, state}) {
         if(state.<%=varName%>DataLoad){
             return 
         }
@@ -85,10 +100,18 @@ const actions = {
             commit(SET_<%=constantName%>_LIST, data);
         });
     },
-    [PAGE_<%=constantName%>]({commit, state}, pageIndex){
-        <%=entity.simpleName%>Service.list<%=entity.simpleName%> (pageIndex, function (data) {
+    [PAGE_<%=constantName%>]({commit, state}, {pageStartId, pageSize}){
+        <%=entity.simpleName%>Service.list<%=entity.simpleName%> (pageStartId, function (data) {
             commit(PAGE_<%=constantName%>, data);
-        });
+        }, pageSize);
+    },
+    [PAGE_INDEX_<%=constantName%>]({commit}, index){
+        if (typeof index === 'number') {
+            commit(PAGE_INDEX_<%=constantName%>, index)
+        }
+    },
+    [PAGE_HEAD_RECORD_<%=constantName%>]({commit}, {pageIndex, elementId}){
+        commit(PAGE_HEAD_RECORD_<%=constantName%>, {pageIndex, elementId});
     },
 
     [DEL_<%=constantName%>]({commit}, {item, callback}) {
@@ -129,6 +152,7 @@ const actions = {
             }
         });
     },
+
 }
 
 const mutations = {
@@ -151,22 +175,34 @@ const mutations = {
 
     [ADD_<%=constantName%>](state, item) {
         state.<%=varName%>List.push(item);
-        state.<%=varName%>Page.push(item);
+        state.<%=varName%>Page.splice(0,0,item);
     },
 
     [SET_<%=constantName%>](state, item) {
         let index = state.<%=varName%>List.findIndex(i => i.id === item.id);
         if(index >= 0) {
-            // state.<%=varName%>List[index] = item;
             Vue.set(state.<%=varName%>List, index, item);
         } else  {
             state.<%=varName%>List.push(item);
+        }
+
+        index = state.<%=varName%>Page.findIndex(i => i.id === item.id);
+        if(index >= 0) {
+            Vue.set(state.<%=varName%>Page, index, item);
+        } else  {
+            state.<%=varName%>Page.push(item);
         }
     },
 
     [PAGE_<%=constantName%>](state, list) {
         state.<%=varName%>Page = list;
-    }
+    },
+    [PAGE_INDEX_<%=constantName%>](state, index){
+        state.<%=varName%>PageIndex = index;
+    },
+    [PAGE_HEAD_RECORD_<%=constantName%>](state, {pageIndex, elementId}){
+        state.<%=varName%>PageHeadRecord[pageIndex] = elementId;
+    },
 
 }
 
@@ -254,28 +290,10 @@ function listVueComponents(entity) {
                 </tr>
             </tbody>
         </table>
-        
-        <div>
-            <div class="ui icon buttons" style="margin-right: 10px;">
-                <button class="ui button" title="prePage" :disabled="(pageIndex == 0)" @click="prePage">
-                    <i class="angle left icon"></i>
-                </button>
-                <button class="ui button">
-                    {{ pageIndex }}
-                </button>
-                <button class="ui button" title="nextPage" @click="nextPage">
-                    <i class="angle right icon"></i>
-                </button>
-            </div>
-
-            <div class="ui action input">
-                <input type="number" step="1" v-model="toPageIndex" placeholder="Input Page...">
-                <button class="ui button" @click="toPage">
-                    <i class="angle double right icon"></i>
-                </button>
-            </div>
-        </div>
-
+         
+        <page-selector :module-name="moduleName" :forward-to-page="<%=varName%>PageIndex"
+            :page-size="25" :page-data="<%=varName%>Page">
+        </page-selector>
         <CommonDialog :dialog-holder="initDialog" dialog-type="Remove">
         </CommonDialog>
     </div>
@@ -288,9 +306,11 @@ import {
     DEL_<%=constantName%>,
     ADD_<%=constantName%>, 
     PAGE_<%=constantName%>,
+    MODULE_<%=constantName%>,
 
 } from "@/store/store.types";
 
+import PageSelector from "../common/PageSelector";
 import CommonDialog from "@/components/modal/CommonDialog";
 import { mapGetters } from 'vuex';
 import ErrorCode from "../../common/errorcode";
@@ -298,31 +318,27 @@ import ErrorCode from "../../common/errorcode";
 export default {
     name: 'List<%=entity.simpleName%>',
     components: {
-        CommonDialog
+        CommonDialog,
+        PageSelector,
     },
     data() {
         return {
             dialogHolder: null,
             operatingItem: null,
-            pageIndex: 0,
-            toPageIndex: 0,
+            moduleName: MODULE_<%=constantName%>,
         }
     },
 
     mounted() {
-        // this.$store.dispatch(FETCH_<%=constantName%>, 0);
-        this.fetchPageData();
+
     },
 
     computed: {
-        ...mapGetters(['<%=varName%>Page']),
+        ...mapGetters(['<%=varName%>Page', '<%=varName%>PageIndex']),
 
     },
 
     methods: {
-        fetchPageData() {
-            this.$store.dispatch(PAGE_<%=constantName%>, this.pageIndex);
-        },
 
         initDialog(dialog) {
             this.dialogHolder = dialog;
@@ -375,26 +391,7 @@ export default {
             });
         },
 
-        nextPage() {
-            this.pageIndex++;
-            this.fetchPageData();
-        },
-
-        prePage() {
-            if (this.pageIndex > 0) {
-                this.pageIndex--;
-                this.fetchPageData();
-            }
-        },
-        toPage(){
-            if (this.toPageIndex < 0) {
-                this.toastError(this.toPageIndex + ' 不是一个有效的页码');
-                return;
-            }
-
-            this.pageIndex = this.toPageIndex;
-            this.fetchPageData();
-        },
+        
     },
 
 };
