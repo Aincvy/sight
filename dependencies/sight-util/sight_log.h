@@ -20,6 +20,8 @@ namespace sight {
     extern bool logSourceLocation;
 #endif
 
+    enum class NodePortType;
+
     enum class LogLevel {
         Trace,
         Debug,
@@ -47,7 +49,8 @@ namespace sight {
         LogLevel l;
 
     public:
-        LogConstructor(const char* filename, int lineno, const char* functionName, LogLevel l) : l(l) {
+        LogConstructor(const char* filename, int lineno, const char* functionName, LogLevel l)
+            : l(l) {
             // append time
             std::time_t t = std::time(0);     // get time now
             std::tm* now = std::localtime(&t);
@@ -72,9 +75,9 @@ namespace sight {
             buffer << "] ";
 
 #ifdef SIGHT_DEBUG
-        if (logSourceLocation) {
-            buffer << absl::Substitute("[$0:$1 ($2)] ", filename, lineno, functionName);
-        }
+            if (logSourceLocation) {
+                buffer << absl::Substitute("[$0:$1 ($2)] ", filename, lineno, functionName);
+            }
 #endif
 
             // switch (l) {
@@ -94,7 +97,6 @@ namespace sight {
             //     buffer << "[ERROR] ";
             //     break;
             // }
-
         }
 
         template<typename T>
@@ -115,21 +117,33 @@ namespace sight {
             callLogWriter(this->l, tmp.c_str());
         }
 
-        template<typename ...Args>
-        std::string printValues(const char* fmt, Args&&... args){
-            return absl::Substitute(fmt, std::forward<Args>(args)...);
+        absl::substitute_internal::Arg convert(sight::NodePortType type) {
+            return absl::substitute_internal::Arg(static_cast<int>(type));
         }
 
+        template<typename T>
+        auto convertIfNodePortType(T&& arg) {
+            if constexpr (std::is_same_v<std::decay_t<T>, sight::NodePortType>) {
+                return convert(arg);
+            } else {
+                return std::forward<T>(arg);
+            }
+        }
+
+        template<typename... Args>
+        std::string printValues(const char* fmt, Args&&... args) {
+            return absl::Substitute(fmt, convertIfNodePortType(std::forward<Args>(args))...);
+        }
     };
 
 }
 
 #ifdef SIGHT_DEBUG
-#define trace(...) sight::LogConstructor(__FILE__, __LINE__, __func__, LogLevel::Trace).print(__VA_ARGS__)
-#define logDebug(...) sight::LogConstructor(__FILE__, __LINE__, __func__, LogLevel::Debug).print(__VA_ARGS__)
-#define logInfo(...) sight::LogConstructor(__FILE__, __LINE__, __func__, LogLevel::Info).print(__VA_ARGS__)
-#define logWarning(...) sight::LogConstructor(__FILE__, __LINE__, __func__, LogLevel::Warning).print(__VA_ARGS__)
-#define logError(...) sight::LogConstructor(__FILE__, __LINE__, __func__, LogLevel::Error).print(__VA_ARGS__)
+#    define trace(...) sight::LogConstructor(__FILE__, __LINE__, __func__, LogLevel::Trace).print(__VA_ARGS__)
+#    define logDebug(...) sight::LogConstructor(__FILE__, __LINE__, __func__, LogLevel::Debug).print(__VA_ARGS__)
+#    define logInfo(...) sight::LogConstructor(__FILE__, __LINE__, __func__, LogLevel::Info).print(__VA_ARGS__)
+#    define logWarning(...) sight::LogConstructor(__FILE__, __LINE__, __func__, LogLevel::Warning).print(__VA_ARGS__)
+#    define logError(...) sight::LogConstructor(__FILE__, __LINE__, __func__, LogLevel::Error).print(__VA_ARGS__)
 #else
 #    define trace(...)
 #    define logDebug(...)

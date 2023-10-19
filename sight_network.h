@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "sight_defines.h"
+
 #include <uv.h>
 #include <vector>
 #include <sstream>

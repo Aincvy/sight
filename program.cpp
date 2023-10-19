@@ -1,7 +1,3 @@
-#include <signal.h>
-#include <thread>
-#include <filesystem>
-
 #include "sight.h"
 #include "sight_ui.h"
 #include "sight_js.h"
@@ -9,6 +5,10 @@
 #include "sight_util.h"
 #include "sight_network.h"
 #include "sight_log.h"
+
+#include <signal.h>
+#include <thread>
+#include <filesystem>
 
 #ifdef SIGHT_DEBUG
 #include "backward.hpp"

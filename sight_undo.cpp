@@ -9,8 +9,11 @@
 #include <atomic>
 #include <cassert>
 #include <string>
-#include <sys/termios.h>
 #include <vector>
+
+#ifdef NOT_WIN32
+#    include <sys/termios.h>
+#endif
 
 #define UNDO_LIST_COUNT 60
 

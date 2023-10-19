@@ -25,6 +25,12 @@
 
 #include "functional"
 
+#ifdef _WIN32
+#    define TO_CONST_CHAT_POINTER(x) (x)._Unwrapped()
+#else
+#    define TO_CONST_CHAT_POINTER(x) (x)
+#endif
+
 extern "C" {
     // dependencies/tree-sitter-javascript/src/parser.c
     TSLanguage *tree_sitter_javascript(void);
@@ -183,10 +189,10 @@ namespace sight {
                 auto kind = ts_node_child_by_field_id(tsNode, jsLangFields.kind);
                 bool isConst = false;
                 constexpr const auto strConst = "const";
-                if (strncmp(code.source.begin() + ts_node_start_byte(kind), strConst, strlen(strConst)) == 0) {
+                if (strncmp(TO_CONST_CHAT_POINTER(code.source.begin() + ts_node_start_byte(kind)), strConst, strlen(strConst)) == 0) {
                     // const
                     isConst = true;
-                } 
+                }
 
                 // append source.
                 if (isConst) {

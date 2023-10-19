@@ -19,13 +19,12 @@
 #include <cstdlib>
 #include <initializer_list>
 #include <iterator>
+#include <stdlib.h>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 #include <random>
-
-#include "GLFW/glfw3.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -34,6 +33,10 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_split.h"
+
+#ifdef OPENGL
+#    include "GLFW/glfw3.h"
+#endif
 
 // #ifdef __APPLE__
 // #include <CoreFoundation/CFBundle.h>
@@ -53,9 +56,9 @@ namespace sight {
     //          Begin Of Keys
     //////////////////////////////////////////////////////////////////////////////////
     /* spellchecker: disable */
-    
-    void initKeys() {
-        
+
+    void initOpenGLKeys() {
+#ifdef OPENGL
         // ctrl, alt, win/super, shift
         keyMap["lctrl"] = keyArray.add(SightKey(GLFW_KEY_LEFT_CONTROL));
         keyMap["rctrl"] = keyArray.add(SightKey(GLFW_KEY_RIGHT_CONTROL));
@@ -153,6 +156,15 @@ namespace sight {
         // others
         keyMap["esc"] = keyArray.add(SightKey(GLFW_KEY_ESCAPE));
         keyMap["backspace"] = keyArray.add(SightKey(GLFW_KEY_BACKSPACE));
+#endif
+    }
+
+    void initKeys(){
+#ifdef OPENGL
+        initOpenGLKeys();
+#endif
+
+        
     }
 
 
@@ -188,6 +200,7 @@ namespace sight {
             return nullptr;
         }
 
+        #ifdef OPENGL
         GLuint imageTexture;
         glGenTextures(1, &imageTexture);
         glBindTexture(GL_TEXTURE_2D, imageTexture);
@@ -206,6 +219,9 @@ namespace sight {
         stbi_image_free(data);
 
         return reinterpret_cast<ImTextureID>(static_cast<std::intptr_t>(imageTexture));
+        #endif 
+
+        return nullptr;
     }
 
     bool loadImage(const char* path, SightImage* image) {
@@ -242,40 +258,43 @@ namespace sight {
     }
 
     std::string openFileDialog(const char* basePath, int* status, std::vector<std::pair<const char*, const char*>> filter) {
-        // initialize NFD
-        NFD::Guard nfdGuard;
-        // auto-freeing memory
-        NFD::UniquePath outPath;
+        // todo 实现并修正这个函数
+        // // initialize NFD
+        // NFD::Guard nfdGuard;
+        // // auto-freeing memory
+        // NFD::UniquePath outPath;
 
-        // prepare filters for the dialog
-        std::pair<const char*, const char*> a = {"", ""};
-        auto size = std::size(filter);
-        nfdnfilteritem_t data[size];
-        if (size > 0) {
-            int i = -1;
-            for( const auto& item: filter){
-                i++;
-                data[i] = {.name = item.first, .spec = item.second};
-            }
-        }
+        // // prepare filters for the dialog
+        // std::pair<const char*, const char*> a = {"", ""};
+        // auto size = std::size(filter);
+        // nfdnfilteritem_t data[size];
+        // if (size > 0) {
+        //     int i = -1;
+        //     for (const auto& item : filter) {
+        //         i++;
+        //         data[i] = {.name = item.first, .spec = item.second};
+        //     }
+        // }
 
-        // show the dialog
-        std::string pathResult{};
+        // // show the dialog
+        // std::string pathResult{};
 
-        nfdresult_t result = NFD::OpenDialog(outPath, data, size, basePath);
-        if (result == NFD_OKAY) {
-            SET_CODE(status, CODE_OK);
-            pathResult = outPath.get();
-        } else if (result == NFD_CANCEL) {
-            // std::cout << "User pressed cancel." << std::endl;
-            SET_CODE(status, CODE_USER_CANCELED);
-        } else {
-            std::cout << "Error: " << NFD::GetError() << std::endl;
-            SET_CODE(status, CODE_ERROR);
-        }
-        // NFD::Guard will automatically quit NFD.
+        // nfdresult_t result = NFD::OpenDialog(outPath, data, size, basePath);
+        // if (result == NFD_OKAY) {
+        //     SET_CODE(status, CODE_OK);
+        //     pathResult = outPath.get();
+        // } else if (result == NFD_CANCEL) {
+        //     // std::cout << "User pressed cancel." << std::endl;
+        //     SET_CODE(status, CODE_USER_CANCELED);
+        // } else {
+        //     std::cout << "Error: " << NFD::GetError() << std::endl;
+        //     SET_CODE(status, CODE_ERROR);
+        // }
+        // // NFD::Guard will automatically quit NFD.
 
-        return pathResult;
+        // return pathResult;
+
+        return {};
     }
 
     std::string openFolderDialog(const char* basePath, int* status) {

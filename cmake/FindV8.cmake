@@ -44,10 +44,10 @@ include(FindPackageHandleStandardArgs)
 
 # V8 search paths
 set(V8_PATHS
-	${V8_HOME}
 	${V8_ROOT}
 	$ENV{ProgramFiles}/v8
 	$ENV{SystemDrive}/v8
+	${V8_HOME}
 	$ENV{V8_HOME}
 	$ENV{EXTERNLIBS}/v8
 	${V8_DIR}
@@ -67,10 +67,12 @@ set(V8_PATHS
 if(NOT UNIX)
 	set(V8_PATHS_DEBUG
 		${V8_DIR}/build/Debug
+		${V8_DIR}/lib/Debug
 	)
 
 	set(V8_PATHS_RELEASE
 		${V8_DIR}/build/Release
+		${V8_DIR}/lib/Release
 	)
 else()
 	set(V8_PATHS_DEBUG

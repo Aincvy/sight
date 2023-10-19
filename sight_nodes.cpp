@@ -10,7 +10,7 @@
 #include <iterator>
 #include <set>
 #include <string>
-#include <sys/termios.h>
+#include <string_view>
 #include <sys/types.h>
 #include <utility>
 #include <vector>
@@ -38,6 +38,10 @@
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_split.h"
 #include "v8pp/object.hpp"
+
+#ifdef NOT_WIN32
+#    include <sys/termios.h>
+#endif
 
 
 // node editor status
@@ -202,7 +206,7 @@ namespace sight {
         } else if (port.kind == NodePortType::Field) {
             this->fields.push_back(port);
         } else {
-            logError("unHandle port kind: $0", port.kind);
+            logError("unHandle port kind: $0", (int)port.kind);
         }
 
     }
@@ -880,10 +884,10 @@ namespace sight {
         return CODE_OK;
     }
 
-    int SightNodeGraph::load(const char *path) {
+    int SightNodeGraph::load(std::string_view path) {
         this->filepath = path;
 
-        std::ifstream fin(path);
+        std::ifstream fin(path.data());
         if (!fin.is_open()) {
             return -1;
         }
@@ -954,7 +958,7 @@ namespace sight {
             logDebug("load ok");
             return status;
         }catch (const YAML::BadConversion & e){
-            fprintf(stderr, "read file %s error!\n", path);
+            fprintf(stderr, "read file %s error!\n", path.data());
             fprintf(stderr, "%s\n", e.what());
             this->reset();
             return CODE_FILE_ERROR;    // bad file

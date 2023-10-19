@@ -3,6 +3,11 @@
 //
 
 #pragma once
+
+#ifdef _WIN32
+#    define NOMINMAX
+#endif
+
 #include <string>
 
 // used for name string
@@ -36,6 +41,12 @@
 }
 
 #define SET_CODE(code, i) if(code) *code = i;
+
+#ifdef _WIN32
+typedef unsigned int uint;
+typedef unsigned short ushort;
+typedef unsigned char u_char;
+#endif
 
 namespace sight {
 

@@ -70,7 +70,7 @@ namespace sight {
             parent.files.clear();
 
             for (const auto& item : directory_iterator{parent.path}) {
-                std::string fullpath = std::filesystem::canonical(item.path());
+                std::string fullpath = std::filesystem::canonical(item.path()).string();
                 if (item.is_directory()) {
                     parent.files.push_back(
                         {
@@ -105,7 +105,7 @@ namespace sight {
                             }
                         } else if (ext == ".json") {
                             // graph position file
-                            std::string nameWithoutExt = removeExt(filename);
+                            std::string nameWithoutExt = removeExt(filename.string());
                             auto findResult = std::find_if(parent.files.begin(), parent.files.end(), [&nameWithoutExt](ProjectFile const& f){ 
                                 return f.fileType == ProjectFileType::Graph && f.filename == nameWithoutExt;
                             });
@@ -835,7 +835,7 @@ namespace sight {
                 //     out << source;
                 //     out.close();
                 // }
-                parseGraph(path.c_str());
+                parseGraph(path.string());
             }
         }
     }
@@ -877,7 +877,7 @@ namespace sight {
             }
 
             SightNodeGraph graph;
-            if (graph.load(path.c_str()) != CODE_OK) {
+            if (graph.load(path.string()) != CODE_OK) {
                 logDebug("graph load failed: $0", path.c_str());
                 continue;
             }

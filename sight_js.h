@@ -232,7 +232,7 @@ namespace sight{
      */
     void clearJsNodeCache();
 
-    int parseGraph(const char* filename, bool generateTargetLang = true, bool writeToOutFile = true);
+    int parseGraph(std::string_view filename, bool generateTargetLang = true, bool writeToOutFile = true);
 
     /**
      * @brief checkTinyData(), tinyData()

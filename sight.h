@@ -3,12 +3,12 @@
 //
 #pragma once
 
+#include "sight_defines.h"
+
 #include <future>
 #include <string>
 #include <string_view>
 #include <sys/types.h>
-
-#include "sight_defines.h"
 
 namespace sight {
 
@@ -57,6 +57,7 @@ namespace sight {
         CODE_OK = 0,
         CODE_FAIL = 1,
         CODE_NOT_IMPLEMENTED,
+        CODE_NOT_SUPPORTED,
         CODE_ERROR,
 
         CODE_FILE_ERROR = 100,

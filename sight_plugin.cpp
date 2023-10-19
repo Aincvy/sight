@@ -17,11 +17,19 @@
 #include <cstring>
 #include <iterator>
 #include <string>
-#include <unistd.h>
 #include <vector>
+
+#ifdef NOT_WIN32
+#    include <unistd.h>
+#endif
+
+#ifdef _WIN32
+#    define strdup _strdup
+#endif
 
 #define FILE_NAME_PACKAGE "package.js"
 #define FILE_NAME_EXPORTS_UI "exports-ui.js"
+
 
 namespace sight {
 
@@ -231,9 +239,9 @@ namespace sight {
             }
 
             auto fullPath = std::filesystem::canonical(path);
-            auto code = runJsFile(isolate, fullPath.c_str(), nullptr, module);
+            auto code = runJsFile(isolate, fullPath.string().c_str(), nullptr, module);
             if (code != CODE_OK) {
-                logDebug("js run failed: $0", fullPath.c_str());
+                logDebug("js run failed: $0", fullPath.string().c_str());
                 return CODE_PLUGIN_FILE_ERROR;
             }
         }
@@ -242,7 +250,7 @@ namespace sight {
         auto exportsUIPath = rootPath / "exports-ui.js";
         if (fs::exists(exportsUIPath)) {
             auto fullPath = std::filesystem::canonical(exportsUIPath);
-            addUICommand(UICommandType::RunScriptFile, strdup(fullPath.c_str()), 0, true);
+            addUICommand(UICommandType::RunScriptFile, strdup(fullPath.string().c_str()), 0, true);
         }
 
         if (this->module.IsEmpty()) {

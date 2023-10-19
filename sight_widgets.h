@@ -1,6 +1,8 @@
 
 #pragma once
 
+#include "sight_defines.h"
+
 #include "imgui.h"
 #include "sight_util.h"
 #include <string>

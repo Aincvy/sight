@@ -41,21 +41,27 @@
 #include <thread>
 
 #include <filesystem>
+#include <functional>
 
-#include <GLFW/glfw3.h>
 #include <string>
 #include <string_view>
-#include <sys/termios.h>
 #include <sys/types.h>
 #include <uv.h>
 #include <vector>
 
 #include <absl/strings/match.h>
 
+#ifdef NOT_WIN32
+#    include <sys/termios.h>
+#endif
 
-#define COMMON_LANGUAGE_KEYS g_UIStatus->languageKeys->commonKeys
-#define WINDOW_LANGUAGE_KEYS g_UIStatus->languageKeys->windowNames
-#define MENU_LANGUAGE_KEYS g_UIStatus->languageKeys->menuKeys
+#    ifdef OPENGL
+#        include <GLFW/glfw3.h>
+#    endif
+
+#    define COMMON_LANGUAGE_KEYS g_UIStatus->languageKeys->commonKeys
+#    define WINDOW_LANGUAGE_KEYS g_UIStatus->languageKeys->windowNames
+#    define MENU_LANGUAGE_KEYS g_UIStatus->languageKeys->menuKeys
 
 // todo change this
 static void glfw_error_callback(int error, const char* description)
@@ -1467,6 +1473,7 @@ for(const item of a) {
 
     int initOpenGL() {
 
+#ifdef OPENGL
         glfwSetErrorCallback(glfw_error_callback);
         if (!glfwInit())
             return CODE_FAIL;
@@ -1481,6 +1488,84 @@ for(const item of a) {
 #endif
 
         return CODE_OK;
+#else
+        return CODE_NOT_SUPPORTED;
+#endif
+    }
+
+    void* initOpenGLWindow(const char* title, int width, int height) {
+    #ifdef OPENGL
+        glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+        GLFWwindow* window = glfwCreateWindow(width, height, title, nullptr, NULL);
+        if (window == nullptr)
+            return nullptr;
+        glfwMakeContextCurrent(window);
+        glfwSwapInterval(1);     // Enable vsync
+
+        // Setup Platform/Renderer backends
+        ImGui::CreateContext();
+        ImGui_ImplGlfw_InitForOpenGL(window, true);
+        const char* glsl_version = "#version 150";
+        ImGui_ImplOpenGL3_Init(glsl_version);
+
+        return window;
+#else
+        return nullptr;
+#endif
+    }
+
+    void mainLoopOpenGLWindow(void* glWindow, uv_loop_t* uvLoop,
+                              std::function<int()> beforeRenderFunc, std::function<void()> render_func) {
+#ifdef OPENGL
+
+        // Main loop
+        
+        ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+        GLFWwindow* window = (GLFWwindow*)glWindow;
+
+        while (!glfwWindowShouldClose(window) && !exitFlag) {
+            if (beforeRenderFunc() != CODE_OK) {
+                break;
+            }
+
+            // Poll and handle events (inputs, window resize, etc.)
+            // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
+            // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
+            // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
+            // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
+            glfwPollEvents();
+
+            // Start the Dear ImGui frame
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
+
+            render_func();
+
+            // Rendering
+            ImGui::Render();
+            int display_w, display_h;
+            glfwGetFramebufferSize(window, &display_w, &display_h);
+            glViewport(0, 0, display_w, display_h);
+            glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
+            glClear(GL_COLOR_BUFFER_BIT);
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+            glfwSwapBuffers(window);
+
+            uv_run(uvLoop, UV_RUN_NOWAIT);
+        }
+#endif
+    }
+
+    void cleanUpOpenGLWindow(void* glWindow) {
+#ifdef OPENGL
+        ImGui_ImplOpenGL3_Shutdown();
+        ImGui_ImplGlfw_Shutdown();
+        ImGui::DestroyContext();
+
+        glfwDestroyWindow((GLFWwindow*)glWindow);
+        #endif
     }
 
     int showLoadingWindow(){
@@ -1489,30 +1574,22 @@ for(const item of a) {
         const int width = 640;
         const int height = 360;
 
-        glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
-        GLFWwindow* window = glfwCreateWindow(width, height, "sight - loading", nullptr, NULL);
-        if (window == nullptr)
-            return 1;
-        glfwMakeContextCurrent(window);
-        glfwSwapInterval(1); // Enable vsync
-
         // Setup Dear ImGui context
         IMGUI_CHECKVERSION();
-        ImGui::CreateContext();
-        ImGuiIO& io = ImGui::GetIO(); (void)io;
+#ifdef OPENGL
+        void* glWindow = initOpenGLWindow("sight - loading", width, height);
+        if (! glWindow) {
+            return CODE_FAIL;
+        }
+#elif DirectX11
+        
+#endif
+
+        ImGuiIO& io = ImGui::GetIO();
+        (void)io;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
 
-        // Setup Dear ImGui style
-        // ImGui::StyleColorsDark();
-
-        // Setup Platform/Renderer backends
-        ImGui_ImplGlfw_InitForOpenGL(window, true);
-        const char* glsl_version = "#version 150";
-        ImGui_ImplOpenGL3_Init(glsl_version);
-
-        // Our state
-        ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
         // init ...
         g_UIStatus = new UIStatus({
@@ -1601,35 +1678,27 @@ for(const item of a) {
         bool folderError = false;
         std::string lastOpenFolder = ".";
 
-        // Main loop
-        while (!glfwWindowShouldClose(window) && !exitFlag)
-        {
+
+        auto beforeRenderFunc = [&leftFrame]() -> int {
             auto project = currentProject();
             if (g_UIStatus->isLoadingOver() && project && leftFrame <= 0) {
-                break;
+                return CODE_FAIL;
             }
+            return CODE_OK;
+        };
 
-            // Poll and handle events (inputs, window resize, etc.)
-            // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
-            // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
-            // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
-            // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
-            glfwPollEvents();
-
-            // Start the Dear ImGui frame
-            ImGui_ImplOpenGL3_NewFrame();
-            ImGui_ImplGlfw_NewFrame();
-            ImGui::NewFrame();
-
-
-            ImGui::SetNextWindowPos(ImVec2(0,0));
+        //
+        auto renderFunc = [&exitFlag, &progress, &uiStatus, &pluginStartLoad, &folderError, &lastOpenFolder]() {
+            ImGui::SetNextWindowPos(ImVec2(0, 0));
             ImGui::SetNextWindowSize(ImVec2(width, height));
             ImGui::Begin("loading", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize);
             ImGui::Text("sight is loading...");
             ImGui::Text("past frame: %d", ++progress);
             ImGui::Separator();
             ImGui::BeginChild("content view", ImVec2(0, -ImGui::GetFrameHeightWithSpacing()));
-            ImGui::Dummy(ImVec2(1,5));
+            ImGui::Dummy(ImVec2(1, 5));
+            auto project = currentProject();
+
             if (project) {
                 ImGui::Text("Project: %s", project->getBaseDir().c_str());
 
@@ -1649,7 +1718,7 @@ for(const item of a) {
                     uiOpenProject(folderError, lastOpenFolder, false);
                 }
 
-                ImGui::Dummy(ImVec2(1,5));
+                ImGui::Dummy(ImVec2(1, 5));
                 if (lastOpenFolder != ".") {
                     ImGui::Text("Try Open Folder: %s", lastOpenFolder.c_str());
                 }
@@ -1657,7 +1726,7 @@ for(const item of a) {
                     ImGui::Text("Folder do not empty, or not a sight project folder, or loading !");
                 }
             }
-            
+
             ImGui::EndChild();
 
             if (ImGui::Button("Exit")) {
@@ -1667,25 +1736,18 @@ for(const item of a) {
             //
             if (uiStatus.loadingStatus.jsThread && !uiStatus.loadingStatus.nodeStyle) {
                 // update node style.
-                // currentNodeStatus()->updateTemplateNodeStyles();    // still has errors... 
+                // currentNodeStatus()->updateTemplateNodeStyles();    // still has errors...
                 uiStatus.loadingStatus.nodeStyle = true;
             }
 
             ImGui::End();
+        };
 
-            // Rendering
-            ImGui::Render();
-            int display_w, display_h;
-            glfwGetFramebufferSize(window, &display_w, &display_h);
-            glViewport(0, 0, display_w, display_h);
-            glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
-            glClear(GL_COLOR_BUFFER_BIT);
-            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+#ifdef OPENGL
+        mainLoopOpenGLWindow(glWindow, uvLoop, beforeRenderFunc, renderFunc);
+#elif DirectX11
 
-            glfwSwapBuffers(window);
-
-            uv_run(uvLoop, UV_RUN_NOWAIT);
-        }
+#endif
 
         // load template nodes.
         for (int i = 0; i < 30; ++i) {
@@ -1693,12 +1755,12 @@ for(const item of a) {
         }
 
         // Cleanup
-        ImGui_ImplOpenGL3_Shutdown();
-        ImGui_ImplGlfw_Shutdown();
-        ImGui::DestroyContext();
+#ifdef OPENGL
+        cleanUpOpenGLWindow(glWindow);
+#elif DirectX11
 
-        glfwDestroyWindow(window);
-
+#endif
+        
         logDebug("end loading");
         return 0;
     }
@@ -1718,22 +1780,23 @@ for(const item of a) {
         v8::Context::Scope contextScope(context);
         logDebug("v8 runtime init over.");
 
-        // Create window with graphics context
-        glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
-        GLFWwindow* window = glfwCreateWindow(1600, 900, "sight - a code generate tool", nullptr, NULL);
-        if (window == nullptr)
-            return 1;
-        glfwMakeContextCurrent(window);
-        glfwSwapInterval(1); // Enable vsync
+
+#ifdef OPENGL
+        void* glWindow = initOpenGLWindow("sight - a code generate tool", 1600, 900);
+        if (!glWindow) {
+            return CODE_FAIL;
+        }
+#elif DirectX11
+
+#endif
 
         // Setup Dear ImGui context
-        ImGui::CreateContext();
 
         ImGuiIO& io = ImGui::GetIO(); (void)io;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;           // Enable Docking
         // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;         // Enable Multi-Viewport / Platform Windows
-
+        
         io.ConfigWindowsMoveFromTitleBarOnly = true;
         io.Fonts->AddFontDefault();
         ImFontConfig config;
@@ -1753,14 +1816,6 @@ for(const item of a) {
         ImGui::StyleColorsDark();
         
 
-        // Setup Platform/Renderer backends
-        ImGui_ImplGlfw_InitForOpenGL(window, true);
-        const char* glsl_version = "#version 150";
-        ImGui_ImplOpenGL3_Init(glsl_version);
-
-        // Our state
-        ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-
         // project path 
         auto project = currentProject();
         if (project) {
@@ -1770,54 +1825,38 @@ for(const item of a) {
         initUndo();
 
         auto uvLoop = g_UIStatus->uvLoop;
-        // Main loop
-        while (!glfwWindowShouldClose(window) && !g_UIStatus->closeWindow)
-        {
-            // Poll and handle events (inputs, window resize, etc.)
-            // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
-            // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
-            // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
-            // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
-            glfwPollEvents();
 
-            // Start the Dear ImGui frame
-            ImGui_ImplOpenGL3_NewFrame();
-            ImGui_ImplGlfw_NewFrame();
-            ImGui::NewFrame();
+        auto beforeRenderFunc = []() -> int {
+            return CODE_OK;
+        };
 
+        auto renderFunc = []() {
             mainWindowFrame(*g_UIStatus);
 
             // ImGui::ShowDemoWindow();     // for debug
- 
-            // Rendering
-            ImGui::Render();
-            int display_w, display_h;
-            glfwGetFramebufferSize(window, &display_w, &display_h);
-            glViewport(0, 0, display_w, display_h);
-            glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
-            glClear(GL_COLOR_BUFFER_BIT);
-            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-            glfwSwapBuffers(window);
 
             g_UIStatus->needInit = false;
+        };
 
-            uv_run(uvLoop, UV_RUN_NOWAIT);
-        }
-
+#ifdef OPENGL
+        mainLoopOpenGLWindow(glWindow, uvLoop, beforeRenderFunc, renderFunc);
         // Cleanup
-        ImGui_ImplOpenGL3_Shutdown();
-        ImGui_ImplGlfw_Shutdown();
-        ImGui::DestroyContext();
+        cleanUpOpenGLWindow(glWindow);
+#elif DirectX11
 
-        glfwDestroyWindow(window);
+#endif
 
         return 0;
     }
 
     void destroyWindows() {
         destroyNodeEditor(true, true);
+
+#ifdef OPENGL
         glfwTerminate();
+#elif DirectX11
+
+#endif
 
         g_UIStatus->entityOperations.reset();
         g_UIStatus->v8GlobalContext.Reset();

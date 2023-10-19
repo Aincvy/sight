@@ -1,38 +1,64 @@
 # build dependencies ..
 
-# imgui
-MESSAGE(STATUS "glfw: ${GLFW3_INCLUDE}")
-
 SET(
         IMGUI_SOURCES
         ${CMAKE_CURRENT_LIST_DIR}/imgui/imgui.cpp
         ${CMAKE_CURRENT_LIST_DIR}/imgui/imgui_draw.cpp
         ${CMAKE_CURRENT_LIST_DIR}/imgui/imgui_widgets.cpp
         ${CMAKE_CURRENT_LIST_DIR}/imgui/imgui_tables.cpp
+)
+
+if (UNIX AND NOT APPLE)
+    set(LINUX TRUE)
+endif()
+
+if (LINUX OR APPLE)
+    list(APPEND IMGUI_SOURCES 
         ${CMAKE_CURRENT_LIST_DIR}/imgui/backends/imgui_impl_glfw.cpp
         ${CMAKE_CURRENT_LIST_DIR}/imgui/backends/imgui_impl_opengl3.cpp
-)
+    )
+elseif(WIN32)
+    list(APPEND IMGUI_SOURCES 
+        ${CMAKE_CURRENT_LIST_DIR}/imgui/backends/imgui_impl_win32.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/imgui/backends/imgui_impl_dx11.cpp
+    )
+endif()
 
 add_library(imgui SHARED ${IMGUI_SOURCES})
 
-# OpenGL
-find_package(OpenGL REQUIRED)
+if (LINUX OR APPLE)
+    # OpenGL
+    find_package(OpenGL REQUIRED)
 
-# GLFW
-find_package(glfw3 REQUIRED)
-message(STATUS "Found GLFW3 in ${GLFW3_LIBRARY}")
+    # GLFW
+    find_package(glfw3 REQUIRED)
+    message(STATUS "Found GLFW3 in ${GLFW3_LIBRARY}")
 
-target_include_directories(imgui PUBLIC
-        ${CMAKE_CURRENT_LIST_DIR}/imgui
-        ${CMAKE_CURRENT_LIST_DIR}/imgui/backends
-        ${CMAKE_CURRENT_LIST_DIR}/imgui/examples/libs/gl3w
-)
+    target_include_directories(imgui PUBLIC
+            ${CMAKE_CURRENT_LIST_DIR}/imgui
+            ${CMAKE_CURRENT_LIST_DIR}/imgui/backends
+            ${CMAKE_CURRENT_LIST_DIR}/imgui/examples/libs/gl3w
+    )
 
-target_link_libraries(
-        imgui PUBLIC
-        glfw
-        OpenGL::GL
-)
+    target_link_libraries(
+            imgui PUBLIC
+            glfw
+            OpenGL::GL
+    )
+elseif(WIN32)
+    # DirectX
+    # Assuming DirectX is already installed on Windows
+    target_include_directories(imgui PUBLIC
+            ${CMAKE_CURRENT_LIST_DIR}/imgui
+            ${CMAKE_CURRENT_LIST_DIR}/imgui/backends
+    )
+
+    target_link_libraries(
+            imgui PUBLIC
+            d3d11
+    )
+endif()
+
 
 # macos  
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
@@ -62,6 +88,7 @@ add_library(imgui_node_editor SHARED ${IMGUI_NODE_EDITOR_SOURCES})
 target_include_directories(
         imgui_node_editor PUBLIC
         ${CMAKE_CURRENT_LIST_DIR}/imgui-node-editor
+        ${CMAKE_CURRENT_LIST_DIR}/imgui
 )
 
 target_link_libraries(
@@ -99,7 +126,8 @@ ELSE()
 ENDIF(CMAKE_BUILD_TYPE STREQUAL "Debug")
 
 # abseil
-find_package(absl REQUIRED)
+# find_package(absl REQUIRED)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/abseil-cpp)
 target_link_libraries(
         sight-util PUBLIC
         absl::base

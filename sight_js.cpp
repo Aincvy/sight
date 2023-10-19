@@ -16,8 +16,6 @@
 #include "functional"
 #include <string>
 #include <string_view>
-#include <sys/cdefs.h>
-#include <sys/termios.h>
 #include <sys/types.h>
 #include <thread>
 #include <chrono>
@@ -50,6 +48,13 @@
 
 #ifdef __linux__
 #define isnumber isdigit
+#endif
+
+#ifdef NOT_WIN32
+#    include <sys/cdefs.h>
+#    include <sys/termios.h>
+#else
+#    define isnumber isdigit
 #endif
 
 #define GENERATE_CODE_DETAILS 1
@@ -691,10 +696,10 @@ namespace sight {
                     return v8::Undefined(isolate);
                 }
 
-                auto currentPath = v8pp::from_v8<std::string>(isolate, filename);
+                std::string currentPath = v8pp::from_v8<std::string>(isolate, filename);
                 auto scriptPath = std::filesystem::path(currentPath.c_str());
 
-                currentPath = scriptPath.parent_path().c_str();
+                currentPath = scriptPath.parent_path().string();
                 appendIfNotExists(currentPath, "/") += path;
                 path = currentPath;
             }
@@ -1487,7 +1492,7 @@ namespace sight {
             return true;
         }
 
-        void v8EntityFieldTypedValue(FunctionCallbackInfo<Value> const& args) {
+        static void v8EntityFieldTypedValue(FunctionCallbackInfo<Value> const& args) {
             auto isolate = args.GetIsolate();
             auto field = v8pp::class_<SightEntityField>::unwrap_object(isolate, args.This());
             if (!field || field->defaultValue.empty()) {
@@ -1577,7 +1582,7 @@ namespace sight {
         }
 
         v8::V8::Dispose();
-        v8::V8::ShutdownPlatform();
+        // v8::V8::ShutdownPlatform();
 
         if (g_V8Runtime->arrayBufferAllocator) {
             delete g_V8Runtime->arrayBufferAllocator;
@@ -1612,11 +1617,11 @@ namespace sight {
         // auto initTypes = Object::New(isolate);
         v8pp::module initTypes(isolate);
 
-        initTypes.set_const("JS", MODULE_INIT_JS);
-        initTypes.set_const("UI", MODULE_INIT_UI);
-        initTypes.set_const("js", MODULE_INIT_JS);
-        initTypes.set_const("ui", MODULE_INIT_UI);
-        module.set_const("InitType", initTypes);
+        initTypes.const_("JS", MODULE_INIT_JS);
+        initTypes.const_("UI", MODULE_INIT_UI);
+        initTypes.const_("js", MODULE_INIT_JS);
+        initTypes.const_("ui", MODULE_INIT_UI);
+        module.const_("InitType", initTypes);
 
     }
 
@@ -1625,95 +1630,92 @@ namespace sight {
 
         v8pp::module jsNodePortTypeEnum(isolate);
         jsNodePortTypeEnum
-            .set_const("Input", static_cast<int>(NodePortType::Input))
-            .set_const("Output", static_cast<int>(NodePortType::Output))
-            .set_const("Both", static_cast<int>(NodePortType::Both))
-            .set_const("Field", static_cast<int>(NodePortType::Field));
-        module.set("NodePortType", jsNodePortTypeEnum);
+            .const_("Input", static_cast<int>(NodePortType::Input))
+            .const_("Output", static_cast<int>(NodePortType::Output))
+            .const_("Both", static_cast<int>(NodePortType::Both))
+            .const_("Field", static_cast<int>(NodePortType::Field));
+        module.submodule("NodePortType", jsNodePortTypeEnum);
 
         v8pp::class_<SightBaseNodePortOptions> nodePortOptionsClass(isolate);
         nodePortOptionsClass
             .ctor<>()
-            .set("show", &SightBaseNodePortOptions::show)
-            .set("showValue", &SightBaseNodePortOptions::showValue)
-            .set("errorMsg", &SightBaseNodePortOptions::errorMsg);
+            .var("show", &SightBaseNodePortOptions::show)
+            .var("showValue", &SightBaseNodePortOptions::showValue)
+            .var("errorMsg", &SightBaseNodePortOptions::errorMsg);
         nodePortOptionsClass.auto_wrap_objects(true);
-        module.set("SightNodePortOptions", nodePortOptionsClass);
+        module.class_("SightNodePortOptions", nodePortOptionsClass);
 
         v8pp::class_<SightNodePort> nodePortClass(isolate);
         nodePortClass.ctor<>()
-            .set("portName", v8pp::property(&SightNodePort::getPortName))
-            .set("name", v8pp::property(&SightNodePort::getPortName))
-            .set("id", v8pp::property(&SightNodePort::getId))
-            .set("node", v8pp::property(&SightNodePort::getNode))
-            .set("nodeId", &SightNodePort::getNodeId)
-            .set("setKind", &SightNodePort::setKind)
-            .set("options", &SightNodePort::options);
+            .property("portName", &SightNodePort::getPortName)
+            .property("name", &SightNodePort::getPortName)
+            .property("id", &SightNodePort::getId)
+            .property("node", &SightNodePort::getNode)
+            .function("nodeId", &SightNodePort::getNodeId)
+            .function("setKind", &SightNodePort::setKind)
+            .var("options", &SightNodePort::options);
         nodePortClass.auto_wrap_objects(true);
-        module.set("SightNodePort", nodePortClass);
+        module.class_("SightNodePort", nodePortClass);
 
         v8pp::class_<SightNode> nodeClass(isolate);
         nodeClass
             .ctor<>()
-            .set("nodeName", &SightNode::nodeName)
-            .set("name", &SightNode::nodeName)
-            .set("nodeId", v8pp::property(&SightNode::getNodeId))
-            .set("id", v8pp::property(&SightNode::getNodeId))
-            .set("addPort", &SightNode::addPort)
-            .set("templateAddress", &v8NodeTemplateAddress)
-            .set("portValue", &v8NodePortValue)
-            .set("getPorts", &v8NodeGetPorts)
-            .set("getOtherSideValue", &v8GetOtherSideValue)
-            .set("helper", &v8GetNodeHelper)
-            ;
+            .var("nodeName", &SightNode::nodeName)
+            .var("name", &SightNode::nodeName)
+            .property("nodeId", &SightNode::getNodeId)
+            .property("id", &SightNode::getNodeId)
+            .function("addPort", &SightNode::addPort)
+            .function("templateAddress", &v8NodeTemplateAddress)
+            .function("portValue", &v8NodePortValue)
+            .function("getPorts", &v8NodeGetPorts)
+            .function("getOtherSideValue", &v8GetOtherSideValue)
+            .function("helper", &v8GetNodeHelper);
         nodeClass.auto_wrap_objects(true);
-        module.set("SightNode", nodeClass);
+        module.class_("SightNode", nodeClass);
 
         v8pp::class_<SightNodePortWrapper> nodePortWrapperClass(isolate);
         nodePortWrapperClass
-            .set("id", v8pp::property(&SightNodePortWrapper::getId))
-            .set("portId", v8pp::property(&SightNodePortWrapper::getId))
-            .set("name", v8pp::property(&SightNodePortWrapper::getName))
-            .set("kind", v8pp::property(&SightNodePortWrapper::getKind))
-            .set("show", v8pp::property(&SightNodePortWrapper::isShow, &SightNodePortWrapper::setShow))
-            .set("errorMsg", v8pp::property(&SightNodePortWrapper::getErrorMsg, &SightNodePortWrapper::setErrorMsg))
-            .set("readonly", v8pp::property(&SightNodePortWrapper::isReadonly, &SightNodePortWrapper::setReadonly))
-            .set("type", v8pp::property(&SightNodePortWrapper::getType, &SightNodePortWrapper::setType))
-            .set("deleteLinks", &SightNodePortWrapper::deleteLinks)
-            .set("resetType", &SightNodePortWrapper::resetType)
-            ;
-        module.set("SightNodePortWrapper", nodePortOptionsClass);
+            .property("id", &SightNodePortWrapper::getId)
+            .property("portId", &SightNodePortWrapper::getId)
+            .property("name", &SightNodePortWrapper::getName)
+            .property("kind", &SightNodePortWrapper::getKind)
+            .property("show", &SightNodePortWrapper::isShow, &SightNodePortWrapper::setShow)
+            .property("errorMsg", &SightNodePortWrapper::getErrorMsg, &SightNodePortWrapper::setErrorMsg)
+            .property("readonly", &SightNodePortWrapper::isReadonly, &SightNodePortWrapper::setReadonly)
+            .property("type", &SightNodePortWrapper::getType, &SightNodePortWrapper::setType)
+            .function("deleteLinks", &SightNodePortWrapper::deleteLinks)
+            .function("resetType", &SightNodePortWrapper::resetType);
+        module.class_("SightNodePortWrapper", nodePortOptionsClass);
 
         v8pp::class_<SightNodeGraphWrapper> nodeGraphWrapperClass(isolate);
         nodeGraphWrapperClass
-            .set("nodes", v8pp::property(&SightNodeGraphWrapper::getCachedNodes))
-            .set("updateNodeData", &SightNodeGraphWrapper::updateNodeData)
-            .set("findNodeWithId", &SightNodeGraphWrapper::findNodeWithId)
-            .set("findNodeWithFilter", &SightNodeGraphWrapper::findNodeWithFilter)
-            .set("findNodePort", &SightNodeGraphWrapper::findNodePort)
-            .set("findNodeByPortId", &SightNodeGraphWrapper::findNodeByPortId);
-        module.set("SightNodeGraphWrapper", nodeGraphWrapperClass);
+            .property("nodes", &SightNodeGraphWrapper::getCachedNodes)
+            .function("updateNodeData", &SightNodeGraphWrapper::updateNodeData)
+            .function("findNodeWithId", &SightNodeGraphWrapper::findNodeWithId)
+            .function("findNodeWithFilter", &SightNodeGraphWrapper::findNodeWithFilter)
+            .function("findNodePort", &SightNodeGraphWrapper::findNodePort)
+            .function("findNodeByPortId", &SightNodeGraphWrapper::findNodeByPortId);
+        module.class_("SightNodeGraphWrapper", nodeGraphWrapperClass);
 
         v8pp::module connectionModule(isolate);
-        connectionModule.set("addCodeTemplate", v8AddConnectionCodeTemplate);
-        module.set("connection", connectionModule);
+        connectionModule.function("addCodeTemplate", v8AddConnectionCodeTemplate);
+        module.submodule("connection", connectionModule);
 
         // connection class
         v8pp::class_<SightNodeConnection> connectionClass(isolate);
         connectionClass.ctor<>()
-            .set("priority", &SightNodeConnection::priority)
-            .set("connectionId", &SightNodeConnection::connectionId)
-            .set("id", &SightNodeConnection::connectionId)
-            .set("left", &SightNodeConnection::left)
-            .set("right", &SightNodeConnection::right);
-        module.set("SightNodeConnection", connectionClass);
+            .var("priority", &SightNodeConnection::priority)
+            .var("connectionId", &SightNodeConnection::connectionId)
+            .var("id", &SightNodeConnection::connectionId)
+            .var("left", &SightNodeConnection::left)
+            .var("right", &SightNodeConnection::right);
+        module.class_("SightNodeConnection", connectionClass);
 
         v8pp::class_<SightNodeGenerateHelper> nodeGenerateHelperClass(isolate);
         nodeGenerateHelperClass.ctor()
-            .set("varName", &SightNodeGenerateHelper::varName)
-            .set("templateName", v8pp::property(&SightNodeGenerateHelper::getTemplateNodeName))
-            ;
-        module.set("SightNodeGenerateHelper", nodeGenerateHelperClass);
+            .var("varName", &SightNodeGenerateHelper::varName)
+            .property("templateName", &SightNodeGenerateHelper::getTemplateNodeName);
+        module.class_("SightNodeGenerateHelper", nodeGenerateHelperClass);
     }
 
     void bindUIThreadFunctions(const v8::Local<v8::Context>& context, v8pp::module& module) {
@@ -1724,51 +1726,51 @@ namespace sight {
             auto& map = uiStatus->entityOperations;
             return map.addOperation(name, desc, PersistentFunction(uiStatus->isolate, f));
         };
-        entityModule.set("addOperation", addEntityOperation);
-        module.set("entity", entityModule);
+        entityModule.function("addOperation", addEntityOperation);
+        module.submodule("entity", entityModule);
 
         v8pp::class_<SightEntityFieldOptions> entityFieldOptionsClass(isolate);
         entityFieldOptionsClass
             .ctor()
-            .set("portType", v8pp::property(&SightEntityFieldOptions::portTypeValue))
-            .set("portOptions", &SightEntityFieldOptions::portOptions);
+            .property("portType", &SightEntityFieldOptions::portTypeValue)
+            .var("portOptions", &SightEntityFieldOptions::portOptions);
         entityFieldOptionsClass.auto_wrap_objects();
 
         v8pp::class_<SightEntityField> entityFieldClass(isolate);
         entityFieldClass.ctor<>()
-            .set("name", &SightEntityField::name)
-            .set("type", &SightEntityField::type)
-            .set("defaultValue", &SightEntityField::defaultValue)
-            .set("options", &SightEntityField::options)
-            .set("v8TypedValue", v8EntityFieldTypedValue);
+            .var("name", &SightEntityField::name)
+            .var("type", &SightEntityField::type)
+            .var("defaultValue", &SightEntityField::defaultValue)
+            .var("options", &SightEntityField::options)
+            .function("v8TypedValue", &v8EntityFieldTypedValue);
         entityFieldClass.auto_wrap_objects(true);
-        module.set("entityFieldClass", entityFieldClass);
+        module.class_("entityFieldClass", entityFieldClass);
 
         v8pp::class_<SightEntity> entityClass(isolate);
         entityClass.ctor<>()
-            .set("simpleName", v8pp::property(&SightEntity::getSimpleName))
-            .set("packageName", v8pp::property(&SightEntity::getPackageName))
-            .set("name", &SightEntity::name)
-            .set("templateAddress", &SightEntity::templateAddress)
-            .set("fields", &SightEntity::fields);
-        module.set("entityClass", entityClass);
-
+            .function("simpleName", &SightEntity::getSimpleName)
+            .function("packageName", &SightEntity::getPackageName)
+            .var("name", &SightEntity::name)
+            .var("templateAddress", &SightEntity::templateAddress)
+            .var("fields", &SightEntity::fields);
+        module.class_("entityClass", entityClass);
     }
+
 
     void bindLanguage(v8::Isolate* isolate, const v8::Local<v8::Context>& context, v8pp::module& module){
         v8pp::class_<DefLanguage> defLanguage(isolate);
         defLanguage.ctor<int, int>()
-            .set("type", &DefLanguage::type)
-            .set("version", &DefLanguage::version);
-        module.set("DefLanguage", defLanguage);
+            .var("type", &DefLanguage::type)
+            .var("version", &DefLanguage::version);
+        module.class_("DefLanguage", defLanguage);
 
         v8pp::module langTypes(isolate);
-        langTypes.set_const("JavaScript", static_cast<int>(DefLanguageType::JavaScript));
-        langTypes.set_const("Java", static_cast<int>(DefLanguageType::Java));
-        langTypes.set_const("CSharp", static_cast<int>(DefLanguageType::CSharp));
-        langTypes.set_const("Cpp", static_cast<int>(DefLanguageType::Cpp));
-        langTypes.set_const("C", static_cast<int>(DefLanguageType::C));
-        module.set("DefLanguageTypes", langTypes);
+        langTypes.const_("JavaScript", static_cast<int>(DefLanguageType::JavaScript));
+        langTypes.const_("Java", static_cast<int>(DefLanguageType::Java));
+        langTypes.const_("CSharp", static_cast<int>(DefLanguageType::CSharp));
+        langTypes.const_("Cpp", static_cast<int>(DefLanguageType::Cpp));
+        langTypes.const_("C", static_cast<int>(DefLanguageType::C));
+        module.submodule("DefLanguageTypes", langTypes);
 
         // function
         auto global = context->Global();
@@ -1811,8 +1813,8 @@ namespace sight {
         v8pp::module module(isolate);
 
         // functions ...
-        module.set("addNode", &v8AddNode);
-        module.set("addBuildTarget", &v8AddBuildTarget);
+        module.function("addNode", &v8AddNode);
+        module.function("addBuildTarget", &v8AddBuildTarget);
 
         auto global = context->Global();
         auto addTemplateNodeFunc = v8pp::wrap_function(isolate, "addTemplateNode", v8AddTemplateNode);
@@ -1830,32 +1832,32 @@ namespace sight {
         v8pp::class_<GenerateOptions> generateOptionsClass(isolate);
         generateOptionsClass
             .ctor<>()
-            .set("noCode", &GenerateOptions::noCode)
-            .set("appendLineEnd", &GenerateOptions::appendLineEnd);
+            .var("noCode", &GenerateOptions::noCode)
+            .var("appendLineEnd", &GenerateOptions::appendLineEnd);
 
         v8pp::class_<SightNodeGenerateInfo> generateNodeClass(isolate);
         generateNodeClass
-            .set("hasGenerated", v8pp::property(&SightNodeGenerateInfo::hasGenerated));
-        module.set("SightNodeGenerateInfo", generateNodeClass);
+            .property("hasGenerated", &SightNodeGenerateInfo::hasGenerated);
+        module.class_("SightNodeGenerateInfo", generateNodeClass);
 
         v8pp::class_<GenerateArg$$> generateArg$$(isolate);
         generateArg$$
-            .set("helper", &GenerateArg$$::helper)
-            .set("errorReport", &GenerateArg$$::errorReport)
-            .set("insertSource", &v8InsertSource)
-            .set("ensureNodeGenerated", &v8EnsureNodeGenerated);
-        module.set("GenerateArg$$", generateArg$$);
+            .var("helper", &GenerateArg$$::helper)
+            .function("errorReport", &GenerateArg$$::errorReport)
+            .function("insertSource", &v8InsertSource)
+            .function("ensureNodeGenerated", &v8EnsureNodeGenerated);
+        module.class_("GenerateArg$", generateArg$$);
 
         v8pp::class_<SightEntityFunctions> entityFunctionsClass(isolate);
         entityFunctionsClass
-            .set("generateCodeWork", v8pp::property(&SightEntityFunctions::getGenerateCodeWork, &SightEntityFunctions::setGenerateCodeWork))
-            .set("onReverseActive", v8pp::property(&SightEntityFunctions::getOnReverseActive, &SightEntityFunctions::setOnReverseActive));
-        module.set("SightEntityFunctions", entityFunctionsClass);
+            .property("generateCodeWork", &SightEntityFunctions::getGenerateCodeWork, &SightEntityFunctions::setGenerateCodeWork)
+            .property("onReverseActive", &SightEntityFunctions::getOnReverseActive, &SightEntityFunctions::setOnReverseActive);
+        module.class_("SightEntityFunctions", entityFunctionsClass);
 
         v8pp::class_<ProjectWrapper> projectWrapperClass(isolate);
         projectWrapperClass
-            .set("parseAllGraphs", &ProjectWrapper::parseAllGraphs);
-        module.set("Project", projectWrapperClass);
+            .function("parseAllGraphs", &ProjectWrapper::parseAllGraphs);
+        module.class_("Project", projectWrapperClass);
 
         bindLanguage(isolate, context, module);
 
@@ -1991,8 +1993,7 @@ namespace sight {
 
         //
         v8::Local<v8::String> sourceCode = maySource.ToLocalChecked();
-        Local<Integer> lineOffset = Integer::New(isolate, 0);
-        ScriptOrigin scriptOrigin(v8pp::to_v8(isolate, filepath), lineOffset, lineOffset);
+        ScriptOrigin scriptOrigin(isolate, v8pp::to_v8(isolate, filepath), 0, 0);
         v8::ScriptCompiler::Source source(sourceCode, scriptOrigin);
         Local<Object> context_extensions[0];
         MaybeLocal<Function> mayFunction;
@@ -2336,6 +2337,7 @@ namespace sight {
                         ss << "${";
                     }
                 } else {
+                    
                     if (isalpha(item) || isnumber(item) || item == '.' || item == '_'
                         || item == '$') {
 
@@ -3105,7 +3107,7 @@ namespace sight {
         return names;
     }
 
-    int parseGraph(const char* filename, bool generateTargetLang, bool writeToOutFile) {
+    int parseGraph(std::string_view filename, bool generateTargetLang, bool writeToOutFile) {
         logDebug(filename);
         SightNodeGraph graph;
         int i = graph.load(filename);

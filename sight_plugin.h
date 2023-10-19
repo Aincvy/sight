@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "sight_defines.h"
+
 #include <string>
 #include "vector"
 #include <atomic>

@@ -3,6 +3,10 @@
 // Include node editor ui part and logic part.
 
 #pragma once
+
+#include "sight_defines.h"
+#include "v8pp/convert.hpp"
+
 #include <cstddef>
 #include <functional>
 #include <string>
@@ -15,14 +19,14 @@
 
 #include "sight.h"
 #include "sight_colors.h"
-#include "sight_defines.h"
 #include "sight_memory.h"
 #include "sight_js_parser.h"
 
 #include "v8.h"
-#include "v8pp/convert.hpp"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
+
+#include "absl/strings/substitute.h"
 
 using Isolate = v8::Isolate;
 
@@ -55,6 +59,7 @@ namespace sight {
         Both,
         // do not have a port, only field.  on this way, it should has a input box.
         Field,
+
     };
 
     struct SightNodeConnection;
@@ -864,7 +869,7 @@ namespace sight {
          * after call this function, this->filepath will be `path`.
          * @return CODE_OK success.  
          */
-        int load(const char *path);
+        int load(std::string_view path);
 
         int save();
 
