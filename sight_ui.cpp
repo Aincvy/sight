@@ -1,8 +1,9 @@
+
+#include "sight.h"
+
 #include "imgui.h"
 #include "imgui_internal.h"
-#include "imgui_impl_glfw.h"
-#include "imgui_impl_opengl3.h"
-#include "imgui_internal.h"
+
 #include "imgui_node_editor.h"
 
 #include "sight_terminal.h"
@@ -14,7 +15,6 @@
 #include "sight_nodes.h"
 #include "sight_ui_node_editor.h"
 #include "sight_ui_project.h"
-#include "sight.h"
 #include "sight_js.h"
 #include "sight_js_parser.h"
 #include "sight_project.h"
@@ -23,6 +23,7 @@
 #include "sight_colors.h"
 #include "sight_log.h"
 #include "sight_widgets.h"
+#include "sight_render.h"
 
 #include "v8pp/convert.hpp"
 
@@ -55,19 +56,10 @@
 #    include <sys/termios.h>
 #endif
 
-#    ifdef OPENGL
-#        include <GLFW/glfw3.h>
-#    endif
 
 #    define COMMON_LANGUAGE_KEYS g_UIStatus->languageKeys->commonKeys
 #    define WINDOW_LANGUAGE_KEYS g_UIStatus->languageKeys->windowNames
 #    define MENU_LANGUAGE_KEYS g_UIStatus->languageKeys->menuKeys
-
-// todo change this
-static void glfw_error_callback(int error, const char* description)
-{
-    fprintf(stderr, "Glfw Error %d: %s\n", error, description);
-}
 
 
 static sight::UIStatus* g_UIStatus = nullptr;
@@ -1471,104 +1463,8 @@ for(const item of a) {
         free(command);
     }
 
-    int initOpenGL() {
 
-#ifdef OPENGL
-        glfwSetErrorCallback(glfw_error_callback);
-        if (!glfwInit())
-            return CODE_FAIL;
-
-        // GL 3.2 + GLSL 150
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
-
-#ifdef __APPLE__
-        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // Required on Mac
-#endif
-
-        return CODE_OK;
-#else
-        return CODE_NOT_SUPPORTED;
-#endif
-    }
-
-    void* initOpenGLWindow(const char* title, int width, int height) {
-    #ifdef OPENGL
-        glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
-        GLFWwindow* window = glfwCreateWindow(width, height, title, nullptr, NULL);
-        if (window == nullptr)
-            return nullptr;
-        glfwMakeContextCurrent(window);
-        glfwSwapInterval(1);     // Enable vsync
-
-        // Setup Platform/Renderer backends
-        ImGui::CreateContext();
-        ImGui_ImplGlfw_InitForOpenGL(window, true);
-        const char* glsl_version = "#version 150";
-        ImGui_ImplOpenGL3_Init(glsl_version);
-
-        return window;
-#else
-        return nullptr;
-#endif
-    }
-
-    void mainLoopOpenGLWindow(void* glWindow, uv_loop_t* uvLoop,
-                              std::function<int()> beforeRenderFunc, std::function<void()> render_func) {
-#ifdef OPENGL
-
-        // Main loop
-        
-        ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-        GLFWwindow* window = (GLFWwindow*)glWindow;
-
-        while (!glfwWindowShouldClose(window) && !exitFlag) {
-            if (beforeRenderFunc() != CODE_OK) {
-                break;
-            }
-
-            // Poll and handle events (inputs, window resize, etc.)
-            // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
-            // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
-            // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
-            // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
-            glfwPollEvents();
-
-            // Start the Dear ImGui frame
-            ImGui_ImplOpenGL3_NewFrame();
-            ImGui_ImplGlfw_NewFrame();
-            ImGui::NewFrame();
-
-            render_func();
-
-            // Rendering
-            ImGui::Render();
-            int display_w, display_h;
-            glfwGetFramebufferSize(window, &display_w, &display_h);
-            glViewport(0, 0, display_w, display_h);
-            glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
-            glClear(GL_COLOR_BUFFER_BIT);
-            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-            glfwSwapBuffers(window);
-
-            uv_run(uvLoop, UV_RUN_NOWAIT);
-        }
-#endif
-    }
-
-    void cleanUpOpenGLWindow(void* glWindow) {
-#ifdef OPENGL
-        ImGui_ImplOpenGL3_Shutdown();
-        ImGui_ImplGlfw_Shutdown();
-        ImGui::DestroyContext();
-
-        glfwDestroyWindow((GLFWwindow*)glWindow);
-        #endif
-    }
-
-    int showLoadingWindow(){
+    int showLoadingWindow() {
         logDebug("start loading");
         // Create window with graphics context
         const int width = 640;
@@ -1576,27 +1472,22 @@ for(const item of a) {
 
         // Setup Dear ImGui context
         IMGUI_CHECKVERSION();
-#ifdef OPENGL
-        void* glWindow = initOpenGLWindow("sight - loading", width, height);
-        if (! glWindow) {
+
+        auto sightWindow = initWindow("sight - loading", width, height, [](ImGuiIO& io) {
+            io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+            io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
+        });
+        if (!sightWindow) {
             return CODE_FAIL;
         }
-#elif DirectX11
-        
-#endif
 
         ImGuiIO& io = ImGui::GetIO();
-        (void)io;
-        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
-
-
         // init ...
         g_UIStatus = new UIStatus({
-                                          true,
-                                          &io,
-                                          false,
-                                          getSightSettings()->windowStatus,
+                                    true,
+                                    &io,
+                                    false,
+                                    getSightSettings()->windowStatus,
                                   });
         UIStatus & uiStatus = *g_UIStatus;
         uiStatus.uvAsync = new uv_async_t();
@@ -1743,11 +1634,7 @@ for(const item of a) {
             ImGui::End();
         };
 
-#ifdef OPENGL
-        mainLoopOpenGLWindow(glWindow, uvLoop, beforeRenderFunc, renderFunc);
-#elif DirectX11
-
-#endif
+        mainLoopWindow(sightWindow, uvLoop, exitFlag, beforeRenderFunc, renderFunc);
 
         // load template nodes.
         for (int i = 0; i < 30; ++i) {
@@ -1755,12 +1642,8 @@ for(const item of a) {
         }
 
         // Cleanup
-#ifdef OPENGL
-        cleanUpOpenGLWindow(glWindow);
-#elif DirectX11
+        cleanUpWindow(sightWindow);
 
-#endif
-        
         logDebug("end loading");
         return 0;
     }
@@ -1780,22 +1663,14 @@ for(const item of a) {
         v8::Context::Scope contextScope(context);
         logDebug("v8 runtime init over.");
 
-
-#ifdef OPENGL
-        void* glWindow = initOpenGLWindow("sight - a code generate tool", 1600, 900);
-        if (!glWindow) {
-            return CODE_FAIL;
-        }
-#elif DirectX11
-
-#endif
-
+        auto sightWindow = initWindow("sight - a code generate tool", 1600, 900, [](ImGuiIO& io) {
+            io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+            io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
+            // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;         // Enable Multi-Viewport / Platform Windows
+        });
         // Setup Dear ImGui context
 
-        ImGuiIO& io = ImGui::GetIO(); (void)io;
-        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;           // Enable Docking
-        // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;         // Enable Multi-Viewport / Platform Windows
+        ImGuiIO& io = ImGui::GetIO();
         
         io.ConfigWindowsMoveFromTitleBarOnly = true;
         io.Fonts->AddFontDefault();
@@ -1838,13 +1713,10 @@ for(const item of a) {
             g_UIStatus->needInit = false;
         };
 
-#ifdef OPENGL
-        mainLoopOpenGLWindow(glWindow, uvLoop, beforeRenderFunc, renderFunc);
+        bool exitFlag = false;
+        mainLoopWindow(sightWindow, uvLoop, exitFlag, beforeRenderFunc, renderFunc);
         // Cleanup
-        cleanUpOpenGLWindow(glWindow);
-#elif DirectX11
-
-#endif
+        cleanUpWindow(sightWindow);
 
         return 0;
     }
@@ -1852,11 +1724,7 @@ for(const item of a) {
     void destroyWindows() {
         destroyNodeEditor(true, true);
 
-#ifdef OPENGL
-        glfwTerminate();
-#elif DirectX11
-
-#endif
+        terminateBackend();
 
         g_UIStatus->entityOperations.reset();
         g_UIStatus->v8GlobalContext.Reset();

@@ -1,11 +1,13 @@
 //
 // Created by Aincvy(aincvy@gmail.com) on 2021/7/26.
 //
-#include "stdio.h"
+// #include "stdio.h"
 
 #include "sight_defines.h"
 #include "sight_log.h"
 #include "absl/strings/substitute.h"
+
+#include <iostream>
 
 static std::function<void(sight::LogLevel, std::string_view msg)> logWriter = nullptr;
 
@@ -35,9 +37,13 @@ namespace sight {
     }
 
     void callLogWriter(LogLevel l, const char* msg) {
+
         if (logWriter) {
             logWriter(l, msg);
         }
+
+        // print to stdout
+        std::cout << msg << std::endl;
     }
     
 }

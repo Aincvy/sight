@@ -64,5 +64,8 @@ v8 库来自：  https://globalcdn.nuget.org/packages/v8-v143-x64.11.8.172.15.nu
 
 v8有问题的地方在于，  有一个API 被废弃了， 但是头文件里面还有， 只是没有实现了。。。 
 
+从这里下载 v8库的dll文件：  https://globalcdn.nuget.org/packages/v8.redist-v143-x64.11.9.169.4.nupkg
+解压后放到build 目录里面
 
+使用这个工具可以查看符号和dll依赖：  https://github.com/lucasg/Dependencies
 

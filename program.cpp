@@ -5,6 +5,7 @@
 #include "sight_util.h"
 #include "sight_network.h"
 #include "sight_log.h"
+#include "sight_render.h"
 
 #include <signal.h>
 #include <thread>
@@ -60,7 +61,7 @@ int main(int argc, char* argv[]){
     // initNetworkServer(getSightSettings()->networkListenPort);
     // std::thread networkThread(sight::runNetworkThread);
     
-    sight::initOpenGL();
+    sight::initWindowBackend();
     sight::showLoadingWindow();
     if (currentProject() != nullptr) {
         sight::showMainWindow();

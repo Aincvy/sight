@@ -62,6 +62,8 @@ if(WIN32)
         MESSAGE(STATUS "WIN32 Env")
         target_compile_definitions(sight PRIVATE DirectX11)
 
+        target_sources(sight PRIVATE sight_render_directx11.cpp)
+
         # v8
         SET(V8_DIR "F:/Library/v8")
 
@@ -71,11 +73,12 @@ if(WIN32)
 
         # V8_LIBRARIES
         SET(V8_LIBRARIES
-                "${V8_DIR}/lib/Debug/third_party_icu_icui18n.dll.lib"
-                "${V8_DIR}/lib/Debug/third_party_zlib.dll.lib"
-                "${V8_DIR}/lib/Debug/v8_libbase.dll.lib"
-                "${V8_DIR}/lib/Debug/v8_libplatform.dll.lib"
-                "${V8_DIR}/lib/Debug/v8.dll.lib"
+                # "${V8_DIR}/lib/Release/third_party_abseil-cpp_absl.dll.lib"
+                # "${V8_DIR}/lib/Release/third_party_icu_icui18n.dll.lib"
+                # "${V8_DIR}/lib/Release/third_party_zlib.dll.lib"
+                "${V8_DIR}/lib/Release/v8_libbase.dll.lib"
+                "${V8_DIR}/lib/Release/v8_libplatform.dll.lib"
+                "${V8_DIR}/lib/Release/v8.dll.lib"
         )
         
         # libuv
@@ -109,6 +112,7 @@ if(WIN32)
         
 else()
   target_compile_definitions(sight PRIVATE OPENGL NOT_WIN32)
+  target_sources(sight PRIVATE sight_render_opengl.cpp)
 
   # V8
   SET(V8_DIR "/opt/v8")
