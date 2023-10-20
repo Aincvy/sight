@@ -196,7 +196,7 @@ namespace sight {
         v8::HandleScope handle_scope(isolate);
         auto context = isolate->GetCurrentContext();
         v8::ScriptCompiler::Source source(sourceCode.ToLocalChecked());
-        auto mayFunction = v8::ScriptCompiler::CompileFunctionInContext(context, &source, 0, nullptr, 0, nullptr);
+        auto mayFunction = v8::ScriptCompiler::CompileFunction(context, &source, 0, nullptr);
         if (mayFunction.IsEmpty()) {
             return CODE_PLUGIN_COMPILE_FAIL;
         }

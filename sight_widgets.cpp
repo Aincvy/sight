@@ -392,17 +392,17 @@ namespace sight {
         }
     }
 
-    SightKey::SightKey(ushort code)
+    SightKey::SightKey(int code)
         : code(code) {
     }
 
     bool SightKey::isKeyReleased() const {
         logDebug(code);
-        return ImGui::IsKeyReleased(code);
+        return ImGui::IsKeyReleased((ImGuiKey)code);
     }
 
     bool SightKey::isKeyDown() const {
-        return ImGui::IsKeyDown(code);
+        return ImGui::IsKeyDown((ImGuiKey)code);
     }
 
     bool SightKey::isKeyUp() const {
@@ -410,7 +410,7 @@ namespace sight {
     }
 
     bool SightKey::IsKeyPressed(bool repeat) const {
-        return ImGui::IsKeyPressed(code, repeat);
+        return ImGui::IsKeyPressed((ImGuiKey)code, repeat);
     }
 
     bool SightEmptyKey::isKeyReleased() const {
@@ -457,7 +457,7 @@ namespace sight {
     bool SightTwoKey::isKeyReleased() const {
         logDebug("1");
         if (this->both) {
-            ImGui::IsKeyPressed(1);
+            // ImGui::IsKeyPressed((ImGuiKey)1);     // why zheli you ge 1 ?
             return key1->isKeyReleased() && key2->isKeyReleased();
         }
         return key1->isKeyReleased() || key2->isKeyReleased();

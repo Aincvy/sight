@@ -6,6 +6,7 @@
 
 #ifdef _WIN32
 #    define NOMINMAX
+#    define YAML_CPP_API
 #endif
 
 #include <string>

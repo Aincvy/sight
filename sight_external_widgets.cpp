@@ -100,7 +100,7 @@ namespace sight {
                 state.activeIdx = i;
                 clicked = 1;
             }
-            if (IsItemFocused() && IsKeyPressed(GetIO().KeyMap[ImGuiKey_Enter])) {
+            if (IsItemFocused() && IsKeyPressed((ImGuiKey)(GetIO().KeyMap[ImGuiKey_Enter]))) {
                 // Allow ENTER key to select current highlighted item (w/ keyboard navigation)
                 state.activeIdx = i;
                 clicked = 1;

@@ -71,12 +71,11 @@ if(WIN32)
 
         # V8_LIBRARIES
         SET(V8_LIBRARIES
-                "${V8_DIR}/lib/Release/third_party_abseil-cpp_absl.dll.lib"
-                "${V8_DIR}/lib/Release/third_party_icu_icui18n.dll.lib"
-                "${V8_DIR}/lib/Release/third_party_zlib.dll.lib"
-                "${V8_DIR}/lib/Release/v8_libbase.dll.lib"
-                "${V8_DIR}/lib/Release/v8_libplatform.dll.lib"
-                "${V8_DIR}/lib/Release/v8.dll.lib"
+                "${V8_DIR}/lib/Debug/third_party_icu_icui18n.dll.lib"
+                "${V8_DIR}/lib/Debug/third_party_zlib.dll.lib"
+                "${V8_DIR}/lib/Debug/v8_libbase.dll.lib"
+                "${V8_DIR}/lib/Debug/v8_libplatform.dll.lib"
+                "${V8_DIR}/lib/Debug/v8.dll.lib"
         )
         
         # libuv
@@ -87,8 +86,8 @@ if(WIN32)
         )
 
         # tree-sitter
-        # find_library(TREE_SITTER_LIBRARY "libtree-sitter-cpp" HINTS "F:\\Library\\Other")
-        SET(TREE_SITTER_LIBRARY "F:\\Library\\Other\\libtree-sitter-cpp.dll")
+        # SET(TREE_SITTER_LIBRARY "F:\\Library\\Other\\libtree-sitter-cpp.dll")
+        SET(TREE_SITTER_LIBRARY "F:\\Library\\tree-sitter\\lib\\build\\\\Debug\\tree-sitter.lib")
         SET(TREE_SITTER_INCLUDE_DIR "F:\\Library\\tree-sitter\\lib\\include")
         target_include_directories(sight PRIVATE ${TREE_SITTER_INCLUDE_DIR})
 

@@ -1,22 +1,62 @@
 # build dependencies ..
 
-SET(
-        IMGUI_SOURCES
-        ${CMAKE_CURRENT_LIST_DIR}/imgui/imgui.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/imgui/imgui_draw.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/imgui/imgui_widgets.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/imgui/imgui_tables.cpp
-)
-
 if (UNIX AND NOT APPLE)
     set(LINUX TRUE)
 endif()
+
+
+SET(
+        IMGUI_SOURCES
+        ${CMAKE_CURRENT_LIST_DIR}/imgui/imconfig.h
+        ${CMAKE_CURRENT_LIST_DIR}/imgui/imgui_draw.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/imgui/imgui_internal.h
+        ${CMAKE_CURRENT_LIST_DIR}/imgui/imgui_tables.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/imgui/imgui_widgets.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/imgui/imgui.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/imgui/imgui.h
+        ${CMAKE_CURRENT_LIST_DIR}/imgui/imstb_rectpack.h
+        ${CMAKE_CURRENT_LIST_DIR}/imgui/imstb_textedit.h
+        ${CMAKE_CURRENT_LIST_DIR}/imgui/imstb_truetype.h
+)
+
+
+# imgui-node-editor
+SET(
+        IMGUI_NODE_EDITOR_SOURCES
+        ${CMAKE_CURRENT_LIST_DIR}/imgui-node-editor/crude_json.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/imgui-node-editor/crude_json.h
+        ${CMAKE_CURRENT_LIST_DIR}/imgui-node-editor/imgui_bezier_math.h
+        ${CMAKE_CURRENT_LIST_DIR}/imgui-node-editor/imgui_bezier_math.inl
+        ${CMAKE_CURRENT_LIST_DIR}/imgui-node-editor/imgui_canvas.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/imgui-node-editor/imgui_canvas.h
+        ${CMAKE_CURRENT_LIST_DIR}/imgui-node-editor/imgui_extra_math.h
+        ${CMAKE_CURRENT_LIST_DIR}/imgui-node-editor/imgui_extra_math.inl
+        ${CMAKE_CURRENT_LIST_DIR}/imgui-node-editor/imgui_node_editor_api.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/imgui-node-editor/imgui_node_editor_internal.h
+        ${CMAKE_CURRENT_LIST_DIR}/imgui-node-editor/imgui_node_editor_internal.inl
+        ${CMAKE_CURRENT_LIST_DIR}/imgui-node-editor/imgui_node_editor.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/imgui-node-editor/imgui_node_editor.h
+)
+
+SET(
+        SIGHT_UTIL_SOURCES
+        ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_log.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_queue.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/sight-util/shared_queue.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_language.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_address.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_util.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_memory.cpp
+)
+
 
 if (LINUX OR APPLE)
     list(APPEND IMGUI_SOURCES 
         ${CMAKE_CURRENT_LIST_DIR}/imgui/backends/imgui_impl_glfw.cpp
         ${CMAKE_CURRENT_LIST_DIR}/imgui/backends/imgui_impl_opengl3.cpp
     )
+
+
 elseif(WIN32)
     list(APPEND IMGUI_SOURCES 
         ${CMAKE_CURRENT_LIST_DIR}/imgui/backends/imgui_impl_win32.cpp
@@ -24,7 +64,18 @@ elseif(WIN32)
     )
 endif()
 
-add_library(imgui SHARED ${IMGUI_SOURCES})
+# add_library(imgui SHARED ${IMGUI_SOURCES})
+
+if(WIN32)
+    add_library(imgui STATIC ${IMGUI_SOURCES})
+    add_library(imgui_node_editor STATIC ${IMGUI_NODE_EDITOR_SOURCES})
+    add_library(sight-util STATIC ${SIGHT_UTIL_SOURCES})
+else()
+    add_library(imgui_node_editor SHARED ${IMGUI_NODE_EDITOR_SOURCES})
+    add_library(imgui SHARED ${IMGUI_SOURCES})
+    add_library(sight-util SHARED ${SIGHT_UTIL_SOURCES})
+endif()
+
 
 if (LINUX OR APPLE)
     # OpenGL
@@ -45,6 +96,7 @@ if (LINUX OR APPLE)
             glfw
             OpenGL::GL
     )
+
 elseif(WIN32)
     # DirectX
     # Assuming DirectX is already installed on Windows
@@ -71,19 +123,6 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
         )
 endif()
 
-# imgui-node-editor
-SET(
-        IMGUI_NODE_EDITOR_SOURCES
-        ${CMAKE_CURRENT_LIST_DIR}/imgui-node-editor/crude_json.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/imgui-node-editor/imgui_bezier_math.inl
-        ${CMAKE_CURRENT_LIST_DIR}/imgui-node-editor/imgui_canvas.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/imgui-node-editor/imgui_extra_math.inl
-        ${CMAKE_CURRENT_LIST_DIR}/imgui-node-editor/imgui_node_editor.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/imgui-node-editor/imgui_node_editor_api.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/imgui-node-editor/imgui_node_editor_internal.inl
-)
-
-add_library(imgui_node_editor SHARED ${IMGUI_NODE_EDITOR_SOURCES})
 
 target_include_directories(
         imgui_node_editor PUBLIC
@@ -91,25 +130,13 @@ target_include_directories(
         ${CMAKE_CURRENT_LIST_DIR}/imgui
 )
 
-target_link_libraries(
-        imgui_node_editor PRIVATE
-        imgui
-)
+target_link_libraries( imgui_node_editor PRIVATE imgui )
 
 
 # sight-util
-SET(
-        SIGHT_UTIL_SOURCES
-        ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_log.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_queue.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/sight-util/shared_queue.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_language.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_address.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_util.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/sight-util/sight_memory.cpp
-)
 
-add_library(sight-util SHARED ${SIGHT_UTIL_SOURCES})
+
+# add_library(sight-util SHARED ${SIGHT_UTIL_SOURCES})
 
 target_include_directories(
         sight-util PUBLIC

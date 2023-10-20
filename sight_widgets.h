@@ -42,12 +42,12 @@ namespace sight {
     };
 
     class SightKey : public SightEmptyKey {
-        ushort code{0};
+        int code{0};
 
     public:
         SightKey() = default;
         SightKey(SightKey const& key) = default;
-        SightKey(ushort code);
+        SightKey(int code);
         ~SightKey() = default;
 
         bool isKeyReleased() const override;

@@ -13,6 +13,7 @@
 #include "sight_js.h"
 #include "sight_project.h"
 
+
 #include "yaml-cpp/yaml.h"
 
 static sight::SightSettings sightSettings;

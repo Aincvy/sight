@@ -570,7 +570,7 @@ namespace sight {
             ScriptCompiler::Source source(code);
             auto arg = v8pp::to_v8(isolate, "arg");
             Local<String> args[] = {arg};
-            auto function = ScriptCompiler::CompileFunctionInContext(context, &source, 1, args, 0, nullptr).ToLocalChecked();
+            auto function = ScriptCompiler::CompileFunction(context, &source, 1, args).ToLocalChecked();
             Local<Value> argv[] = {value};
             auto result = function->Call(context, Object::New(isolate), 1, argv).ToLocalChecked();
             return v8pp::from_v8<std::string>(isolate, result);
@@ -1995,18 +1995,16 @@ namespace sight {
         v8::Local<v8::String> sourceCode = maySource.ToLocalChecked();
         ScriptOrigin scriptOrigin(isolate, v8pp::to_v8(isolate, filepath), 0, 0);
         v8::ScriptCompiler::Source source(sourceCode, scriptOrigin);
-        Local<Object> context_extensions[0];
         MaybeLocal<Function> mayFunction;
 
         if (module.IsEmpty() || module->IsNullOrUndefined()) {
-            mayFunction = v8::ScriptCompiler::CompileFunctionInContext(context, &source, 0, nullptr, 0, context_extensions);
+            mayFunction = v8::ScriptCompiler::CompileFunction(context, &source, 0, nullptr);
         } else {
             v8::Local<v8::String> paramModule = v8::String::NewFromUtf8(isolate, "module").ToLocalChecked();
             v8::Local<v8::String> paramExports = v8::String::NewFromUtf8(isolate, "exports").ToLocalChecked();
             v8::Local<v8::String> arguments[] { paramModule, paramExports};
 
-            mayFunction = v8::ScriptCompiler::CompileFunctionInContext(context, &source, std::size(arguments), arguments,
-                                                                       0, context_extensions);
+            mayFunction = v8::ScriptCompiler::CompileFunction(context, &source, std::size(arguments), arguments);
         }
         
         if (mayFunction.IsEmpty()) {
@@ -2165,11 +2163,10 @@ namespace sight {
                                       GenerateOptions* options = nullptr, GenerateFunctionStatus* status = nullptr, int reverseActivePort = -1 ) {
         auto sourceCode = v8pp::to_v8(isolate, functionCode);
         ScriptCompiler::Source source(sourceCode);
-        Local<Object> contextExt[0];
         v8::Local<v8::String> param$ = v8::String::NewFromUtf8(isolate, "$").ToLocalChecked();
         v8::Local<v8::String> paramOptions = v8::String::NewFromUtf8(isolate, "$$").ToLocalChecked();
         v8::Local<v8::String> arguments[] = {param$, paramOptions};
-        auto mayTargetFunction = ScriptCompiler::CompileFunctionInContext(context, &source, std::size(arguments), arguments, 0,contextExt);
+        auto mayTargetFunction = ScriptCompiler::CompileFunction(context, &source, std::size(arguments), arguments);
         if (mayTargetFunction.IsEmpty()) {
             logDebug("code compiles error: $0", functionCode.c_str());
             return {};
@@ -2822,7 +2819,7 @@ namespace sight {
         sourceCode = "return " + sourceCode;
 
         v8::ScriptCompiler::Source source(v8pp::to_v8(isolate, sourceCode.c_str()));
-        auto mayFunction = v8::ScriptCompiler::CompileFunctionInContext(context, &source, 0, nullptr, 0, nullptr);
+        auto mayFunction = v8::ScriptCompiler::CompileFunction(context, &source, 0, nullptr);
         Local<Value> tmp;
         if (!mayFunction.IsEmpty() && (tmp = mayFunction.ToLocalChecked())->IsFunction()) {
             tmp = tmp.As<Function>()->Call(context, Object::New(isolate), 0, nullptr).ToLocalChecked();
