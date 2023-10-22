@@ -60,7 +60,8 @@ yaml 库来自：   https://globalcdn.nuget.org/packages/fluid.yaml-cpp.1.0.10.n
 
 
 现在到v8 了
-v8 库来自：  https://globalcdn.nuget.org/packages/v8-v143-x64.11.8.172.15.nupkg
+v8 库来自：  https://globalcdn.nuget.org/packages/v8-v143-x64.11.8.172.15.nupkg      
+上面的版本有问题， 要使用这个版本：   https://globalcdn.nuget.org/packages/v8-v143-x64.11.9.169.4.nupkg   
 
 v8有问题的地方在于，  有一个API 被废弃了， 但是头文件里面还有， 只是没有实现了。。。 
 
@@ -75,7 +76,15 @@ v8有问题的地方在于，  有一个API 被废弃了， 但是头文件里�
 现在考虑的方向
 - 使用 msvc 编译项目
   - no luck       和clang 一样的错误。。。 
+  - 屏蔽一下 sight_js.cpp 文件， 看看能不能启动。 
+  - yaml-test 里面，  即使加入了v8 也还是能成功启动到main 函数
+  - 屏蔽了 sight_js.cpp 之后， 确实能启动了。。  但是目前的问题是，这个文件非常巨大。。  我日。。
+  - 应该还是和v8pp 有关系， 目前bindXX 函数是有问题的。。。 
+  - `v8::Exception::TypeError(v8pp::to_v8(isolate, "Not impl."))`   TypeError 居然是一个v8里面的类型！ 我草了， 我以为是windows 给的提示呢。。 
+  - 原因是 lib文件和 dll 文件里面的符号表不一致。。  日了。  ~~所以我现在要自己手动的编译v8 ~~
+  - 确实不一样， 是我下载 nuget 的版本不一样。。  早知道还是使用nuget 下载了， 而不是手动下载。。。 
 - 使用clang 本地编译v8 
+  - 先尝试用 clang把， 不行的话， 再使用msvc 
 
 使用一个简单的项目进行了一些测试， 我发现确实是这样的， 使用clang编译的话， 就无法使用这个dll , 如果使用 msvc的话就可以。。 
 
