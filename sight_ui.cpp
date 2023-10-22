@@ -1533,8 +1533,8 @@ for(const item of a) {
         // terminal and log
         g_UIStatus->terminalData.terminal = new ImTerm::terminal<TerminalCommands>(g_UIStatus->terminalData.runtimeArgs);
         g_UIStatus->terminalData.terminal->theme() = ImTerm::themes::cherry;
-        auto logWriterFunc = [](LogLevel l, std::string_view msg){
-            if (g_UIStatus->terminalData.stopLogging) {
+        auto logWriterFunc = [](LogLevel l, std::string_view msg) {
+            if (!g_UIStatus || g_UIStatus->terminalData.stopLogging) {
                 return;
             }
 

@@ -105,6 +105,7 @@ namespace sight {
             buffer << str ;
             auto tmp = buffer.str();
             std::cout << tmp << std::endl;
+            
             callLogWriter(this->l, tmp.c_str());
         }
 

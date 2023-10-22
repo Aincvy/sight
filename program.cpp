@@ -47,6 +47,16 @@ int main(int argc, char* argv[]){
 
     logDebug("init project");
     auto settings = getSightSettings();
+    auto& sightRootFolder = settings->sightRootFolder;
+    if (!sightRootFolder.empty()) {
+        logDebug("sight root folder: $0", sightRootFolder);
+        // check exists, if yes, change working dir to it.
+        if (std::filesystem::exists(sightRootFolder)) {
+            std::filesystem::current_path(sightRootFolder);
+            logDebug("change working directory: $0", std::filesystem::current_path().generic_string());
+        }
+    }
+
     if (!settings->lastOpenProject.empty()) {
         openProject(settings->lastOpenProject.c_str(), true);
     } else {

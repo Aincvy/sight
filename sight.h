@@ -1,4 +1,4 @@
-//
+﻿//
 // Created by Aincvy(aincvy@gmail.com) on 2021/7/21.
 //
 #pragma once
@@ -153,7 +153,14 @@ namespace sight {
 
         bool autoSave = false;
 
+        bool b = false;
+
         std::string lastUseEntityOperation = "";
+        // 会将当前的工作目录切换到这个目录
+        // 主要是用于调试的时候， 以及sight.exe 和项目不在同一个目录的时候
+        std::string sightRootFolder = "";
+
+        int i =1;
     };
 
     /**

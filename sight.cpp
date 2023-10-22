@@ -84,6 +84,13 @@ namespace sight {
             sightSettings.lastUseEntityOperation = n.as<std::string>();
         }
 
+        n = root["sightRootFolder"];
+        if (n.IsDefined()) {
+            sightSettings.sightRootFolder = n.as<std::string>();
+        }
+
+        sightSettings.b = true;
+        sightSettings.i = 10;
         return CODE_OK;
     }
 
@@ -111,6 +118,7 @@ namespace sight {
         out << YAML::EndMap;        // end of windowStatus
         
         out << YAML::Key << "lastUseEntityOperation" << YAML::Value << sightSettings.lastUseEntityOperation;
+        out << YAML::Key << "sightRootFolder" << YAML::Value << sightSettings.sightRootFolder;
 
         out << YAML::EndMap;
         std::ofstream fOut(sightSettings.path, std::ios::out | std::ios::trunc);

@@ -212,7 +212,7 @@ namespace sight {
      * @param basePath 
      * @return std::string 
      */
-    std::string openFolderDialog(const char* basePath, int* status);
+    std::string openFolderDialog(std::string_view basePath, int* status);
 
     /**
      * @brief 

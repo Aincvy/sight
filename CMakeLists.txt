@@ -65,7 +65,7 @@ if(WIN32)
         target_sources(sight PRIVATE sight_render_directx11.cpp)
 
         # v8
-        SET(V8_DIR "F:/Library/v8")
+        SET(V8_DIR "F:/Library/v8-libs-files")
 
 
         # V8_INCLUDE_DIR
@@ -129,7 +129,7 @@ else()
 endif()
 
 target_include_directories(sight PRIVATE ${V8_INCLUDE_DIR})
-target_compile_definitions(sight PRIVATE V8_COMPRESS_POINTERS V8_31BIT_SMIS_ON_64BIT_ARCH)
+target_compile_definitions(sight PRIVATE V8_COMPRESS_POINTERS V8_31BIT_SMIS_ON_64BIT_ARCH V8_ENABLE_SANDBOX)
 
 # tree-sitter
 

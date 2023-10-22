@@ -41,9 +41,6 @@ namespace sight {
         if (logWriter) {
             logWriter(l, msg);
         }
-
-        // print to stdout
-        std::cout << msg << std::endl;
     }
     
 }

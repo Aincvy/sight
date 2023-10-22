@@ -1535,7 +1535,7 @@ namespace sight {
         }
 
         // Initialize V8.
-        v8::V8::InitializeICUDefaultLocation(execPath);
+        v8::V8::InitializeICU();
         v8::V8::InitializeExternalStartupData(execPath);
         std::unique_ptr<v8::Platform> platform = v8::platform::NewDefaultPlatform();
         v8::V8::InitializePlatform(platform.get());

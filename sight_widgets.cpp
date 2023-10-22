@@ -176,20 +176,31 @@ namespace sight {
         return {};
     }
 
-    std::string openFolderDialog(const char* basePath, int* status) {
+    std::string openFolderDialog(std::string_view basePath, int* status) {
         // initialize NFD
         NFD::Guard nfdGuard;
         // auto-freeing memory
         NFD::UniquePath outPath;
 
-        nfdresult_t result = NFD::PickFolder(outPath, basePath);
+        
+#ifdef _WIN32
+        const char* defaultPath = nullptr;
+        if (basePath.length() >= 1 && basePath[0] != '.') {
+            defaultPath = basePath.data();
+        }
+#else
+        const char* defaultPath = basePath.data();
+#endif
+        logDebug("openFolderDialog defaultPath: $0", defaultPath);
+        nfdresult_t result = NFD::PickFolder(outPath, defaultPath);
         if (result == NFD_OKAY) {
             SET_CODE(status, CODE_OK);
             return outPath.get();
         } else if (result == NFD_CANCEL) {
             SET_CODE(status, CODE_USER_CANCELED);
         } else {
-            std::cout << "Error: " << NFD::GetError() << std::endl;
+            // std::cout << "Error: " << NFD::GetError() << std::endl;
+            logError(NFD::GetError());
             SET_CODE(status, CODE_ERROR);
         }
 
