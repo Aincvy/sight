@@ -1,4 +1,4 @@
-#include "sight_keybindings.h"
+﻿#include "sight_keybindings.h"
 #include "sight_log.h"
 #include "sight_util.h"
 #include "sight_widgets.h"

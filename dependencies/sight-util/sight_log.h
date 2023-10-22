@@ -14,6 +14,8 @@
 #include <ctime>
 #include "absl/strings/substitute.h"
 
+#include "sight_util.h"
+
 namespace sight {
 
 #ifdef SIGHT_DEBUG
@@ -99,6 +101,13 @@ namespace sight {
             // }
         }
 
+        void nextAndWrite(std::string_view str) {
+            buffer << str ;
+            auto tmp = buffer.str();
+            std::cout << tmp << std::endl;
+            callLogWriter(this->l, tmp.c_str());
+        }
+
         template<typename T>
         std::void_t<decltype(std::declval<std::ostream&>() << std::declval<T>())> print(T u) {
             buffer << u;
@@ -110,11 +119,12 @@ namespace sight {
 
         template<typename... Args>
         void print(const char* fmt, Args&&... args) {
-            buffer << printValues(fmt, std::forward<Args>(args)...);
-            auto tmp = buffer.str();
-            std::cout << tmp << std::endl;
+            nextAndWrite(printValues(fmt, std::forward<Args>(args)...));
+        }
 
-            callLogWriter(this->l, tmp.c_str());
+        template<typename... Args>
+        void print(const wchar_t* fmt, Args&&... args) {
+            nextAndWrite(printValues(fmt, std::forward<Args>(args)...));
         }
 
         absl::substitute_internal::Arg convert(sight::NodePortType type) {
@@ -133,6 +143,12 @@ namespace sight {
         template<typename... Args>
         std::string printValues(const char* fmt, Args&&... args) {
             return absl::Substitute(fmt, convertIfNodePortType(std::forward<Args>(args))...);
+        }
+
+        template<typename... Args>
+        std::string printValues(const wchar_t* fmt, Args&&... args) {
+            auto str = narrow(fmt);
+            return absl::Substitute(str.c_str(), convertIfNodePortType(std::forward<Args>(args))...);
         }
     };
 

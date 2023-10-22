@@ -371,7 +371,7 @@ for(const item of a) {
                 }
                 ImGui::EndCombo();
             }
-            ImGui::Text(u8"在吗，这里是下一行");
+            // ImGui::Text(u8"在吗，这里是下一行");
 
             ImGui::Button(ICON_MD_SEARCH " Search");
             ImGui::Text(ICON_MD_REPEAT " Repeat");
@@ -1579,7 +1579,7 @@ for(const item of a) {
         };
 
         //
-        auto renderFunc = [&exitFlag, &progress, &uiStatus, &pluginStartLoad, &folderError, &lastOpenFolder]() {
+        auto renderFunc = [=,&exitFlag, &progress, &uiStatus, &pluginStartLoad, &folderError, &lastOpenFolder]() {
             ImGui::SetNextWindowPos(ImVec2(0, 0));
             ImGui::SetNextWindowSize(ImVec2(width, height));
             ImGui::Begin("loading", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize);

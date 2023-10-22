@@ -158,4 +158,14 @@ namespace sight {
         return ss.str();
     }
 
+    std::string narrow(const std::wstring& str) {
+        std::ostringstream stm;
+
+        // Correct code.
+        const std::ctype<wchar_t>& ctfacet = use_facet<std::ctype<wchar_t>>(stm.getloc());
+
+        for (size_t i = 0; i < str.size(); ++i)
+            stm << ctfacet.narrow(str[i], 0);
+        return stm.str();
+    }
 }

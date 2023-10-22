@@ -2347,8 +2347,7 @@ namespace sight {
         auto context = isolate->GetCurrentContext();
         auto recv = v8pp::class_<SightNode>::reference_external(isolate, node);
 
-        Local<Value> args[0];
-        auto result = f->Call(context, recv, 0, args);
+        auto result = f->Call(context, recv, 0, nullptr);
         v8pp::class_<SightNode>::unreference_external(isolate, node);
         if (result.IsEmpty()) {
             return;

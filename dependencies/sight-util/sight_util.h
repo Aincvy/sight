@@ -4,13 +4,13 @@
 
 #pragma once
 
-#include "string"
 #include <algorithm>
 #include <cstddef>
 #include <cstdio>
 #include <string>
 #include <string_view>
 #include <vector>
+
 
 namespace sight {
 
@@ -172,7 +172,9 @@ namespace sight {
      * @return std::string 
      */
     std::string removeExcessSpaces(std::string_view str, int indentSpaceCount = 2);
-    
 
+#ifdef _WIN32
+    std::string narrow(const std::wstring& str);
+#endif
 
 }

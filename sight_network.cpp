@@ -157,10 +157,12 @@ namespace sight {
         }
 
         bufferLen -= 2;
-        char buffer[bufferLen];
+        // char buffer[bufferLen];
+        auto buffer = new char[bufferLen];
         auto readSize = bufferStream.readsome(buffer, bufferLen);
         assert(readSize == bufferLen);
         OnMsg(command, buffer, readSize);
+        delete[] buffer;
     }
 
     SightNetClient* SightNetServer::findClient(uv_tcp_t* client) {
@@ -194,9 +196,9 @@ namespace sight {
 
     std::string SightNetBaseMsg::readString() {
         auto size = readShort();
-        char buf[size];
-        stream.readsome(buf, size);
-        return std::string(buf, size);
+        std::vector<char> buf(size);
+        stream.readsome(buf.data(), size);
+        return std::string(buf.begin(), buf.end());
     }
 
     SightNetBaseMsg::SightNetBaseMsg(const char* buffer, int size)

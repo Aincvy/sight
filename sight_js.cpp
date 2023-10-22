@@ -568,7 +568,7 @@ namespace sight {
             auto context = isolate->GetCurrentContext();
             auto code = v8pp::to_v8(isolate, "return String(arg)");
             ScriptCompiler::Source source(code);
-            auto arg = v8pp::to_v8(isolate, "arg");
+            Local<String> arg = v8pp::to_v8(isolate, "arg");
             Local<String> args[] = {arg};
             auto function = ScriptCompiler::CompileFunction(context, &source, 1, args).ToLocalChecked();
             Local<Value> argv[] = {value};

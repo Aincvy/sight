@@ -132,7 +132,9 @@ namespace sight {
             notUsed.clear();
         }
 
-
+        bool containsNotUsed(int data) const {
+            return notUsed.find(data) != notUsed.end();
+        }
 
         struct SightArrayConstIterator {
             SightArray const* arrayPointer;
@@ -153,7 +155,9 @@ namespace sight {
             SightArrayConstIterator operator++() {
                 do {
                     current++;
-                } while (arrayPointer->notUsed.template contains(current));
+
+                } while (arrayPointer->containsNotUsed(current));
+
                 return *this;
             }
             SightArrayConstIterator operator++(int) { SightArrayConstIterator tmp = *this; ++(*this); return tmp; }
@@ -196,7 +200,7 @@ namespace sight {
 
     private:
         T **pointer = nullptr;
-//        std::vector<int> notUsed;
+        // 从0到当前的索引中间可能存在被移除的元素， 哪些索引数据将保存到下面的set 里面
         absl::flat_hash_set<int> notUsed;
 
         size_t arraySize = 0;
@@ -271,7 +275,7 @@ namespace sight {
 
         [[nodiscard]] size_t findFirstValidIndex() const{
             int i = 0;
-            while (notUsed.template contains(i)) {
+            while (containsNotUsed(i)) {
                 i++;
             }
             return i;
