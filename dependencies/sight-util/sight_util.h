@@ -1,4 +1,4 @@
-//
+﻿//
 // Created by Aincvy(aincvy@gmail.com) on 2021/8/10.
 //
 
@@ -19,6 +19,14 @@ namespace sight {
         size_t residentMemBytes = 0;
     };
 
+    enum class CaseTypes {
+        None,
+        PascalCase,     // 大驼峰命名法   MyVariable、MyClass。
+        CamelCase,      // 小驼峰命名法  myVariable、myMethod。
+        SnakeCase,      //  下划线命名法 my_variable、my_method。
+    };
+
+    
     ProcessUsageInfo currentProcessUsageInfo();
 
     /**
@@ -91,6 +99,10 @@ namespace sight {
      */
     std::string removeComment(std::string const& code);
 
+    std::string changeStringToPascalCase(std::string_view str);
+    std::string changeStringToCamelCase(std::string_view str);
+    std::string changeStringToSnakeCase(std::string_view str);
+
     /**
      * https://stackoverflow.com/a/313990/11226492
      * @param data
@@ -147,6 +159,21 @@ namespace sight {
         }
     }
 
+    
+    inline std::string changeStringToCase(std::string_view str, CaseTypes caseType) {
+        switch (caseType) {
+        case CaseTypes::None:
+            return std::string(str);
+        case CaseTypes::PascalCase:
+            return changeStringToPascalCase(str);
+        case CaseTypes::CamelCase:
+            return changeStringToCamelCase(str);
+        case CaseTypes::SnakeCase:
+           return changeStringToSnakeCase(str);
+        }
+        return {};
+    }
+
     /**
      * @brief 
      * 
@@ -175,6 +202,11 @@ namespace sight {
 
 #ifdef _WIN32
     std::string narrow(const std::wstring& str);
+
+    std::wstring broaden(std::string_view str);
 #endif
 
+
+
+    
 }

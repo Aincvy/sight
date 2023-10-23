@@ -2703,7 +2703,7 @@ namespace sight {
                 break;
             case JsCommandType::EndInit:
                 logDebug("end init js part");
-                std::this_thread::sleep_for(std::chrono::milliseconds(850));
+                std::this_thread::sleep_for(std::chrono::milliseconds(150));
                 addUICommand(UICommandType::JsEndInit);
                 break;
             case JsCommandType::Test:

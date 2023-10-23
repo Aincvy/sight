@@ -2,13 +2,16 @@
 // Created by Aincvy(aincvy@gmail.com) on 2021/7/20.
 //
 #include <cassert>
+#include <corecrt_wstdio.h>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <ios>
 #include <iterator>
 #include <set>
+#include <stdio.h>
 #include <string>
 #include <string_view>
 #include <sys/types.h>
@@ -38,6 +41,8 @@
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_split.h"
 #include "v8pp/object.hpp"
+
+#include "crude_json.h"
 
 #ifdef NOT_WIN32
 #    include <sys/termios.h>
@@ -988,9 +993,10 @@ namespace sight {
     }
 
     void SightNodeGraph::addNode(const SightNode &node) {
-        // check id repeat? 
+        // check id repeat?
 
         auto p = this->nodes.add(node);
+        p->graph = this;
         p->updateChainPortPointer();
         idMap[node.nodeId] = {
                 SightAnyThingType::Node,
@@ -1426,6 +1432,127 @@ namespace sight {
             port.node,
             port.getId()
         };
+    }
+
+    int SightNodeGraph::outputJson(std::string_view path, bool overwrite, SightNodeGraphOutputJsonConfig const& config) const {
+        logDebug("try output json to $0", path);
+
+        // check path has file ?
+        if (std::filesystem::exists(path)) {
+            if (!overwrite) {
+                return CODE_FILE_EXISTS;
+            }
+
+            // delete
+            // std::filesystem::remove(path);
+        }
+
+        // get file output stream
+        std::ofstream out;
+        out.open(path.data(), std::ios::trunc);
+
+        if (!out.is_open()) {
+            return CODE_FILE_ERROR;
+        }
+
+        // generate json
+        crude_json::value root;
+        crude_json::value nodes;
+        crude_json::value connections;
+
+        auto nodeFunc = [&config](std::vector<SightNodePort> const& list, crude_json::value& root) {
+            logDebug("list size: $0", list.size());
+            for (auto& item : list) {
+                if (item.portName.empty()) {
+                    // title input/output port 
+                    continue;
+                }
+
+                crude_json::value tmp;
+                tmp["name"] = changeStringToCase(item.portName, config.fieldNameCaseType);
+                tmp["id"] = item.id * 1.0;
+                if (item.templateNodePort) {
+                    auto const& value = item.value;
+                    switch (value.getType()) {
+                    case IntTypeString:
+                        tmp["value"] = value.getString();
+                        break;
+                    case IntTypeLargeString:
+                        tmp["value"] = value.getLargeStringCopy();
+                        break;
+                    case IntTypeFloat:
+                        tmp["value"] = value.u.f;
+                        break;
+                    case IntTypeInt:
+                        tmp["value"] = value.u.i * 1.0;
+                        break;
+                    case IntTypeDouble:
+                    case IntTypeLong:
+                        tmp["value"] = value.u.d;
+                        break;
+                    case IntTypeBool:
+                        tmp["value"] = value.u.b;
+                        break;
+                    default:
+                        logError("output json,unknown int type: $0", value.getType());
+                        break;
+                    }
+                }
+                
+                root.push_back(tmp);
+            }
+        };
+
+        // fill nodes data
+        auto index = -1;
+        for (auto& item : this->nodes) {
+            index++;
+
+            crude_json::value node;
+            node["id"] = item.nodeId * 1.0;
+            node["name"] = item.nodeName;
+
+            //
+            crude_json::value members{ crude_json::type_t::array };
+            CALL_NODE_FUNC(&item, members);
+            node["members"] = members;
+
+            nodes[index] = node;
+        }
+
+        // fill connections data
+        index = -1;
+        for (auto& item : this->connections) {
+            index++;
+
+            crude_json::value connection;
+
+            connection["id"] = item.connectionId * 1.0;
+            connection["left"] = item.left * 1.0;
+            connection["right"] = item.right * 1.0;
+
+            if (config.includeNodeIdOnConnectionData) {
+                auto port = item.findLeftPort();
+                if (port) {
+                    connection["leftNode"] = port->getNodeId() * 1.0;
+                }
+
+                port = item.findRightPort();
+                if (port) {
+                    connection["rightNode"] = port->getNodeId() * 1.0;
+                }
+            } 
+            connections[index] = connection;
+        }
+        
+        root[config.nodeRootName] = nodes;
+        root[config.connectionRootName] = connections;
+
+        out << root.dump(2);
+        out.close();
+        
+        logDebug("output json to $0 over! ", path);
+        return CODE_OK;
     }
 
     SightNode *SightAnyThingWrapper::asNode() const {
@@ -2277,6 +2404,18 @@ namespace sight {
         auto& largeString = u.largeString;
         sprintf(largeString.pointer, "%s", str.c_str());
         largeString.size = str.size();
+    }
+
+    const char* SightNodeValue::getString() const {
+        return u.string;
+    }
+
+    const char* SightNodeValue::getLargeString() const {
+        return u.largeString.pointer;    
+    }
+
+    std::string SightNodeValue::getLargeStringCopy() const {
+        return std::string(u.largeString.pointer, u.largeString.size);
     }
 
     SightNodeValue::SightNodeValue(uint type)

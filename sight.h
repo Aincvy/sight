@@ -62,6 +62,7 @@ namespace sight {
 
         CODE_FILE_ERROR = 100,
         CODE_FILE_NOT_EXISTS,
+        CODE_FILE_EXISTS,
         CODE_FILE_FORMAT_ERROR,
         CODE_FILE_INIT,
 

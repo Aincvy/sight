@@ -130,7 +130,7 @@ namespace sight {
         MSG msg;
         while (::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE)) {
             logDebug("receive message: $0", msg.message);
-            
+
             ::TranslateMessage(&msg);
             ::DispatchMessage(&msg);
             if (msg.message == WM_QUIT) {
@@ -232,9 +232,4 @@ namespace sight {
         return ::DefWindowProcW(hWnd, msg, wParam, lParam);
     }
 
-
-
-    void initKeys() {
-
-    }
 }

@@ -1,6 +1,7 @@
 #include "IconsMaterialDesign.h"
 #include "sight_defines.h"
 #include "sight_log.h"
+#include "sight_util.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -742,6 +743,32 @@ namespace sight {
                 trace("Reset Zoom: $0, $1", ed::GetCurrentZoom(), zoomValue);
             }
             helpMarker("Reset Zoom");
+
+            ImGui::SameLine();
+            // SaveAsJson
+            if (ImGui::Button("SaveAsJson")) {
+                SightNodeGraphOutputJsonConfig jsonConfig;
+                jsonConfig.includeNodeIdOnConnectionData = true;
+                jsonConfig.fieldNameCaseType = CaseTypes::PascalCase;
+
+                int status = CODE_OK;
+                std::string filename = graph->getName().data();
+                filename.append(".json");
+
+                auto path = saveFileDialog(".", &status, filename);
+                if (status != CODE_OK) {
+                    if (status == CODE_USER_CANCELED) {
+                        logDebug("select file: User canceled");
+                    } else {
+                        logDebug("select file failed: $0", status);
+                    }
+                } else {
+                    status = graph->outputJson(path, true, jsonConfig);
+                    if (status != CODE_OK) {
+                        logDebug("save as json failed: $0", status);
+                    }
+                }
+            }
             ImGui::Separator();
 
             // Start interaction with editor.

@@ -48,7 +48,6 @@ namespace sight {
     namespace {
         SightArray<SightKey> keyArray(LITTLE_ARRAY_SIZE);
         SightArray<SightTwoKey> doubleKeyArray(LITTLE_ARRAY_SIZE);
-
         absl::flat_hash_map<std::string, SightEmptyKey*> keyMap(LITTLE_ARRAY_SIZE);
     }
 
@@ -136,44 +135,71 @@ namespace sight {
         return openFileDialog(basePath, status, {});
     }
 
-    std::string openFileDialog(const char* basePath, int* status, std::vector<std::pair<const char*, const char*>> filter) {
-        // todo 实现并修正这个函数
-        // // initialize NFD
-        // NFD::Guard nfdGuard;
-        // // auto-freeing memory
-        // NFD::UniquePath outPath;
+    std::string openFileDialog(std::string_view basePath, int* status, std::vector<std::pair<const char*, const char*>> filter) {
 
-        // // prepare filters for the dialog
-        // std::pair<const char*, const char*> a = {"", ""};
-        // auto size = std::size(filter);
+        // initialize NFD
+        NFD::Guard nfdGuard;
+        // auto-freeing memory
+        NFD::UniquePathN outPath;
+
+#ifdef _WIN32
+        std::vector<std::wstring> tmpBuffer;
+#endif
+        
+        // prepare filters for the dialog
+        std::pair<const char*, const char*> a = {"", ""};
+        nfdfiltersize_t size = std::size(filter);
         // nfdnfilteritem_t data[size];
-        // if (size > 0) {
-        //     int i = -1;
-        //     for (const auto& item : filter) {
-        //         i++;
-        //         data[i] = {.name = item.first, .spec = item.second};
-        //     }
-        // }
+        std::vector<nfdnfilteritem_t> data;
+        if (size > 0) {
+            int i = -1;
+            for (const auto& item : filter) {
+                i++;
 
-        // // show the dialog
-        // std::string pathResult{};
+#ifdef _WIN32
+                nfdnfilteritem_t tmp;
+                tmpBuffer.push_back(broaden(item.first));
+                tmp.name = tmpBuffer.back().c_str();
 
-        // nfdresult_t result = NFD::OpenDialog(outPath, data, size, basePath);
-        // if (result == NFD_OKAY) {
-        //     SET_CODE(status, CODE_OK);
-        //     pathResult = outPath.get();
-        // } else if (result == NFD_CANCEL) {
-        //     // std::cout << "User pressed cancel." << std::endl;
-        //     SET_CODE(status, CODE_USER_CANCELED);
-        // } else {
-        //     std::cout << "Error: " << NFD::GetError() << std::endl;
-        //     SET_CODE(status, CODE_ERROR);
-        // }
-        // // NFD::Guard will automatically quit NFD.
+                tmpBuffer.push_back(broaden(item.second));
+                tmp.spec = tmpBuffer.back().c_str();
+                data.push_back(tmp);
+#else
+                data[i] = { .name = item.first, .spec = item.second };
+#endif
+            }
+        }
 
-        // return pathResult;
+        // show the dialog
+        std::string pathResult{};
+#ifdef _WIN32
+        const wchar_t* defaultPath = nullptr;
+        if (basePath.length() >= 1 && basePath[0] != '.') {
+            // defaultPath = basePath.data();
 
-        return {};
+            tmpBuffer.push_back(broaden(basePath));
+            defaultPath =  tmpBuffer.back().c_str();
+
+        }
+#else
+        const char* defaultPath = basePath.data();
+#endif
+        
+        logDebug("openFolderDialog defaultPath: $0", defaultPath);
+        nfdresult_t result = NFD::OpenDialog(outPath, data.data(), size, defaultPath);
+        if (result == NFD_OKAY) {
+            SET_CODE(status, CODE_OK);
+            auto tmpOutPath = outPath.get();
+            pathResult = narrow(tmpOutPath);
+        } else if (result == NFD_CANCEL) {
+            SET_CODE(status, CODE_USER_CANCELED);
+        } else {
+            std::cout << "Error: " << NFD::GetError() << std::endl;
+            SET_CODE(status, CODE_ERROR);
+        }
+        // NFD::Guard will automatically quit NFD.
+
+        return pathResult;
     }
 
     std::string openFolderDialog(std::string_view basePath, int* status) {
@@ -207,13 +233,23 @@ namespace sight {
         return {};
     }
 
-    std::string saveFileDialog(const char* basePath, int* status, std::string_view defaultName) {
+    std::string saveFileDialog(std::string_view basePath, int* status, std::string_view defaultName) {
         // initialize NFD
         NFD::Guard nfdGuard;
         // auto-freeing memory
         NFD::UniquePath outPath;
 
-        auto result = NFD::SaveDialog(outPath, nullptr, 0, basePath, defaultName.data());
+#ifdef _WIN32
+        const char* defaultPath = nullptr;
+        if (basePath.length() >= 1 && basePath[0] != '.') {
+            defaultPath = basePath.data();
+        }
+#else
+        const char* defaultPath = basePath.data();
+#endif
+
+        logDebug("openFolderDialog defaultPath: $0", defaultPath);
+        auto result = NFD::SaveDialog(outPath, nullptr, 0, defaultPath, defaultName.data());
         if (result == NFD_OKAY) {
             SET_CODE(status, CODE_OK);
             return outPath.get();
@@ -282,17 +318,17 @@ namespace sight {
         }
     }
 
-    SightKey::SightKey(int code)
-        : code(code) {
+    SightKey::SightKey(ImGuiKey key)
+        : code(key) {
     }
 
     bool SightKey::isKeyReleased() const {
         logDebug(code);
-        return ImGui::IsKeyReleased((ImGuiKey)code);
+        return ImGui::IsKeyReleased(code);
     }
 
     bool SightKey::isKeyDown() const {
-        return ImGui::IsKeyDown((ImGuiKey)code);
+        return ImGui::IsKeyDown(code);
     }
 
     bool SightKey::isKeyUp() const {
@@ -300,7 +336,7 @@ namespace sight {
     }
 
     bool SightKey::IsKeyPressed(bool repeat) const {
-        return ImGui::IsKeyPressed((ImGuiKey)code, repeat);
+        return ImGui::IsKeyPressed(code, repeat);
     }
 
     bool SightEmptyKey::isKeyReleased() const {
@@ -520,7 +556,108 @@ namespace sight {
 
     void ToastController::resetNextArgs() {
         info();
+    }
 
+    void initKeys() {
+        // ctrl, alt, win/super, shift
+        keyMap["lctrl"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_LeftCtrl));
+        keyMap["rctrl"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_RightCtrl));
+        keyMap["ctrl"] = doubleKeyArray.add(SightTwoKey(keyMap["lctrl"], keyMap["rctrl"], false));
+
+
+        keyMap["lsuper"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_LeftSuper));
+        keyMap["rsuper"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_RightSuper));
+        keyMap["super"] = doubleKeyArray.add(SightTwoKey(keyMap["lsuper"], keyMap["rsuper"], false));
+        // some compatibility
+        keyMap["lwin"] = keyMap["lsuper"];
+        keyMap["rwin"] = keyMap["rsuper"];
+        keyMap["win"] = keyMap["super"];
+        keyMap["lcmd"] = keyMap["lsuper"];
+        keyMap["rcmd"] = keyMap["rsuper"];
+        keyMap["cmd"] = keyMap["super"];
+
+        keyMap["lalt"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_LeftAlt));
+        keyMap["ralt"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_RightAlt));
+        keyMap["alt"] = doubleKeyArray.add(SightTwoKey(keyMap["lalt"], keyMap["ralt"], false));
+
+        keyMap["lshift"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_LeftShift));
+        keyMap["rshift"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_RightShift));
+        keyMap["shift"] = doubleKeyArray.add(SightTwoKey(keyMap["lshift"], keyMap["rshift"], false));
+
+        // alphabet
+        keyMap["a"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_A));
+        keyMap["b"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_B));
+        keyMap["c"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_C));
+        keyMap["d"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_D));
+        keyMap["e"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_E));
+        keyMap["f"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_F));
+        keyMap["g"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_G));
+        keyMap["h"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_H));
+        keyMap["i"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_I));
+        keyMap["j"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_J));
+        keyMap["k"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_K));
+        keyMap["l"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_L));
+        keyMap["m"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_M));
+        keyMap["n"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_N));
+        keyMap["o"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_O));
+        keyMap["p"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_P));
+        keyMap["q"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_Q));
+        keyMap["r"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_R));
+        keyMap["s"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_S));
+        keyMap["t"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_T));
+        keyMap["u"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_U));
+        keyMap["v"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_V));
+        keyMap["w"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_W));
+        keyMap["x"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_X));
+        keyMap["y"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_Y));
+        keyMap["z"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_Z));
+
+
+        // fx
+        keyMap["f1"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_F1));
+        keyMap["f2"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_F2));
+        keyMap["f3"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_F3));
+        keyMap["f4"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_F4));
+        keyMap["f5"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_F5));
+        keyMap["f6"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_F6));
+        keyMap["f7"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_F7));
+        keyMap["f8"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_F8));
+        keyMap["f9"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_F9));
+        keyMap["f10"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_F10));
+        keyMap["f11"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_F11));
+        keyMap["f12"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_F12));
+
+        // up down left right
+        keyMap["up"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_UpArrow));
+        keyMap["down"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_DownArrow));
+        keyMap["left"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_LeftArrow));
+        keyMap["right"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_RightArrow));
+
+        // numbers
+        keyMap["@1"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_Keypad1));
+        keyMap["@2"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_Keypad2));
+        keyMap["@3"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_Keypad3));
+        keyMap["@4"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_Keypad4));
+        keyMap["@5"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_Keypad5));
+        keyMap["@6"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_Keypad6));
+        keyMap["@7"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_Keypad7));
+        keyMap["@8"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_Keypad8));
+        keyMap["@9"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_Keypad9));
+        keyMap["@0"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_Keypad0));
+        keyMap["1"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_1));
+        keyMap["2"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_2));
+        keyMap["3"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_3));
+        keyMap["4"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_4));
+        keyMap["5"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_5));
+        keyMap["6"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_6));
+        keyMap["7"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_7));
+        keyMap["8"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_8));
+        keyMap["9"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_9));
+        keyMap["0"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_0));
+
+        // others
+        keyMap["esc"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_Escape));
+        keyMap["backspace"] = keyArray.add(SightKey(ImGuiKey::ImGuiKey_Backspace));
     }
 
 }

@@ -14,7 +14,10 @@
 #include <sys/stat.h>
 
 #ifdef __APPLE__
-#include <mach/mach.h>
+#    include <mach/mach.h>
+#elif _WIN32
+#    include <Windows.h>
+#    include <psapi.h>
 #endif
 
 namespace sight {
@@ -35,6 +38,14 @@ namespace sight {
             usageInfo.virtualMemBytes = t_info.virtual_size;
             usageInfo.residentMemBytes = t_info.resident_size;
         }
+#elif _WIN32
+        // Memory usage
+        PROCESS_MEMORY_COUNTERS_EX memInfo;
+        auto process = GetCurrentProcess();
+        if (GetProcessMemoryInfo(process, (PROCESS_MEMORY_COUNTERS*)&memInfo, sizeof(memInfo))) {
+            usageInfo.virtualMemBytes = memInfo.PrivateUsage;
+            usageInfo.residentMemBytes = memInfo.WorkingSetSize;
+        } 
 #endif
         return usageInfo;
     }
@@ -96,7 +107,53 @@ namespace sight {
 
         return ss.str();
     }
+    std::string changeStringToPascalCase(std::string_view str) {
+        std::stringstream result;
+        bool capitalizeNext = true;
 
+        for (char c : str) {
+            if (std::isalpha(c)) {
+                if (capitalizeNext) {
+                    result << static_cast<char>(std::toupper(c));
+                    capitalizeNext = false;
+                } else {
+                    result << c;
+                }
+            } else {
+                capitalizeNext = true;
+            }
+        }
+
+        return result.str();
+    }
+
+    std::string changeStringToCamelCase(std::string_view str) {
+        std::string pascalCaseStr = changeStringToPascalCase(str);
+        if (!pascalCaseStr.empty()) {
+            pascalCaseStr[0] = std::tolower(pascalCaseStr[0]);
+        }
+        return pascalCaseStr;
+    }
+
+    std::string changeStringToSnakeCase(std::string_view str) {
+        std::stringstream result;
+
+        for (char c : str) {
+            if (std::isalpha(c)) {
+                if (std::isupper(c)) {
+                    result << '_';
+                    result << static_cast<char>(std::tolower(c));
+                } else {
+                    result << c;
+                }
+            } else {
+                result << '_';
+            }
+        }
+
+        return result.str();
+    }
+    
     bool isFileHidden(const char* path) {
         // I don't know how to impl this ... 
         if (std::strcmp(path, ".DS_Store") == 0) {
@@ -168,4 +225,13 @@ namespace sight {
             stm << ctfacet.narrow(str[i], 0);
         return stm.str();
     }
+
+    std::wstring broaden(std::string_view str) {
+        int size = str.size() + 1;
+        std::wstring res(size, L'\0');
+        mbstowcs(&res[0], str.data(), size);
+        return res;
+    }
+
+
 }

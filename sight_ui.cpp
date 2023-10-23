@@ -52,6 +52,8 @@
 
 #include <absl/strings/match.h>
 
+#include "crude_json.h"
+
 #ifdef NOT_WIN32
 #    include <sys/termios.h>
 #endif
@@ -286,6 +288,15 @@ for(const item of a) {
             if (ImGui::MenuItem("Test1")) {
                 auto g = currentGraph();
 
+                crude_json::value a;
+                a["hello"] = 1.0;
+                a["world"] = 2.0;
+
+                crude_json::value root;
+                root["a"] = a;
+                root["version"] = "1.1";
+                auto jsonStr = root.dump(2);
+                logDebug("json: $0", jsonStr);
             }
         }
 
@@ -1665,7 +1676,7 @@ for(const item of a) {
         v8::Context::Scope contextScope(context);
         logDebug("v8 runtime init over.");
 
-        auto sightWindow = initWindow("sight - a code generate tool", 1600, 900, [](ImGuiIO& io) {
+        auto sightWindow = initWindow("sight - a code generate tool", 1920, 1080, [](ImGuiIO& io) {
             io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
             io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
             // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;         // Enable Multi-Viewport / Platform Windows
@@ -1702,10 +1713,10 @@ for(const item of a) {
         initUndo();
 
         auto uvLoop = g_UIStatus->uvLoop;
-        
+
         auto beforeRenderFunc = [uvLoop]() -> int {
             uv_run(uvLoop, UV_RUN_NOWAIT);
-            return CODE_OK;
+            return g_UIStatus->closeWindow ? CODE_FAIL : CODE_OK;
         };
 
         auto renderFunc = []() {

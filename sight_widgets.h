@@ -42,12 +42,12 @@ namespace sight {
     };
 
     class SightKey : public SightEmptyKey {
-        int code{0};
+        ImGuiKey code = ImGuiKey::ImGuiKey_None;
 
     public:
         SightKey() = default;
         SightKey(SightKey const& key) = default;
-        SightKey(int code);
+        SightKey(ImGuiKey key);
         ~SightKey() = default;
 
         bool isKeyReleased() const override;
@@ -202,7 +202,7 @@ namespace sight {
      * @param basePath 
      * @return std::string 
      */
-    std::string openFileDialog(const char* basePath, int* status, std::vector<std::pair<const char*, const char*>> filter);
+    std::string openFileDialog(std::string_view basePath, int* status, std::vector<std::pair<const char*, const char*>> filter);
     std::string openFileDialog(const char* basePath, int* status);
 
     /**
@@ -221,7 +221,7 @@ namespace sight {
      * @param basePath 
      * @return std::string 
      */
-    std::string saveFileDialog(const char* basePath, int* status = nullptr, std::string_view defaultName = "");
+    std::string saveFileDialog(std::string_view basePath, int* status = nullptr, std::string_view defaultName = "");
 
     void openUrlWithDefaultBrowser(std::string const& urlString);
 

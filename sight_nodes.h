@@ -5,6 +5,7 @@
 #pragma once
 
 #include "sight_defines.h"
+#include "sight_util.h"
 #include "v8pp/convert.hpp"
 
 #include <cstddef>
@@ -112,6 +113,13 @@ namespace sight {
         bool stringCheck(size_t needSize);
         void stringCopy(std::string const& str);
 
+        const char* getString() const;
+
+        const char* getLargeString() const;
+
+        std::string getLargeStringCopy() const;
+ 
+
         SightNodeValue(uint type);
         SightNodeValue() = default;
         /**
@@ -129,7 +137,7 @@ namespace sight {
         SightNodeValue& operator=(SightNodeValue const& rhs);
 
         ~SightNodeValue();
-
+        
     private:
         uint type;
 
@@ -791,6 +799,17 @@ namespace sight {
         char graphName[LITTLE_NAME_BUF_SIZE] = {0};
     };
 
+    struct SightNodeGraphOutputJsonConfig {
+        std::string nodeRootName = "nodes";
+        std::string connectionRootName = "connections";
+
+        bool includeRightConnections = false;
+        bool includeNodeIdOnConnectionData = false;
+        
+        // fields
+        CaseTypes fieldNameCaseType = CaseTypes::None;
+    };
+
     /**
      * A graph contains many nodes.
      */
@@ -944,6 +963,8 @@ namespace sight {
          */
         void addPortId(SightNodePort const& port);
 
+        int outputJson(std::string_view path, bool overwrite, SightNodeGraphOutputJsonConfig const& config) const;
+        
     private:
 
         // save and read path.
