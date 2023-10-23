@@ -223,16 +223,14 @@ namespace sight {
 
             initCShaprHandlerMap();
             initJavaScriptHandlerMap();
-
         }
-
-    
-
+        
     }
 
     int initParser() {
+        logDebug("start initParser");
         if (g_parser) {
-            return 1;
+            return CODE_FAIL;
         }
 
         g_parser = ts_parser_new();
@@ -242,7 +240,8 @@ namespace sight {
         initTreeSitterFields(language);
 
         initCaseMap();
-        return 0;
+        logDebug("end initParser");
+        return CODE_OK;
     }
 
     void freeParser() {

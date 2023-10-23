@@ -6,7 +6,6 @@
 #include "imgui_internal.h"
 
 #include <functional>
-#include <uv.h>
 
 namespace sight {
 
@@ -14,7 +13,7 @@ namespace sight {
 
     void* initWindow(const char* title, int width, int height, std::function<void(ImGuiIO&)> initImgui);
 
-    void mainLoopWindow(void* window, uv_loop_t* uvLoop, bool& exitFlag,
+    void mainLoopWindow(void* window,  bool& exitFlag,
                         std::function<int()> beforeRenderFunc, std::function<void()> render_func);
 
     void cleanUpWindow(void* window);

@@ -91,8 +91,6 @@ namespace sight {
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
             glfwSwapBuffers(window);
-
-            uv_run(uvLoop, UV_RUN_NOWAIT);
         }
     }
 

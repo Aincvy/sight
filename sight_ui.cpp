@@ -1563,16 +1563,17 @@ for(const item of a) {
 
         // 
         uint progress = 0;
-        int leftFrame = 0;
         bool pluginStartLoad = false;
         bool exitFlag = false;
         bool folderError = false;
         std::string lastOpenFolder = ".";
 
 
-        auto beforeRenderFunc = [&leftFrame]() -> int {
+        auto beforeRenderFunc = [uvLoop]() -> int {
+            uv_run(uvLoop, UV_RUN_NOWAIT);
             auto project = currentProject();
-            if (g_UIStatus->isLoadingOver() && project && leftFrame <= 0) {
+            if (g_UIStatus->isLoadingOver() && project ) {
+                logDebug("project loading over, should be turn into main window..");
                 return CODE_FAIL;
             }
             return CODE_OK;
@@ -1629,12 +1630,13 @@ for(const item of a) {
                 // update node style.
                 // currentNodeStatus()->updateTemplateNodeStyles();    // still has errors...
                 uiStatus.loadingStatus.nodeStyle = true;
+                logDebug("nodeStyle load over!");
             }
 
             ImGui::End();
         };
 
-        mainLoopWindow(sightWindow, uvLoop, exitFlag, beforeRenderFunc, renderFunc);
+        mainLoopWindow(sightWindow, exitFlag, beforeRenderFunc, renderFunc);
 
         // load template nodes.
         for (int i = 0; i < 30; ++i) {
@@ -1700,8 +1702,9 @@ for(const item of a) {
         initUndo();
 
         auto uvLoop = g_UIStatus->uvLoop;
-
-        auto beforeRenderFunc = []() -> int {
+        
+        auto beforeRenderFunc = [uvLoop]() -> int {
+            uv_run(uvLoop, UV_RUN_NOWAIT);
             return CODE_OK;
         };
 
@@ -1714,7 +1717,7 @@ for(const item of a) {
         };
 
         bool exitFlag = false;
-        mainLoopWindow(sightWindow, uvLoop, exitFlag, beforeRenderFunc, renderFunc);
+        mainLoopWindow(sightWindow, exitFlag, beforeRenderFunc, renderFunc);
         // Cleanup
         cleanUpWindow(sightWindow);
 

@@ -7,6 +7,7 @@
 #include <tchar.h>
 
 #include "sight.h"
+#include "sight_log.h"
 
 // Forward declare message handler from imgui_impl_win32.cpp
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -65,7 +66,7 @@ namespace sight {
         return hwnd;
     }
 
-    void mainLoopWindow(void* window, uv_loop_t* uvLoop, bool& exitFlag,
+    void mainLoopWindow(void* window, bool& exitFlag,
                         std::function<int()> beforeRenderFunc, std::function<void()> render_func) {
         ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
         while (!exitFlag) {
@@ -79,8 +80,11 @@ namespace sight {
             while (::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE)) {
                 ::TranslateMessage(&msg);
                 ::DispatchMessage(&msg);
-                if (msg.message == WM_QUIT)
+                if (msg.message == WM_QUIT) {
+                    logDebug("WM_QUIT message recieved");
+
                     exitFlag = true;
+                }
             }
             if (exitFlag)
                 break;
@@ -108,7 +112,8 @@ namespace sight {
             ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
             g_pSwapChain->Present(1, 0);     // Present with vsync
-            //g_pSwapChain->Present(0, 0); // Present without vsync
+                                             //g_pSwapChain->Present(0, 0); // Present without vsync
+
         }
     }
 
@@ -121,6 +126,17 @@ namespace sight {
         ::DestroyWindow(HWND(window));
         ::UnregisterClassW(gWc.lpszClassName, gWc.hInstance);
         gWc = {};
+
+        MSG msg;
+        while (::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE)) {
+            logDebug("receive message: $0", msg.message);
+            
+            ::TranslateMessage(&msg);
+            ::DispatchMessage(&msg);
+            if (msg.message == WM_QUIT) {
+                logDebug("WM_QUIT message recieved");
+            }
+        }
     }
 
     void terminateBackend() {

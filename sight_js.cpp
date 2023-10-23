@@ -1846,7 +1846,7 @@ namespace sight {
             .function("errorReport", &GenerateArg$$::errorReport)
             .function("insertSource", &v8InsertSource)
             .function("ensureNodeGenerated", &v8EnsureNodeGenerated);
-        module.class_("GenerateArg$", generateArg$$);
+        module.class_("GenerateArg$$", generateArg$$);
 
         v8pp::class_<SightEntityFunctions> entityFunctionsClass(isolate);
         entityFunctionsClass
@@ -2702,7 +2702,8 @@ namespace sight {
                 initParser();
                 break;
             case JsCommandType::EndInit:
-                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                logDebug("end init js part");
+                std::this_thread::sleep_for(std::chrono::milliseconds(850));
                 addUICommand(UICommandType::JsEndInit);
                 break;
             case JsCommandType::Test:
