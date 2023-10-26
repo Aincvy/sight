@@ -34,6 +34,12 @@
 #include "sight_ui.h"
 #include "sight_log.h"
 
+#include "v8-json.h"
+#include "v8-local-handle.h"
+#include "v8-object.h"
+#include "v8-primitive.h"
+#include "v8-value.h"
+#include "v8.h"
 #include "v8pp/call_v8.hpp"
 #include "v8pp/convert.hpp"
 #include "v8pp/class.hpp"
@@ -452,11 +458,14 @@ namespace sight {
         }
 
         //
-        // auto& t = graph->getComponents();
-        for(auto& item: components){
-            delete item;
+        // for(auto& item: components){
+        //     delete item;
+        // }
+        // components.clear();
+        if (this->componentContainer) {
+            graph->getComponentContainers().remove(this->componentContainer);
+            this->componentContainer = nullptr;
         }
-        components.clear();
     }
 
     SightNodePortHandle SightNode::findPort(const char* name, int orderSize, int order[]) {
@@ -535,13 +544,9 @@ namespace sight {
             return false;
         }
 
-        // if (templateNode == this->templateNode) {
-        //     return false;
-        // }
-        
         auto p = templateNode->instantiate();
         addComponent(p);
-        this->graph->markDirty();
+        
         return true;
     }
 
@@ -550,14 +555,7 @@ namespace sight {
             return false;
         }
 
-        p->graph = this->graph;
-        auto nodeFunc = [p](std::vector<SightNodePort>& list) {
-            for (auto& item : list) {
-                item.node = p;
-            }
-        };
-        CALL_NODE_FUNC(p);
-        components.push_back(p);
+        getComponentContainer()->addComponent(p, this->graph);
         return true;
     }
 
@@ -573,6 +571,52 @@ namespace sight {
 
         CALL_NODE_FUNC(this);
         return result;
+    }
+
+    SightComponentContainer* SightNode::getComponentContainer() {
+        if (!componentContainer) {
+            
+            this->componentContainer = graph->getComponentContainers().add();
+        }
+        return componentContainer;
+    }
+
+    v8::Local<v8::Object> SightNode::toV8Object(v8::Isolate* isolate) const {
+        auto object = v8::Object::New(isolate);
+        auto context = isolate->GetCurrentContext();
+        auto nodeFunc = [&object, isolate, &context](std::vector<SightNodePort> const& list) {
+            for (const auto& item : list) {
+                auto v = getPortValue(isolate, item.getType(), item.value);
+                auto key = v8pp::to_v8(isolate, item.portName);
+
+                // check contains
+                auto hasResult = object->Has(context, key);
+                if (hasResult.IsJust() && hasResult.FromJust()) {
+                    // already exists
+                    logWarning("port name already exists: $0", item.portName);
+                    continue;
+                }
+
+                object->Set(context, key, v).ToChecked();
+            }
+        };
+
+        // CALL_NODE_FUNC(this);
+
+        nodeFunc(this->fields);
+        nodeFunc(this->inputPorts);
+        nodeFunc(this->outputPorts);
+
+        auto key = v8pp::to_v8(isolate, "@@nodeId");
+        auto hasResult = object->Has(context, key);
+        // if do not contains, then add to object
+        if (hasResult.IsJust() && hasResult.FromJust()) {
+
+        } else {
+            object->Set(context, key, v8pp::to_v8(isolate, this->nodeId)).ToChecked();
+        }
+
+        return object;
     }
 
     SightJsNode::SightJsNode() {
@@ -836,7 +880,22 @@ namespace sight {
         return right > 0 ? CURRENT_GRAPH->findPort(right) : nullptr;
     }
 
-    int SightNodeGraph::saveToFile(const char *path, bool set,bool saveAnyway) {
+    SightComponentContainer*         SightNodeConnection::getComponentContainer() {
+        if (!componentContainer) {
+            componentContainer = graph->getComponentContainers().add();
+        }
+        return componentContainer;
+    }
+
+    bool SightNodeConnection::addComponent(SightJsNode* templateNode) {    
+        return getComponentContainer()->addComponent(templateNode, this->graph);
+    }
+
+    bool SightNodeConnection::addComponent(SightNode* sightNode) {
+        return getComponentContainer()->addComponent(sightNode, this->graph);
+    }
+
+    int SightNodeGraph::saveToFile(const char* path, bool set, bool saveAnyway, SaveReason saveReason) {
         if (set) {
             this->setFilePath(path);
         }
@@ -879,13 +938,19 @@ namespace sight {
         out << YAML::Key << "enterNode" << YAML::Value << settings.enterNode;
         out << YAML::EndMap;
 
+        // this->saveAsJsonHistory
+        out << YAML::Key << "saveAsJsonHistory" << YAML::Value << this->saveAsJsonHistory;
+
         out << YAML::EndMap;       // end of 1st begin map
 
         // save file
         std::ofstream outToFile(path, std::ios::out | std::ios::trunc);
         outToFile << out.c_str() << std::endl;
         outToFile.close();
-        logDebug("save over");
+
+        if (saveReason == SaveReason::User) {
+            logDebug("save over to: $0", path);
+        }
         return CODE_OK;
     }
 
@@ -928,15 +993,19 @@ namespace sight {
 
             // connections
             auto connectionRoot = root["connections"];
-            SightNodeConnection tmpConnection;
             for (const auto &item : connectionRoot) {
+                SightNodeConnection tmpConnection;
+                tmpConnection.graph = this;
+
                 auto connectionId = item.first.as<int>();
                 item.second >> tmpConnection;
-                auto code = createConnection(tmpConnection.left, tmpConnection.right, connectionId, tmpConnection.priority);
-                assert(code > 0);
+                createConnection(tmpConnection.left, tmpConnection.right, connectionId, tmpConnection.priority);
                 auto con = findConnection(connectionId);
-                assert(con);
+                assert(con);        // find connection failed!
                 con->generateCode = tmpConnection.generateCode;
+
+                // tmpConnection will auto free when current loop ends, so let new connection have componentContainer
+                con->componentContainer = tmpConnection.componentContainer;
             }
 
             // settings
@@ -956,6 +1025,36 @@ namespace sight {
                 }
                 if (settingsNode["enterNode"]) {
                     settings.enterNode = settingsNode["enterNode"].as<int>();
+                }
+            }
+
+            auto saveAsJsonHistoryNode = root["saveAsJsonHistory"];
+            if (saveAsJsonHistoryNode.IsDefined()) {
+                this->saveAsJsonHistory = saveAsJsonHistoryNode.as<std::vector<std::string>>();
+            }
+
+            // set graph ref
+            // loop of this->nodes
+            for (auto& node : this->nodes) {
+                node.graph = this;
+
+                if (node.componentContainer) {
+                    // loop of container
+                    for (auto& component : node.componentContainer->components) {
+                        component->graph = this;
+                    }
+                }
+            }
+
+            // loop of this->connections
+            for (auto& connection : this->connections) {
+                connection.graph = this;
+
+                if (connection.componentContainer) {
+                    // loop of container
+                    for (auto& component : connection.componentContainer->components) {
+                        component->graph = this;
+                    }
                 }
             }
 
@@ -1085,6 +1184,7 @@ namespace sight {
 
     void SightNodeGraph::addConnection(const SightNodeConnection &connection, SightNodePort* left, SightNodePort* right) {
         auto p = this->connections.add(connection);
+        p->graph = this;
         idMap[connection.connectionId] = {
                 SightAnyThingType::Connection,
                 p
@@ -1283,9 +1383,24 @@ namespace sight {
         return {};
     }
 
-    const SightAnyThingWrapper& SightNodeGraph::findSightAnyThing(uint id) {
-        std::map<uint, SightAnyThingWrapper>::iterator iter;
-        if ((iter = idMap.find(id)) == idMap.end()) {
+    bool SightNodeGraph::isNode(uint id) const {
+        auto t = findSightAnyThing(id);
+        return t.type == SightAnyThingType::Node;
+    }
+
+    bool SightNodeGraph::isConnection(uint id) const {
+        auto t = findSightAnyThing(id);
+        return t.type == SightAnyThingType::Connection;    
+    }
+
+    bool SightNodeGraph::isPort(uint id) const {
+    	auto t = findSightAnyThing(id);
+        return t.type == SightAnyThingType::Port;    
+    }
+
+    const SightAnyThingWrapper& SightNodeGraph::findSightAnyThing(uint id) const {
+        auto iter = idMap.find(id);
+        if (iter == idMap.end()) {
             return invalidAnyThingWrapper;
         }
         return iter->second;
@@ -1340,12 +1455,12 @@ namespace sight {
         return CODE_OK;
     }
 
-    int SightNodeGraph::save() {
+    int SightNodeGraph::save(SaveReason saveReason) {
         if (!editing) {
             return CODE_OK;
         }
 
-        auto c = saveToFile(this->filepath.c_str(), false);
+        auto c = saveToFile(this->filepath.c_str(), false, false, saveReason);
         if (c == CODE_OK) {
             this->editing = false;
         }
@@ -1436,6 +1551,74 @@ namespace sight {
 
     int SightNodeGraph::outputJson(std::string_view path, bool overwrite, SightNodeGraphOutputJsonConfig const& config) const {
         logDebug("try output json to $0", path);
+        using namespace v8;
+        
+        auto setValue = [](crude_json::value& tmp, const SightNodeValue& value) {
+            switch (value.getType()) {
+            case IntTypeString:
+                tmp["value"] = value.getString();
+                break;
+            case IntTypeLargeString:
+                tmp["value"] = value.getLargeStringCopy();
+                break;
+            case IntTypeFloat:
+                tmp["value"] = value.u.f;
+                break;
+            case IntTypeInt:
+                tmp["value"] = value.u.i * 1.0;
+                break;
+            case IntTypeDouble:
+            case IntTypeLong:
+                tmp["value"] = value.u.d;
+                break;
+            case IntTypeBool:
+                tmp["value"] = value.u.b;
+                break;
+            default:
+                logError("output json,unknown int type: $0", value.getType());
+                break;
+            }
+        };
+
+        auto doComponents = [](crude_json::value& parent, SightComponentContainer* componentContainer) {
+            // logDebug("doComponents, component valid: $0", componentContainer != nullptr);
+            if (!componentContainer) {
+                return;
+            }
+
+            auto isolate = getJsIsolate();
+            for (auto& item : componentContainer->components) {
+                const auto& component = item->templateNode->component;
+                if (!component.appendDataToOutput) {
+                    continue;
+                }
+
+                auto result = component.appendDataToOutput.callByReadonly(isolate, item);
+                if (!result.IsEmpty()) {
+                    // v8::JSON::Stringify(Local<Context> context, Local<Value> json_object)
+                    std::string str = v8pp::from_v8<std::string>(isolate, result.ToLocalChecked());
+                    logDebug("try append string: $0" , str);
+
+                    // convert and merge
+                    auto fromComponent = crude_json::value::parse(str);
+                    if (!fromComponent.is_object()) {
+                        logError("append data failed, component not return object json string: $0", item->nodeId);
+                        continue;
+                    }
+
+                    // loop of
+                    for (const auto& item : fromComponent.underlyingObject()) {
+                        if (parent.contains(item.first)) {
+                            logError("append data failed, component already exists: $0", item.first);
+                            continue;
+                        }
+
+                        parent[item.first] = item.second;
+                    }
+                }
+            }
+            
+        };
 
         // check path has file ?
         if (std::filesystem::exists(path)) {
@@ -1460,8 +1643,8 @@ namespace sight {
         crude_json::value nodes;
         crude_json::value connections;
 
-        auto nodeFunc = [&config](std::vector<SightNodePort> const& list, crude_json::value& root) {
-            logDebug("list size: $0", list.size());
+        auto nodeFunc = [&config, &setValue](std::vector<SightNodePort> const& list, crude_json::value& root) {
+            // logDebug("list size: $0", list.size());
             for (auto& item : list) {
                 if (item.portName.empty()) {
                     // title input/output port 
@@ -1473,30 +1656,7 @@ namespace sight {
                 tmp["id"] = item.id * 1.0;
                 if (item.templateNodePort) {
                     auto const& value = item.value;
-                    switch (value.getType()) {
-                    case IntTypeString:
-                        tmp["value"] = value.getString();
-                        break;
-                    case IntTypeLargeString:
-                        tmp["value"] = value.getLargeStringCopy();
-                        break;
-                    case IntTypeFloat:
-                        tmp["value"] = value.u.f;
-                        break;
-                    case IntTypeInt:
-                        tmp["value"] = value.u.i * 1.0;
-                        break;
-                    case IntTypeDouble:
-                    case IntTypeLong:
-                        tmp["value"] = value.u.d;
-                        break;
-                    case IntTypeBool:
-                        tmp["value"] = value.u.b;
-                        break;
-                    default:
-                        logError("output json,unknown int type: $0", value.getType());
-                        break;
-                    }
+                    setValue(tmp, value);
                 }
                 
                 root.push_back(tmp);
@@ -1541,7 +1701,9 @@ namespace sight {
                 if (port) {
                     connection["rightNode"] = port->getNodeId() * 1.0;
                 }
-            } 
+            }
+
+            doComponents(connection, item.componentContainer);
             connections[index] = connection;
         }
         
@@ -1553,6 +1715,27 @@ namespace sight {
         
         logDebug("output json to $0 over! ", path);
         return CODE_OK;
+    }
+
+    std::vector<std::string> const& SightNodeGraph::getSaveAsJsonHistory() const {
+    
+        return saveAsJsonHistory;
+    
+    }
+
+    SightArray<SightComponentContainer> & SightNodeGraph::getComponentContainers() {
+        return this->componentContainers;
+    }
+
+    void SightNodeGraph::addSaveAsJsonHistory(std::string_view path) {
+
+        saveAsJsonHistory.insert(saveAsJsonHistory.begin(), std::string(path));     // 将新元素插入到0号位置
+
+        if (saveAsJsonHistory.size() > 5) {
+            saveAsJsonHistory.pop_back();     // 删除最后一个元素
+        }
+
+        markDirty();
     }
 
     SightNode *SightAnyThingWrapper::asNode() const {
@@ -1620,15 +1803,20 @@ namespace sight {
         , templateNode(templateNode) {
     }
 
-    bool SightNodeTemplateAddress::isAnyItemCanShow(bool createComponent) const {
-        if (createComponent) {
+    bool SightNodeTemplateAddress::isAnyItemCanShow(bool filterComponent, SightAnyThingType appendToType) const {
+        if (filterComponent) {
             if (children.empty()) {
                 if (templateNode && templateNode->checkAsComponent()) {
-                    return true;
+                    if (appendToType == SightAnyThingType::Node) {
+                        return templateNode->component.allowNode;
+                    } else if (appendToType == SightAnyThingType::Connection) {
+                        return templateNode->component.allowConnection;
+                    }
+                    return false;
                 }
             } else {
                 for (const auto& item : children) {
-                    if (item.isAnyItemCanShow(createComponent)) {
+                    if (item.isAnyItemCanShow(filterComponent, appendToType)) {
                         return true;
                     }
                 }
@@ -1970,12 +2158,9 @@ namespace sight {
         out << YAML::EndMap;   // end of fields
 
         // components
-        out << YAML::Key << "components" << YAML::Value << YAML::BeginMap;
-        for (const auto& item : node.components) {
-            out << YAML::Key << item->nodeId;
-            out << YAML::Value << *item;
+        if (node.componentContainer) {
+            out << YAML::Key << "components" << YAML::Value << *node.componentContainer;
         }
-        out << YAML::EndMap;
         
         out << YAML::EndMap;   // end of node data.
 
@@ -1984,11 +2169,26 @@ namespace sight {
 
     YAML::Emitter& operator<< (YAML::Emitter& out, const SightNodeConnection& connection) {
         out << YAML::BeginMap;
-        // out << YAML::Key << "id" << YAML::Value << connection.connectionId;
+        out << YAML::Key << "id" << YAML::Value << connection.connectionId;
         out << YAML::Key << "left" << YAML::Value << connection.leftPortId();
         out << YAML::Key << "right" << YAML::Value << connection.rightPortId();
         out << YAML::Key << "priority" << YAML::Value << connection.priority;
         out << YAML::Key << "generateCode" << YAML::Value << connection.generateCode;
+
+        // components
+        if (connection.componentContainer) {
+            out << YAML::Key << "components" << YAML::Value << *connection.componentContainer;
+        }
+        out << YAML::EndMap;
+        return out;
+    }
+
+    YAML::Emitter& operator<<(YAML::Emitter& out, const SightComponentContainer& componentContainer) {
+        out << YAML::BeginMap;
+        for (const auto& item : componentContainer.components) {
+            out << YAML::Key << item->nodeId;
+            out << YAML::Value << *item;
+        }
         out << YAML::EndMap;
         return out;
     }
@@ -2025,7 +2225,25 @@ namespace sight {
         if (node["generateCode"]) {
             connection.generateCode = node["generateCode"].as<bool>();
         }
+
+        auto componentsNode = node["components"];
+        if (componentsNode.IsDefined()) {
+            auto componentsContainer = connection.getComponentContainer();
+            componentsNode >> *componentsContainer;
+        }
         return true;
+    }
+
+    bool operator>>(YAML::Node const& node, SightComponentContainer& componentContainer) {
+        for (auto& item : node) {
+            SightNode* tmp = nullptr;
+
+            if (loadNodeData(item.second, tmp) == CODE_OK) {
+                componentContainer.addComponent(tmp);
+            }
+        }
+
+        return false;
     }
 
     int loadPortInfo(YAML::detail::iterator_value const& item, NodePortType nodePortType, std::vector<SightNodePort>& list, bool useOldId) {
@@ -2204,13 +2422,10 @@ namespace sight {
             }
         }
 
-        auto components = yamlNode["components"];
-        for (const auto& item : components) {
-            SightNode* tmp = nullptr;
-
-            if (loadNodeData(item.second, tmp) == CODE_OK) {
-                nodePointer->addComponent(tmp);
-            }
+        auto componentsNode = yamlNode["components"];
+        if (componentsNode.IsDefined()) {
+            auto componentsContainer = nodePointer->getComponentContainer();
+            componentsNode >> *componentsContainer;
         }
 
         // fix no-data-port's id.   Happened when template node add any port(s).
@@ -2475,9 +2690,9 @@ namespace sight {
         }
     }
 
-    void ScriptFunctionWrapper::operator()(Isolate* isolate, SightNode* node) const {
+    v8::MaybeLocal<v8::Value> ScriptFunctionWrapper::operator()(Isolate* isolate, SightNode* node) const {
         if (!checkFunction(isolate)) {
-            return;
+            return {};
         }
         using namespace v8;
 
@@ -2488,10 +2703,7 @@ namespace sight {
 
         auto result = f->Call(context, recv, 0, nullptr);
         v8pp::class_<SightNode>::unreference_external(isolate, node);
-        if (result.IsEmpty()) {
-            return;
-        }
-        
+        return result;
     }
 
     void ScriptFunctionWrapper::operator()(Isolate* isolate, SightNodePort* thisNodePort, JsEventType eventType, void* pointer) const {
@@ -2579,6 +2791,15 @@ namespace sight {
 
     ScriptFunctionWrapper::operator bool() const {
         return !function.IsEmpty() || !sourceCode.empty();
+    }
+
+    v8::MaybeLocal<v8::Value> ScriptFunctionWrapper::callByReadonly(Isolate* isolate, SightNode* node) const {
+        if (!checkFunction(isolate)) {
+            return {};
+        }
+
+        auto obj = node->toV8Object(isolate);
+        return v8pp::call_v8(isolate, this->function.Get(isolate), obj);
     }
 
     bool ScriptFunctionWrapper::checkFunction(Isolate* isolate) const {
@@ -2791,5 +3012,48 @@ namespace sight {
         }
     }
 
+    bool SightComponentContainer::addComponent(SightJsNode* templateNode, SightNodeGraph* graph) {
+
+        if (!templateNode || !templateNode->checkAsComponent()) {
+            return false;
+        }
+
+        auto p = templateNode->instantiate();
+        addComponent(p, graph);
+        return true;
+    }
+
+    bool SightComponentContainer::addComponent(SightNode* p, SightNodeGraph* graph) {
+        // if (graph) {
+        //     p->graph = graph;
+        // }
+
+        auto nodeFunc = [p](std::vector<SightNodePort>& list) {
+            for (auto& item : list) {
+                item.node = p;
+            }
+        };
+        CALL_NODE_FUNC(p);
+        components.push_back(p);
+        if (graph) {
+            p->graph = graph;
+            graph->markDirty();
+        }
+        return true;
+    }
+
+    void SightComponentContainer::reset() {
+    
+        // means delete
+        if (!this->components.empty()) {
+            //delete all elements
+            for (auto& item : this->components) {
+                delete item;
+            }
+
+            this->components.clear();
+        }
+
+    }
 
 }

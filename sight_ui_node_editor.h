@@ -10,8 +10,6 @@
 
 #include "imgui_node_editor.h"
 
-namespace ed = ax::NodeEditor;
-
 namespace sight {
 
     ImVec2 getNodePos(SightNode* node);
@@ -122,9 +120,17 @@ namespace sight {
     void showGraphSettings();
 
     int showComponentContextMenu();
-    
-    int showNodeComponents(SightNode* node, bool fromInspector = false);
 
+    /**
+     * @brief 
+     * 
+     * @param container 
+     * @param id     node or connection id
+     * @param fromInspector 
+     * @return int 
+     */
+    int showNodeComponents(SightComponentContainer *container, SightNode* node, SightNodeGraph* graph, uint id, bool fromInspector = false);
+    
     /**
      * @brief reload current graph.
      * 
@@ -140,4 +146,6 @@ namespace sight {
     
     void hideAllAddChild(SightNodeGraph* graph);
 
+    void uiSaveGraph();
+    
 }

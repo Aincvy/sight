@@ -8,6 +8,7 @@
 
 #include "sight.h"
 #include "sight_log.h"
+#include "sight_util.h"
 
 // Forward declare message handler from imgui_impl_win32.cpp
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -37,12 +38,16 @@ namespace sight {
     int initWindowBackend() {
         return CODE_OK;
     }
-    
-    void* initWindow(const char* title, int width, int height, std::function<void(ImGuiIO&)> initImgui) {
+
+    void* initWindow(const char* title, int width, int height, std::function<void(ImGuiIO&)> initImgui, bool noTitleBar) {
         gWc = { sizeof(gWc), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, L"ImGui Example", nullptr };
         // gWc = wc;
+        auto titleWStr = broaden(title);
         ::RegisterClassExW(&gWc);
-        HWND hwnd = ::CreateWindowW(gWc.lpszClassName, L"Dear ImGui DirectX11 Example", WS_OVERLAPPEDWINDOW, 100, 100, 1280, 800, nullptr, nullptr, gWc.hInstance, nullptr);
+
+        auto style = noTitleBar ? WS_POPUP : WS_OVERLAPPEDWINDOW;
+        logDebug("initWindow, width: $0, height: $1", width, height);
+        HWND hwnd = ::CreateWindowW(gWc.lpszClassName, titleWStr.c_str(), style , 100, 100, width, height, nullptr, nullptr, gWc.hInstance, nullptr);
 
         // Initialize Direct3D
         if (!CreateDeviceD3D(hwnd)) {
@@ -66,9 +71,10 @@ namespace sight {
         return hwnd;
     }
 
-    void mainLoopWindow(void* window, bool& exitFlag,
+    void mainLoopWindow(void* window, bool& exitFlag, bool mainWindow,
                         std::function<int()> beforeRenderFunc, std::function<void()> render_func) {
         ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+        g_ResizeHeight = g_ResizeWidth = 0;
         while (!exitFlag) {
             if (beforeRenderFunc() != CODE_OK) {
                 break;
@@ -91,8 +97,17 @@ namespace sight {
 
             // Handle window resize (we don't resize directly in the WM_SIZE handler)
             if (g_ResizeWidth != 0 && g_ResizeHeight != 0) {
+                logDebug("Window resized to $0, $1", g_ResizeWidth, g_ResizeHeight);
                 CleanupRenderTarget();
                 g_pSwapChain->ResizeBuffers(0, g_ResizeWidth, g_ResizeHeight, DXGI_FORMAT_UNKNOWN, 0);
+
+                if (mainWindow) {
+                    auto sightSettings = getSightSettings();
+                    sightSettings->lastMainWindowHeight = static_cast<int>(g_ResizeHeight);
+                    sightSettings->lastMainWindowWidth  = static_cast<int>(g_ResizeWidth);
+                    saveSightSettings();
+                }
+
                 g_ResizeWidth = g_ResizeHeight = 0;
                 CreateRenderTarget();
             }
@@ -118,6 +133,8 @@ namespace sight {
     }
 
     void cleanUpWindow(void* window) {
+        logDebug("cleanUpWindow");
+
         ImGui_ImplDX11_Shutdown();
         ImGui_ImplWin32_Shutdown();
         ImGui::DestroyContext();
@@ -137,6 +154,9 @@ namespace sight {
                 logDebug("WM_QUIT message recieved");
             }
         }
+
+        g_ResizeHeight = g_ResizeWidth = 0;
+
     }
 
     void terminateBackend() {
@@ -220,6 +240,7 @@ namespace sight {
                 return 0;
             g_ResizeWidth = (UINT)LOWORD(lParam);     // Queue resize
             g_ResizeHeight = (UINT)HIWORD(lParam);
+            // logDebug("width: $0, height: $1", g_ResizeWidth, g_ResizeHeight);
             return 0;
         case WM_SYSCOMMAND:
             if ((wParam & 0xfff0) == SC_KEYMENU)     // Disable ALT application menu

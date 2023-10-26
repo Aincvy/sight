@@ -36,7 +36,7 @@ namespace sight {
         return CODE_OK;
     }
 
-    void* initWindow(const char* title, int width, int height, std::function<void(ImGuiIO&)> initImgui) {
+    void* initWindow(const char* title, int width, int height, std::function<void(ImGuiIO&)> initImgui, bool noTitleBar) {
         glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
         GLFWwindow* window = glfwCreateWindow(width, height, title, nullptr, NULL);
         if (window == nullptr)
@@ -56,7 +56,7 @@ namespace sight {
         return window;
     }
 
-    void mainLoopWindow(void* glWindow, uv_loop_t* uvLoop, bool& exitFlag, std::function<int()> beforeRenderFunc, std::function<void()> render_func) {
+    void mainLoopWindow(void* glWindow, bool& exitFlag, bool mainWindow, std::function<int()> beforeRenderFunc, std::function<void()> render_func) {
 
         // Main loop
 

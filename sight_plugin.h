@@ -10,6 +10,7 @@
 #include "vector"
 #include <atomic>
 #include <map>
+#include <string_view>
 #include "absl/container/flat_hash_map.h"
 
 #include "v8.h"
@@ -105,6 +106,8 @@ namespace sight {
 
         int loadPlugins();
 
+        int loadPluginAt(std::string_view path);
+
         v8::Isolate* getIsolate();
 
         void addSearchPath(const char* path);
@@ -133,6 +136,8 @@ namespace sight {
         std::vector<std::string> searchPaths;
 
         uint loadedPluginCount = 0;
+
+        void afterPluginLoadSuccess(Plugin* plugin);
     };
 
     /**

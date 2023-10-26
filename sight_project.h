@@ -231,13 +231,6 @@ namespace sight {
          */
         int loadPlugins();
 
-        /**
-         *
-         * @param name as a folder/file name
-         * @return
-         */
-        int loadPlugin(const char* name);
-
         int save();
         int saveConfigFile();
         int saveStyleInfo();
@@ -369,9 +362,10 @@ namespace sight {
         // key: entity full name
         absl::btree_map<std::string, SightEntity> entitiesMap;
 
-        // cache for all type names 
+        // cache for all type names
         std::vector<std::string> typeListCache;
-
+        
+        
         // file locations
         std::string pathConfigFile() const;
         std::string pathStyleConfigFile() const;

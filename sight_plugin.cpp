@@ -56,18 +56,18 @@ namespace sight {
         return CODE_OK;
     }
 
+    void PluginManager::afterPluginLoadSuccess(Plugin* plugin) {
+        plugin->debugBrieflyInfo();
+        flushJsNodeCache();
+        this->pluginMap[plugin->getName()] = plugin;
+        if (plugin->getPluginStatus() == PluginStatus::Loaded) {
+            ++loadedPluginCount;
+        }
+    };
+
     int PluginManager::loadPlugins() {
         logDebug("load plugins");
         loadedPluginCount = 0;
-
-        auto afterPluginLoadSuccess = [this](Plugin* plugin) {
-            plugin->debugBrieflyInfo();
-            flushJsNodeCache();
-            this->pluginMap[plugin->getName()] = plugin;
-            if (plugin->getPluginStatus() == PluginStatus::Loaded) {
-                ++loadedPluginCount;
-            }
-        };
 
         // load sight-base first.
         fs::path sightBasePath{ "./plugins/sight-base" };
@@ -77,33 +77,48 @@ namespace sight {
             afterPluginLoadSuccess(plugin);
         }
 
-        for (auto it = directory_iterator {"./plugins"}; it != directory_iterator {}; ++it) {
-            if (fs::equivalent(sightBasePath, it->path())) {
-                continue;
-            }
-
-            auto plugin = new Plugin(this, it->path().string());
-            int i;
-            if ((i = plugin->load()) != CODE_OK) {
-                if (i != CODE_PLUGIN_DISABLED) {
-                    logDebug("plugin load fail: $0", it->path().c_str());
-                }
-                goto loadFailed;
-            }
-            if (pluginMap.contains(plugin->getName())) {
-                logDebug("maybe name repeat: $0", plugin->getName());
-                goto loadFailed;
-            }
-            
-            afterPluginLoadSuccess(plugin);
-            continue;
-            
-            loadFailed:
-            clearJsNodeCache();
-            delete plugin;
+        for (auto it = directory_iterator{ "./plugins" }; it != directory_iterator{}; ++it) {
+            loadPluginAt(it->path().string());
         }
 
         return 0;
+    }
+
+    int PluginManager::loadPluginAt(std::string_view path) {
+
+        fs::path sightBasePath{ "./plugins/sight-base" };
+
+        if (fs::equivalent(sightBasePath, path)) {
+            return CODE_FAIL;
+        }
+
+        auto plugin = new Plugin(this, std::string(path));
+        int i = CODE_OK;
+        bool fail = false;
+        do {
+            if ((i = plugin->load()) != CODE_OK) {
+                if (i != CODE_PLUGIN_DISABLED) {
+                    logDebug("plugin load fail: $0", path);
+                }
+                fail = true;
+                break;
+            }
+            if (pluginMap.contains(plugin->getName())) {
+                logDebug("maybe name repeat: $0", plugin->getName());
+                fail = true;
+                break;
+            }
+
+            afterPluginLoadSuccess(plugin);
+        } while (false);
+
+        if (fail) {
+            clearJsNodeCache();
+            delete plugin;
+            plugin = nullptr;
+        } 
+
+        return i;
     }
 
     absl::flat_hash_map<std::string, Plugin*> & PluginManager::getPluginMap() {

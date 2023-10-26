@@ -35,6 +35,7 @@ namespace sight{
         Destroy,
         //
         ParseGraph,
+        GraphToJsonData,
         InitPluginManager,
         InitParser,
         // this command will nofity ui thread, js thread is init end.
@@ -48,6 +49,8 @@ namespace sight{
         ProjectClean,
         ProjectRebuild,
         ProjectCodeSetBuild,
+        // load all plugins of the project.
+        ProjectLoadPlugins,
     };
 
     struct JsCommand {

@@ -64,6 +64,8 @@
 #    define MENU_LANGUAGE_KEYS g_UIStatus->languageKeys->menuKeys
 
 
+namespace ed = ax::NodeEditor;
+
 static sight::UIStatus* g_UIStatus = nullptr;
 static std::atomic<bool> uiCommandFree = true;
 
@@ -240,8 +242,9 @@ namespace sight {
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.graph)) {
+                auto graph = currentGraph();
                 if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.parseGraph)) {
-                    
+                    logError("parseGraph Not impl!");
                 } 
                 if (ImGui::MenuItem("VerifyId")) {
                     int c = currentGraph()->verifyId();
@@ -259,6 +262,25 @@ namespace sight {
                 }
                 if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.reload)) {
                     uiReloadGraph();
+                }
+
+                if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.saveAsJson, graph)) {
+                    if (ImGui::MenuItem("...")) {
+                        uiGraphToJson(graph, "", true);
+                    }
+
+                    ImGui::Separator();     // 添加一个分割线
+
+                    // 循环并添加 graph->getSaveAsJsonHistory() 中的项目
+                    const std::vector<std::string>& history = graph->getSaveAsJsonHistory();
+                    for (const std::string& item : history) {
+                        if (ImGui::MenuItem(item.c_str())) {
+                            // addJsCommand(JsCommandType::GraphToJsonData, CommandArgs::copyFrom(item.c_str()));
+                            uiGraphToJson(graph, item.c_str());
+                        }
+                    }
+
+                    ImGui::EndMenu();
                 }
                 ImGui::EndMenu();
             }
@@ -545,7 +567,7 @@ for(const item of a) {
                     ImGui::Text("Ports");
                     ImGui::Separator();
                     showNodePorts(node);
-                    showNodeComponents(node, true);
+                    showNodeComponents(node->componentContainer, node, node->graph, node->getNodeId(), true);
                     showComponentContextMenu();
                 }  
                 if ((connection = selection.getSelectedConnection())) {
@@ -567,6 +589,9 @@ for(const item of a) {
                     if (ImGui::Checkbox("##generateCode", &connection->generateCode)) {
                         graph->markDirty();
                     }
+
+                    showNodeComponents(connection->componentContainer, nullptr, connection->graph, connection->connectionId, true);
+                    showComponentContextMenu();
                 }
             }
 
@@ -1487,7 +1512,7 @@ for(const item of a) {
         auto sightWindow = initWindow("sight - loading", width, height, [](ImGuiIO& io) {
             io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
             io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
-        });
+        }, true);
         if (!sightWindow) {
             return CODE_FAIL;
         }
@@ -1611,6 +1636,7 @@ for(const item of a) {
                     // load plugins
                     addJsCommand(JsCommandType::InitParser);
                     addJsCommand(JsCommandType::InitPluginManager);
+                    addJsCommand(JsCommandType::ProjectLoadPlugins);
                     addJsCommand(JsCommandType::EndInit);
                 } else {
                     ImGui::Text("Loading plugins...");
@@ -1647,7 +1673,7 @@ for(const item of a) {
             ImGui::End();
         };
 
-        mainLoopWindow(sightWindow, exitFlag, beforeRenderFunc, renderFunc);
+        mainLoopWindow(sightWindow, exitFlag, false, beforeRenderFunc, renderFunc);
 
         // load template nodes.
         for (int i = 0; i < 30; ++i) {
@@ -1676,7 +1702,8 @@ for(const item of a) {
         v8::Context::Scope contextScope(context);
         logDebug("v8 runtime init over.");
 
-        auto sightWindow = initWindow("sight - a code generate tool", 1920, 1080, [](ImGuiIO& io) {
+        auto sightSettings = getSightSettings();
+        auto sightWindow = initWindow("sight - a code generate tool", sightSettings->lastMainWindowWidth, sightSettings->lastMainWindowHeight, [](ImGuiIO& io) {
             io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
             io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
             // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;         // Enable Multi-Viewport / Platform Windows
@@ -1728,7 +1755,7 @@ for(const item of a) {
         };
 
         bool exitFlag = false;
-        mainLoopWindow(sightWindow, exitFlag, beforeRenderFunc, renderFunc);
+        mainLoopWindow(sightWindow, exitFlag, true, beforeRenderFunc, renderFunc);
         // Cleanup
         cleanUpWindow(sightWindow);
 
@@ -2265,6 +2292,29 @@ for(const item of a) {
                 }
             }
         }
+    }
+
+    void uiGraphToJson(SightNodeGraph* graph, std::string_view pathArg, bool selectSaveFile) {
+
+        if (selectSaveFile) {
+            int status = CODE_OK;
+            std::string filename = graph->getName().data();
+            filename.append(".json");
+
+            auto path = saveFileDialog(".", &status, filename);
+            if (status != CODE_OK) {
+                if (status == CODE_USER_CANCELED) {
+                    logDebug("select file: User canceled");
+                } else {
+                    logDebug("select file failed: $0", status);
+                }
+            } else {
+                graph->addSaveAsJsonHistory(path);
+                addJsCommand(JsCommandType::GraphToJsonData, CommandArgs::copyFrom(path.c_str()));
+            }
+        } else {
+            addJsCommand(JsCommandType::GraphToJsonData, CommandArgs::copyFrom(pathArg));
+        }        
     }
 
 }

@@ -75,6 +75,9 @@ namespace sight {
         char projectSaveConfig[SHORT_KEYS_BUF_SIZE] = "Save Config";
         char reload[SHORT_KEYS_BUF_SIZE] = "Reload";
         char settings[SHORT_KEYS_BUF_SIZE] = "Settings";
+
+        // save as json
+        char saveAsJson[SHORT_KEYS_BUF_SIZE] = "Save As Json";
         
     };
 

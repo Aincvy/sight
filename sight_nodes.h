@@ -6,8 +6,11 @@
 
 #include "sight_defines.h"
 #include "sight_util.h"
+#include "v8-isolate.h"
+#include "v8-object.h"
 #include "v8pp/convert.hpp"
 
+#include <atomic>
 #include <cstddef>
 #include <functional>
 #include <string>
@@ -62,6 +65,12 @@ namespace sight {
         // do not have a port, only field.  on this way, it should has a input box.
         Field,
 
+    };
+
+    enum class SaveReason {
+        User,
+        Script,
+        Automatic,
     };
 
     struct SightNodeConnection;
@@ -285,6 +294,23 @@ namespace sight {
         operator SightNodePortHandle() const;
     };
 
+    struct SightComponentContainer : ResetAble {
+        std::vector<SightNode*> components;
+
+        /**
+         * @brief 
+         * 
+         * @param node 
+         * @return true 
+         * @return false 
+         */
+        bool addComponent(SightJsNode* templateNode, SightNodeGraph* graph = nullptr);
+
+        bool addComponent(SightNode* p, SightNodeGraph* graph = nullptr);
+
+        void reset() override;
+    };
+
     /**
      * a connection.
      */
@@ -301,6 +327,10 @@ namespace sight {
         // should this connection generate code ?
         bool generateCode = true;
 
+        SightNodeGraph* graph = nullptr;
+        
+        SightComponentContainer* componentContainer = nullptr;
+        
         /**
          * Remove from left and right port.
          */
@@ -311,6 +341,12 @@ namespace sight {
 
         SightNodePort* findLeftPort() const;
         SightNodePort* findRightPort() const;
+
+        SightComponentContainer* getComponentContainer();
+
+        bool addComponent(SightJsNode* templateNode);
+
+        bool addComponent(SightNode* sightNode);
     };
 
     /**
@@ -370,9 +406,10 @@ namespace sight {
         // no input/output ports.
         std::vector<SightNodePort> fields;
 
-        std::vector<SightNode*> components;
         Vector2 position;
 
+        // use `getComponentContainer()` to get a exists object.
+        SightComponentContainer* componentContainer = nullptr;
 
         /**
          * this function do not record by id.
@@ -493,6 +530,16 @@ namespace sight {
          * find all children ports in this node.
          */
         std::vector<uint> findChildrenPorts(uint parentPortId) const;
+
+        SightComponentContainer* getComponentContainer();
+
+        /**
+         * @brief make a snapshot of this object. all fields, inputs, outputs included
+         * 
+         * @return v8::Local<v8::Object> 
+         */
+        v8::Local<v8::Object> toV8Object(v8::Isolate* ) const;
+
         
     protected:
         enum class CopyFromType {
@@ -543,7 +590,7 @@ namespace sight {
             return {};
         }
 
-        void operator()(Isolate* isolate, SightNode* node) const;
+        v8::MaybeLocal<v8::Value> operator()(Isolate* isolate, SightNode* node) const;
         void operator()(Isolate* isolate, SightNodePort* thisNodePort, JsEventType eventType = JsEventType::Default, void* pointer = nullptr) const;
         v8::MaybeLocal<v8::Value> operator()(Isolate* isolate, SightNode* node, v8::Local<v8::Value> arg1, v8::Local<v8::Value> arg2) const;
         v8::MaybeLocal<v8::Value> operator()(Isolate* isolate, SightEntity* entity) const;
@@ -551,6 +598,15 @@ namespace sight {
 
         operator bool() const;
 
+        /**
+         * @brief node will turn into a v8 object, and modify of the object will NOT affect the node.
+         * 
+         * @param isolate 
+         * @param node 
+         * @return v8::MaybeLocal<v8::Value> 
+         */
+        v8::MaybeLocal<v8::Value> callByReadonly(Isolate* isolate, SightNode* node) const;
+        
         private:
 
         /**
@@ -563,14 +619,18 @@ namespace sight {
     };
 
     /**
-     * @brief 
+     * 
+     * @brief component js options
      * 
      */
-    struct SightComponent {
+    struct SightJsComponent {
         bool active = false;
+        bool allowNode = true;
+        bool allowConnection = false;     // allow add this component to connection?
         bool activeOnReverse = false;     // call functions on `onReverseActive` ?
         ScriptFunctionWrapper beforeGenerate;
         ScriptFunctionWrapper afterGenerate;
+        ScriptFunctionWrapper appendDataToOutput;
     };
 
     struct CommonOperation{
@@ -670,7 +730,7 @@ namespace sight {
         ScriptFunctionWrapper onMsg;
 
         SightNodeStyle nodeStyle;
-        SightComponent component;
+        SightJsComponent component;
 
         SightJsNode();
         ~SightJsNode() = default;
@@ -766,7 +826,7 @@ namespace sight {
          * @return true 
          * @return false 
          */
-        bool isAnyItemCanShow(bool createComponent) const;
+        bool isAnyItemCanShow(bool filterComponent, SightAnyThingType appendToType) const;
 
         /**
          * @brief Free external memory.
@@ -796,7 +856,7 @@ namespace sight {
         std::string outputFilePath;
         std::string codeTemplate;
         std::string connectionCodeTemplate;
-        char graphName[LITTLE_NAME_BUF_SIZE] = {0};
+        char graphName[LITTLE_NAME_BUF_SIZE] = { 0 };
     };
 
     struct SightNodeGraphOutputJsonConfig {
@@ -877,12 +937,17 @@ namespace sight {
         SightNodePort* findPort(uint id);
         SightNodePortHandle findPortHandle(uint id);
 
+        bool isNode(uint id) const;
+        bool isConnection(uint id) const;
+        bool isPort(uint id) const;
+
+        
         /**
          *
          * @param id
          * @return You should not keep the return value, just use it's asXXX function.
          */
-        const SightAnyThingWrapper& findSightAnyThing(uint id) ;
+        const SightAnyThingWrapper& findSightAnyThing(uint id) const;
 
         /**
          * You should call this function at init step.
@@ -891,7 +956,7 @@ namespace sight {
          */
         int load(std::string_view path);
 
-        int save();
+        int save(SaveReason saveReason = SaveReason::User);
 
         /**
          * Save graph data to file.
@@ -900,7 +965,7 @@ namespace sight {
          * @param saveAnyway  if true, broken flag will be omitted.
          * @return  0 success, 1 graph is broken.
          */
-        int saveToFile(const char *path = nullptr, bool set = false, bool saveAnyway = false);
+        int saveToFile(const char* path = nullptr, bool set = false, bool saveAnyway = false, SaveReason saveReason = SaveReason::User);
 
 
         void setFilePath(const char* path);
@@ -910,6 +975,8 @@ namespace sight {
         SightArray <SightNode> & getNodes();
         const SightArray <SightNode> & getNodes() const;
         const SightArray<SightNodeConnection>& getConnections() const;
+
+        // NOT USED
         SightArray<SightNode> & getComponents();
 
         SightNodeGraphExternalData& getExternalData();
@@ -963,7 +1030,21 @@ namespace sight {
          */
         void addPortId(SightNodePort const& port);
 
+        /**
+         * @brief need use js thread to run.
+         * 
+         * @param path 
+         * @param overwrite 
+         * @param config 
+         * @return int 
+         */
         int outputJson(std::string_view path, bool overwrite, SightNodeGraphOutputJsonConfig const& config) const;
+
+        SightArray<SightComponentContainer> & getComponentContainers() ;
+
+        void addSaveAsJsonHistory(std::string_view path);
+
+        std::vector<std::string> const& getSaveAsJsonHistory() const;
         
     private:
 
@@ -973,16 +1054,20 @@ namespace sight {
         bool broken = false;
 
         // real nodes
-        SightArray<SightNode> nodes;
+        SightArray<SightNode> nodes{ LITTLE_ARRAY_SIZE };
         // real connections.
-        SightArray<SightNodeConnection> connections{ BIG_ARRAY_SIZE };
+        SightArray<SightNodeConnection> connections{ MEDIUM_ARRAY_SIZE };
 
-        SightArray<SightNode> components;
+        // NOT USED
+        SightArray<SightNode> components{ LITTLE_ARRAY_SIZE };
+        SightArray<SightComponentContainer> componentContainers{ LITTLE_ARRAY_SIZE };
         // key: node/port/connection id, value: the pointer of the instance.
         std::map<uint, SightAnyThingWrapper> idMap;
 
         SightNodeGraphExternalData externalData;
         SightNodeGraphSettings settings;
+
+        std::vector<std::string> saveAsJsonHistory;
 
         /**
          * Dispose graph.
@@ -1105,9 +1190,12 @@ namespace sight {
     YAML::Emitter& operator<< (YAML::Emitter& out, const Vector2& v);
     YAML::Emitter& operator<< (YAML::Emitter& out, const SightNode& node);
     YAML::Emitter& operator<< (YAML::Emitter& out, const SightNodeConnection& connection);
+    YAML::Emitter& operator<< (YAML::Emitter& out, const SightComponentContainer& componentContainer);
     bool operator>>(YAML::Node const&node, Vector2 &v);
-    bool operator>>(YAML::Node const&node, SightNodeConnection &connection);
+    bool operator>>(YAML::Node const& node, SightNodeConnection& connection);
+    bool operator>>(YAML::Node const& node, SightComponentContainer& componentContainer);
     int loadNodeData(YAML::Node const& yamlNode, SightNode*& node, bool useOldId = true);
+
 
     /**
      * @brief 

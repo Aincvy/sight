@@ -17,6 +17,8 @@
 
 #define UNDO_LIST_COUNT 60
 
+namespace ed = ax::NodeEditor;
+
 namespace sight {
 
     static std::vector<UndoCommand> undoList;

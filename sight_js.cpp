@@ -1331,6 +1331,13 @@ namespace sight {
                             component.beforeGenerate = ScriptFunctionWrapper::Function(isolate, tmpValue.As<Function>());
                         } else if (keyString == "afterGenerate") {
                             component.afterGenerate = ScriptFunctionWrapper::Function(isolate, tmpValue.As<Function>());
+                        } else if (keyString == "allowNode") {
+                            component.allowNode = tmpValue->BooleanValue(isolate);
+                        } else if (keyString == "allowConnection") {
+                            component.allowConnection = tmpValue->BooleanValue(isolate);
+                        } else if (keyString == "appendDataToOutput") {
+                            // function
+                            component.appendDataToOutput = ScriptFunctionWrapper::Function(isolate, tmpValue.As<Function>());
                         }
                     }
                 }
@@ -1519,6 +1526,20 @@ namespace sight {
             }
 
             args.GetReturnValue().Set(getNodeHelper(node, isolate));
+        }
+
+        void graphToJsonData(std::string_view filepath) {
+            auto g = currentGraph();
+            if (!g) {
+                logError("graph is null");
+                return;
+            }
+
+            SightNodeGraphOutputJsonConfig jsonConfig;
+            jsonConfig.includeNodeIdOnConnectionData = true;
+            jsonConfig.fieldNameCaseType = CaseTypes::PascalCase;
+            int code = g->outputJson(filepath, true, jsonConfig);
+            logDebug("output json result: $0", code);
         }
 
     }
@@ -2473,13 +2494,13 @@ namespace sight {
      * @return std::string 
      */
     std::string runComponentGenerateFunction(v8::Isolate* isolate, SightNode* node, int type) {
-        if (node->components.empty()) {
+        if (!node->componentContainer) {
             return {};
         }
 
         auto& data = g_V8Runtime->parsingGraphData;
         std::string source = {};
-        for( const auto& item: node->components){
+        for( const auto& item: node->componentContainer->components){
             auto c = item->templateNode->component;
 
             data.component = item;
@@ -2686,6 +2707,10 @@ namespace sight {
                 parseGraph(command.args.argString, true, true);
                 break;
             }
+            case JsCommandType::GraphToJsonData:
+                // filename
+                graphToJsonData(command.args.argString);
+                break;
             case JsCommandType::InitPluginManager:
             {
                 pluginManager()->init(g_V8Runtime->isolate);
@@ -2738,6 +2763,9 @@ namespace sight {
                 break;
             case JsCommandType::ProjectCodeSetBuild:
                 currentProject()->codeSetBuild();
+                break;
+            case JsCommandType::ProjectLoadPlugins:
+                currentProject()->loadPlugins();
                 break;
             }
 

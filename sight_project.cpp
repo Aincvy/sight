@@ -6,6 +6,7 @@
 #include "sight_js.h"
 #include "sight_js_parser.h"
 #include "sight_log.h"
+#include "sight_plugin.h"
 #include "sight_ui_node_editor.h"
 #include "sight_util.h"
 #include "sight.h"
@@ -70,7 +71,10 @@ namespace sight {
         void fillFiles(ProjectFile & parent){
             parent.files.clear();
 
-            for (const auto& item : directory_iterator{parent.path}) {
+            for (const auto& item : directory_iterator{ parent.path }) {
+                if (startsWith(item.path().filename().generic_string(), ".")) {
+                    continue;
+                }
                 std::string fullpath = std::filesystem::canonical(item.path()).string();
                 if (item.is_directory()) {
                     parent.files.push_back(
@@ -286,6 +290,7 @@ namespace sight {
         CHECK_CODE(loadConfigFile(), i);
         CHECK_CODE(loadStyleInfo(), i);
         CHECK_CODE(loadEntities(), i);
+        // CHECK_CODE(loadPlugins(), i);    // NEED INIT V8 FIRST
 
         return 0;
     }
@@ -512,14 +517,19 @@ namespace sight {
         return CODE_OK;
     }
 
-    int Project::loadPlugin(const char *name) {
-
-        return 0;
-    }
-
     int Project::loadPlugins() {
+        auto path = pathPluginsFolder();
+        // loop of path child folder
+        auto mgr = pluginManager();
+        for (const auto& child : std::filesystem::directory_iterator(path)) {
+            int i = mgr->loadPluginAt(child.path().string());
 
-        return 0;
+            if (i != CODE_OK) {
+                return i;
+            }
+        }
+        
+        return CODE_OK;
     }
 
     void Project::initTypeMap() {
@@ -548,6 +558,7 @@ namespace sight {
         typeMap["object"] = IntTypeObject;
         typeMap["number"] = IntTypeFloat;
         typeMap["Flow"] = IntTypeProcess;
+        typeMap["boolean"] = IntTypeBool;
     }
 
     uint Project::getIntType(const std::string &str, bool addIfNotFound) {

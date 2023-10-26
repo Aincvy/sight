@@ -13,6 +13,7 @@
 #include "imgui_canvas.h"
 #include "imgui_internal.h"
 #include "imgui_node_editor.h"
+#include "imgui_node_editor_internal.h"
 
 #include "sight_ui_node_editor.h"
 #include "sight_external_widgets.h"
@@ -44,19 +45,22 @@
 #define NODE_CONTEXT_MENU "NodeContextMenu"
 #define COMPONENT_CONTEXT_MENU "ComponentContextMenu"
 
+namespace ed = ax::NodeEditor;
+
 static struct {
     ed::EditorContext* context = nullptr;
     // file path buf.
     char contextConfigFileBuf[NAME_BUF_SIZE * 2] = { 0 };
 
     bool contextMenuCreateNodeOpen = false;
+    bool needSaveGraph = false;
     sight::SightNodePortHandle portForCreateNode;
 
     ImVec2 nextNodePosition{0,0};
 
     float lastSyncPositionTime = 0;
     bool createComponents = false;
-    uint componentForWhich = 0;        // which node? 
+    uint componentForWhich = 0;     // which node?
 
     bool isNextNodePositionEmpty(){
         return nextNodePosition.x == 0 && nextNodePosition.y == 0;
@@ -670,7 +674,7 @@ namespace sight {
 
             showNodePortsWithEd(node, nodeStyle);
 
-            showNodeComponents(node);
+            showNodeComponents(node->componentContainer, node, node->graph, node->getNodeId(), false);
             ed::EndNode();
             if (syncPositionFrom) {
                 setNodePos(node, ed::GetNodePosition(node->nodeId));
@@ -698,11 +702,11 @@ namespace sight {
             if (ImGui::Button("Parse")) {
                 graph->asyncParse();
             }
-            if (!sightSettings->autoSave) {
-                ImGui::SameLine();
-                if (ImGui::Button("Save")) {
-                    graph->save();
-                }
+            ImGui::SameLine();
+            if (ImGui::Button(ICON_MD_SAVE)) {
+                syncPositionFrom = true;
+                syncPositionTo = false;
+                g_ContextStatus->needSaveGraph = true;
             }
             ImGui::SameLine();
             ImGui::Checkbox("Auto Save", &(sightSettings->autoSave));
@@ -746,29 +750,13 @@ namespace sight {
 
             ImGui::SameLine();
             // SaveAsJson
-            if (ImGui::Button("SaveAsJson")) {
-                SightNodeGraphOutputJsonConfig jsonConfig;
-                jsonConfig.includeNodeIdOnConnectionData = true;
-                jsonConfig.fieldNameCaseType = CaseTypes::PascalCase;
-
-                int status = CODE_OK;
-                std::string filename = graph->getName().data();
-                filename.append(".json");
-
-                auto path = saveFileDialog(".", &status, filename);
-                if (status != CODE_OK) {
-                    if (status == CODE_USER_CANCELED) {
-                        logDebug("select file: User canceled");
-                    } else {
-                        logDebug("select file failed: $0", status);
-                    }
-                } else {
-                    status = graph->outputJson(path, true, jsonConfig);
-                    if (status != CODE_OK) {
-                        logDebug("save as json failed: $0", status);
-                    }
+            auto const& saveAsJsonHistory= graph->getSaveAsJsonHistory();
+            if (!saveAsJsonHistory.empty()) {
+                if (ImGui::Button("SaveAsJson")) {
+                    std::string_view path = saveAsJsonHistory.front();
+                    uiGraphToJson(graph, path);
                 }
-            }
+            } 
             ImGui::Separator();
 
             // Start interaction with editor.
@@ -1034,8 +1022,7 @@ namespace sight {
                 ed::NavigateToContent(0);
 
             if (syncPositionFrom && sightSettings->autoSave) {
-                graph->markDirty();
-                graph->save();
+                g_ContextStatus->needSaveGraph = true;
             }
 
             return CODE_OK;
@@ -1044,12 +1031,12 @@ namespace sight {
 
 
     int showNodeEditorGraph(UIStatus const& uiStatus) {
-        ImVec2 startPos = {
-            300, 20
-        };
-        auto windowSize = uiStatus.io->DisplaySize - startPos;
-        ImGui::SetNextWindowPos(startPos, ImGuiCond_Once);
-        ImGui::SetNextWindowSize(windowSize, ImGuiCond_Once);
+        // ImVec2 startPos = {
+        //     300, 20
+        // };
+        // auto windowSize = uiStatus.io->DisplaySize - startPos;
+        // ImGui::SetNextWindowPos(startPos, ImGuiCond_Once);
+        // ImGui::SetNextWindowSize(windowSize, ImGuiCond_Once);
 
         std::string windowTitle("Graph");
         auto graph = currentGraph();
@@ -1061,8 +1048,8 @@ namespace sight {
 
         bool flag = ImGui::Begin(windowTitle.c_str(), nullptr,
                      ImGuiWindowFlags_NoCollapse |
-                         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
-                         ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus);
+                        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
+                        ImGuiWindowFlags_NoBringToFrontOnFocus);
         if (flag) {
             if (graph) {
                 showNodes(uiStatus);
@@ -1070,8 +1057,13 @@ namespace sight {
                 ImGui::Text("Please open a graph.");
             }
         }
-        
+
         ImGui::End();
+
+        if (g_ContextStatus->needSaveGraph) {
+            g_ContextStatus->needSaveGraph = false;
+            uiSaveGraph();
+        }
 
         return CODE_OK;
     }
@@ -1085,12 +1077,16 @@ namespace sight {
     }
 
     void setNodePos(SightNode* node, ImVec2 pos) {
-        auto target = convert(pos);
-        if(target.x == pos.x && target.y == pos.y) {
+        // logDebug("try set node pos: $0", node->nodeName);
+        const auto& oldPos = node->position;
+        if (oldPos.x == pos.x && oldPos.y == pos.y) {
             return;
         }
+        auto target = convert(pos);
         node->position = target;
         node->graph->markDirty();
+
+        // logDebug("set node pos, name: $0, pos: $1, $2", node->nodeName, target.x, target.y);
     }
 
     void setNodePos(SightNode& node, ImVec2 pos) {
@@ -1142,11 +1138,13 @@ namespace sight {
         config.SettingsFile = configFilePath;
         g_ContextStatus->context = ed::CreateEditor(&config);
         g_ContextStatus->lastSyncPositionTime = 0;
-    
+        
         return CODE_OK;
     }
 
     void showNodePortValue(SightNodePort* port, bool fromGraph, int width, int type) {
+        assert(width > 0);
+
         // do not handle type-list-port
         assert(!port->options.typeList);
         if (port->type > 0 && port->getType() != port->type) {
@@ -1373,10 +1371,17 @@ namespace sight {
                 //
                 if (createComponent) {
                     //
-                    auto n = graph->findNode(g_ContextStatus->componentForWhich);
-                    // n->components.push_back(node);
-                    n->addComponent(this->templateNode);
-                    
+                    auto anyThing = graph->findSightAnyThing(g_ContextStatus->componentForWhich);
+                    if (anyThing.type == SightAnyThingType::Node) {
+                        auto n = anyThing.asNode();
+                        n->addComponent(this->templateNode);
+                    } else if (anyThing.type == SightAnyThingType::Connection) {
+                        auto c = anyThing.asConnection();
+                        c->addComponent(this->templateNode);
+                    } else {
+                        logError("$0 is not a node or connection!", g_ContextStatus->componentForWhich);
+                    }
+                
                 } else {
                     // create node
                     auto node = this->templateNode->instantiate();
@@ -1411,10 +1416,10 @@ namespace sight {
                 
             }
         } else {
-            
+            auto g=  currentGraph();
             if (ImGui::BeginMenu(name.c_str())) {
                 for (auto& item : children) {
-                    if (item.isAnyItemCanShow(createComponent)) {
+                    if (item.isAnyItemCanShow(createComponent, g->findSightAnyThing(g_ContextStatus->componentForWhich).type)) {
                         item.showContextMenu(createComponent);
                     }
                 }
@@ -1703,9 +1708,12 @@ namespace sight {
     }
 
     int showComponentContextMenu() {
+        auto tmpId = g_ContextStatus->componentForWhich;
+        auto g = currentGraph();
+        SightAnyThingType type = g->findSightAnyThing(tmpId).type;
         if (ImGui::BeginPopup(COMPONENT_CONTEXT_MENU)) {
             for (auto& item : currentNodeStatus()->templateAddressList) {
-                if (item.isAnyItemCanShow(true)) {
+                if (item.isAnyItemCanShow(true, type)) {
                     item.showContextMenu(true);
                 }
             }
@@ -1714,12 +1722,33 @@ namespace sight {
         }
         return CODE_OK;
     }
-    
-    int showNodeComponents(SightNode* node, bool fromInspector /* = false */) {
 
+    void showAddComponentButton(uint id) {
+        if (ImGui::Button("Add Component...")) {
+            g_ContextStatus->createComponents = true;
+            g_ContextStatus->componentForWhich = id;
+
+            // g_ContextStatus->nextNodePosition = ImGui::GetMousePos();
+            // g_ContextStatus->contextMenuCreateNodeOpen = true;
+            ImGui::OpenPopup(COMPONENT_CONTEXT_MENU);
+        }
+    }
+    
+    int showNodeComponents(SightComponentContainer *container, SightNode* node, SightNodeGraph* graph, uint id, bool fromInspector) {
+        if (!container) {
+            if (fromInspector) {
+                showAddComponentButton(id);
+            }
+            return CODE_OK;
+        }
+
+        if (!graph && node) {
+            graph = node->graph;
+        }
+        
         int delIndex = -1;
         int index = -1;
-        for (const auto& item : node->components) {
+        for (const auto& item : container->components) {
             index++;
 
             if (fromInspector) {
@@ -1730,28 +1759,23 @@ namespace sight {
                     delIndex = index;
                 }
                 showNodePorts(item);
-            } else {
-                // ImGui::Text("---------");
+            } else if(node){
+                ImGui::TextColored(currentUIStatus()->uiColors->nodeIdText, "%s", ICON_MD_CHECK_BOX);
+                ImGui::SameLine();
                 ImGui::TextColored(currentUIStatus()->uiColors->nodeIdText, "%s", item->nodeName.c_str());
 
                 auto& nodeStyle = node->templateNode->nodeStyle;
                 showNodePortsWithEd(item, nodeStyle);
             }
         }
+
         if (delIndex >= 0) {
-            node->components.erase(node->components.begin() + delIndex);
-            node->graph->markDirty();
+            container->components.erase(container->components.begin() + delIndex);
+            graph->markDirty();
         }
 
         if (fromInspector) {
-            if (ImGui::Button("Add Component...")) {
-                g_ContextStatus->createComponents = true;
-                g_ContextStatus->componentForWhich = node->getNodeId();
-
-                // g_ContextStatus->nextNodePosition = ImGui::GetMousePos();
-                // g_ContextStatus->contextMenuCreateNodeOpen = true;
-                ImGui::OpenPopup(COMPONENT_CONTEXT_MENU);
-            }
+            showAddComponentButton(id);
         }
 
         return CODE_OK;
@@ -1826,6 +1850,15 @@ namespace sight {
         for(auto & node : graph->getNodes()) {
             CALL_NODE_FUNC(&node);
         }
+    }
+
+    void uiSaveGraph() {
+        auto g = currentGraph();
+        g->markDirty();
+        g->save();
+
+        // ed::Detail::EditorContext* editor = reinterpret_cast<ed::Detail::EditorContext*>(ed::GetCurrentEditor());
+        // editor->MakeDirty(ed::SaveReasonFlags::User);
     }
 
     bool isNodeEditorReady() {

@@ -399,6 +399,8 @@ namespace sight {
 
     void checkEntityOperations(EntityOperations& );
 
-    void showEntityOperationList(UIStatus* );
+    void showEntityOperationList(UIStatus*);
+
+    void uiGraphToJson(SightNodeGraph *graph, std::string_view path, bool selectSaveFile = false);
 
 }

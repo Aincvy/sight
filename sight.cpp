@@ -8,9 +8,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
+#include <filesystem>
 
 #include "sight.h"
 #include "sight_js.h"
+#include "sight_log.h"
 #include "sight_project.h"
 
 
@@ -30,7 +32,10 @@ namespace sight {
             path = sightSettings.path.c_str();
         }
 
-        std::ifstream fin(path);
+        sightSettings.path = std::filesystem::absolute(path).string();
+        logDebug("loading sight settings at: $0",  sightSettings.path);
+
+        std::ifstream fin(sightSettings.path);
         if (!fin.is_open()) {
             sightSettings.path = path;
             saveSightSettings();
@@ -89,8 +94,24 @@ namespace sight {
             sightSettings.sightRootFolder = n.as<std::string>();
         }
 
-        sightSettings.b = true;
-        sightSettings.i = 10;
+        n = root["lastMainWindowWidth"];
+        if (n.IsDefined()) {
+            sightSettings.lastMainWindowWidth = n.as<int>();
+            logDebug("n is defined, lastMainWindowWidth: $0", n.as<int>());
+        }
+
+        n = root["lastMainWindowHeight"];
+        if (n.IsDefined()) {
+            sightSettings.lastMainWindowHeight = n.as<int>();
+        }
+
+        logDebug("lastMainWindowWidth: $0, lastMainWindowHeight: $1", 
+            sightSettings.lastMainWindowWidth, sightSettings.lastMainWindowHeight);
+
+        for (const auto& tmp : root) {
+            logDebug("root child: $0", tmp.first.as<std::string>());
+        }
+        
         return CODE_OK;
     }
 
@@ -119,6 +140,9 @@ namespace sight {
         
         out << YAML::Key << "lastUseEntityOperation" << YAML::Value << sightSettings.lastUseEntityOperation;
         out << YAML::Key << "sightRootFolder" << YAML::Value << sightSettings.sightRootFolder;
+
+        out << YAML::Key << "lastMainWindowWidth" << YAML::Value << sightSettings.lastMainWindowWidth;
+        out << YAML::Key << "lastMainWindowHeight" << YAML::Value << sightSettings.lastMainWindowHeight;
 
         out << YAML::EndMap;
         std::ofstream fOut(sightSettings.path, std::ios::out | std::ios::trunc);
