@@ -14,6 +14,7 @@
 #include "sys/types.h"
 
 #include "absl/container/btree_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "v8.h"
 #include "sight.h"
 
@@ -343,6 +344,10 @@ namespace sight {
         void resetTypeListCache(); 
         std::vector<std::string> const& getTypeListCache() const;
 
+        absl::flat_hash_set<std::string> const& getDisabledPluginNames() const;
+
+        absl::flat_hash_set<std::string>& getDisabledPluginNames();
+
     private:
         std::string baseDir;
         bool createIfNotExist;
@@ -364,7 +369,8 @@ namespace sight {
 
         // cache for all type names
         std::vector<std::string> typeListCache;
-        
+
+        absl::flat_hash_set<std::string> disabledPluginNames;
         
         // file locations
         std::string pathConfigFile() const;

@@ -74,7 +74,10 @@ namespace sight {
         CODE_PLUGIN_NO_DESCRIPTION,
         CODE_PLUGIN_FILE_ERROR,
         CODE_PLUGIN_DISABLED,
+        CODE_PLUGIN_DISABLED_BY_PROJECT,
         CODE_PLUGIN_NO_RELOAD,     // not reload-able
+        CODE_PLUGIN_ALREADY_LOAD,
+        CODE_PLUGIN_NOT_FOUND,
 
         CODE_SCRIPT_NO_RESULT = 250,
 
@@ -86,6 +89,7 @@ namespace sight {
         CODE_GRAPH_NO_ENTER_NODE,
         CODE_GRAPH_ERROR_ENTER_NODE,
         CODE_PORT_NAME_REPEAT,
+        CODE_GRAPH_INVALID_ID,
     };
 
     /**

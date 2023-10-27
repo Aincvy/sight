@@ -41,9 +41,8 @@ namespace sight {
          */
         uint anyThingId = 0;
 
-
-        SightNodeConnection connectionData;
-        SightNode nodeData;
+        SightNodeConnection* connectionData = nullptr;
+        SightNode* nodeData = nullptr;
         SightNodeValue portValueData;
 
         UndoCommand() = default;
@@ -54,6 +53,8 @@ namespace sight {
         void undo();
         void redo();
 
+        void freeNodeData();
+        
     };
 
     enum class StartOrStop {
@@ -67,7 +68,7 @@ namespace sight {
     int initUndo();
     int recordUndo(UndoRecordType recordType, uint anyThingId);
     int recordUndo(UndoRecordType recordType, uint anyThingId, ImVec2 pos);
-    int recordUndo(UndoRecordType recordType, uint anyThingId, ImVec2 pos, SightAnyThingWrapper anyThing);
+    // int recordUndo(UndoRecordType recordType, uint anyThingId, ImVec2 pos, SightAnyThingWrapper anyThing);
 
     /**
      * @brief 

@@ -1338,6 +1338,8 @@ namespace sight {
                         } else if (keyString == "appendDataToOutput") {
                             // function
                             component.appendDataToOutput = ScriptFunctionWrapper::Function(isolate, tmpValue.As<Function>());
+                        } else if (keyString == "onlyComponent") {
+                            component.onlyComponent = tmpValue->BooleanValue(isolate);
                         }
                     }
                 }
@@ -2752,6 +2754,12 @@ namespace sight {
                 addUICommand(UICommandType::PluginReloadOver, CommandArgs::copyFrom(msg));
                 break;
             }
+            case JsCommandType::PluginEnable:
+                pluginManager()->enablePlugin(command.args.argString);
+                break;
+            case JsCommandType::PluginDisable:
+                pluginManager()->disablePlugin(command.args.argString);
+                break;
             case JsCommandType::ProjectBuild:
                 currentProject()->build(command.args.argString);
                 break;

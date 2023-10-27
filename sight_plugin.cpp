@@ -6,10 +6,13 @@
 #include "sight.h"
 #include "filesystem"
 #include "sight_defines.h"
+#include "sight_project.h"
 #include "sight_ui.h"
 #include "sight_util.h"
 #include "sight_js.h"
 
+#include "v8-context.h"
+#include "v8-local-handle.h"
 #include "v8pp/convert.hpp"
 #include "v8pp/call_v8.hpp"
 #include "v8pp/object.hpp"
@@ -96,13 +99,15 @@ namespace sight {
         int i = CODE_OK;
         bool fail = false;
         do {
-            if ((i = plugin->load()) != CODE_OK) {
+            i = plugin->load();
+            if (i != CODE_OK && i != CODE_PLUGIN_DISABLED_BY_PROJECT) {
                 if (i != CODE_PLUGIN_DISABLED) {
                     logDebug("plugin load fail: $0", path);
                 }
                 fail = true;
                 break;
             }
+
             if (pluginMap.contains(plugin->getName())) {
                 logDebug("maybe name repeat: $0", plugin->getName());
                 fail = true;
@@ -135,6 +140,26 @@ namespace sight {
 
     uint PluginManager::getLoadedPluginCount() const {
         return loadedPluginCount;
+    }
+
+    int PluginManager::enablePlugin(std::string_view name) {    
+        auto plugin = pluginMap.find(name);
+        if (plugin == pluginMap.end()) {
+            return CODE_PLUGIN_NOT_FOUND;
+        }
+
+        v8::HandleScope handle_scope(isolate);
+        auto context = isolate->GetCurrentContext();
+        return plugin->second->justLoad(context);
+    }
+
+    int PluginManager::disablePlugin(std::string_view name, bool fromProject) {
+        auto plugin = pluginMap.find(name);
+        if (plugin == pluginMap.end()) {
+            return CODE_PLUGIN_NOT_FOUND;
+        }
+
+        return plugin->second->disablePlugin(fromProject);
     }
 
     std::map<std::string, const Plugin*> const& PluginManager::getSnapshotMap(){
@@ -194,7 +219,7 @@ namespace sight {
     int Plugin::loadFromFile() {
         // todo load single file as this plugin
 
-        return CODE_OK;
+        return CODE_NOT_IMPLEMENTED;
     }
 
     int Plugin::loadFromFolder() {
@@ -244,42 +269,18 @@ namespace sight {
             return CODE_PLUGIN_DISABLED;
         }
 
-        // load files.
-        auto module = this->module.IsEmpty() ? v8::Object::New(isolate) : this->module.Get(isolate);
-        fs::path rootPath = this->path;
-        for( const auto& item: loadFiles){
-            fs::path path = rootPath / item;
-            if (!fs::exists(path)) {
-                continue;
-            }
-
-            auto fullPath = std::filesystem::canonical(path);
-            auto code = runJsFile(isolate, fullPath.string().c_str(), nullptr, module);
-            if (code != CODE_OK) {
-                logDebug("js run failed: $0", fullPath.string().c_str());
-                return CODE_PLUGIN_FILE_ERROR;
+        auto project = currentProject();
+        if (project) {
+            // check disabled by project?
+            if (project->getDisabledPluginNames().contains(this->name)) {
+                logDebug("plugin disabled by project: $0", this->name);
+                this->disabledByProject = true;
+                this->status = PluginStatus::Disabled;
+                return CODE_PLUGIN_DISABLED_BY_PROJECT;
             }
         }
 
-        // check exports-ui.js file
-        auto exportsUIPath = rootPath / "exports-ui.js";
-        if (fs::exists(exportsUIPath)) {
-            auto fullPath = std::filesystem::canonical(exportsUIPath);
-            addUICommand(UICommandType::RunScriptFile, strdup(fullPath.string().c_str()), 0, true);
-        }
-
-        if (this->module.IsEmpty()) {
-            this->module = V8ObjectType(isolate, module);
-        }
-        // register global functions
-        registerGlobals(module->Get(context, v8pp::to_v8(isolate, "globals")).ToLocalChecked());
-        // auto onInit = module->Get(context, v8pp::to_v8(isolate, "onInit")).ToLocalChecked();
-        // if (onInit->IsFunction()) {
-        //     v8pp::call_v8(isolate, onInit.As<v8::Function>(), v8::Object::New(isolate), MODULE_INIT_JS);
-        // }
-
-        status = PluginStatus::Loaded;
-        return CODE_OK;
+        return justLoad(context);
     }
 
     int Plugin::load() {
@@ -415,6 +416,66 @@ namespace sight {
         return code;
     }
 
+    int Plugin::justLoad(v8::Local<v8::Context> context) {
+        if (status == PluginStatus::Loaded) {
+            return CODE_PLUGIN_ALREADY_LOAD;
+        }
+
+        auto isolate = this->pluginManager->getIsolate();
+        v8::HandleScope handle_scope(isolate);
+
+        // load files.
+        auto module = this->module.IsEmpty() ? v8::Object::New(isolate) : this->module.Get(isolate);
+        fs::path rootPath = this->path;
+        for (const auto& item : loadFiles) {
+            fs::path path = rootPath / item;
+            if (!fs::exists(path)) {
+                continue;
+            }
+
+            auto fullPath = std::filesystem::canonical(path);
+            auto code = runJsFile(isolate, fullPath.string().c_str(), nullptr, module);
+            if (code != CODE_OK) {
+                logDebug("js run failed: $0", fullPath.string().c_str());
+                return CODE_PLUGIN_FILE_ERROR;
+            }
+        }
+
+        // check exports-ui.js file
+        auto exportsUIPath = rootPath / "exports-ui.js";
+        if (fs::exists(exportsUIPath)) {
+            auto fullPath = std::filesystem::canonical(exportsUIPath);
+            addUICommand(UICommandType::RunScriptFile, strdup(fullPath.string().c_str()), 0, true);
+        }
+
+        if (this->module.IsEmpty()) {
+            this->module = V8ObjectType(isolate, module);
+        }
+        // register global functions
+        registerGlobals(module->Get(context, v8pp::to_v8(isolate, "globals")).ToLocalChecked());
+        // auto onInit = module->Get(context, v8pp::to_v8(isolate, "onInit")).ToLocalChecked();
+        // if (onInit->IsFunction()) {
+        //     v8pp::call_v8(isolate, onInit.As<v8::Function>(), v8::Object::New(isolate), MODULE_INIT_JS);
+        // }
+
+        status = PluginStatus::Loaded;
+        return CODE_OK;
+    }
+
+    int Plugin::unload() {
+        return CODE_NOT_IMPLEMENTED;
+    }
+
+    int Plugin::disablePlugin(bool fromProject) {
+        this->disabled = true;
+        if (fromProject) {
+            this->disabledByProject = true;
+        }
+        this->status = PluginStatus::Disabled;
+        unload();
+        return CODE_OK;
+    }
+
     const char* Plugin::getUrl() const {
         return url.c_str();
     }
@@ -438,6 +499,10 @@ namespace sight {
 
     bool Plugin::isReloadAble() const {
         return this->reloadAble;
+    }
+
+    bool Plugin::isDisabledByProject() const {
+        return this->disabledByProject;        
     }
 
     PluginManager *pluginManager() {

@@ -146,6 +146,12 @@ namespace sight {
     
     void hideAllAddChild(SightNodeGraph* graph);
 
+    /**
+     * @brief use `trySaveCurrentGraph` first if you can.
+     * 
+     */
     void uiSaveGraph();
+
+    void trySaveCurrentGraph();
     
 }

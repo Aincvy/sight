@@ -47,6 +47,7 @@
 typedef unsigned int uint;
 typedef unsigned short ushort;
 typedef unsigned char u_char;
+typedef unsigned char uchar;
 #endif
 
 namespace sight {

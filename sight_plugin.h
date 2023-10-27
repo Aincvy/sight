@@ -49,6 +49,25 @@ namespace sight {
          */
         int load();
 
+        int reload();
+
+        /**
+         * @brief only use when load a disabled plugin!
+         * 
+         * @return int 
+         */
+        int justLoad(v8::Local<v8::Context> context);
+
+        /**
+         * @brief disabled this plugin
+         * 
+         * @return int 
+         */
+        int unload();
+
+        int disablePlugin(bool fromProject = true);
+
+
         [[nodiscard]] std::string const & getName() const;
 
         const char* getPath() const;
@@ -57,13 +76,14 @@ namespace sight {
         const char* getUrl() const;
         bool isUrlEmpty() const;
 
-        int reload();
-
         PluginStatus getPluginStatus() const;
         const char* getPluginStatusString() const;
 
         bool isDisabled() const;
-        bool isReloadAble() const;        
+        bool isReloadAble() const;
+
+        // disabledByProject
+        bool isDisabledByProject() const;
 
     private:
         std::string name;
@@ -73,6 +93,7 @@ namespace sight {
         std::string url;
         bool reloadAble = true;
         bool disabled = false;
+        bool disabledByProject = false;
         std::vector<std::string> loadFiles;
         std::vector<std::string> depends;
 
@@ -120,6 +141,10 @@ namespace sight {
         std::vector<std::string> const& getSortedPluginNames() const;
 
         uint getLoadedPluginCount() const;
+
+        int enablePlugin(std::string_view name);
+
+        int disablePlugin(std::string_view name, bool fromProject = true);
 
     private:
         absl::flat_hash_map<std::string, Plugin*> pluginMap;

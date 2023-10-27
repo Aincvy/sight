@@ -176,10 +176,7 @@ namespace sight {
         }
 
         std::sort(connections.begin(), connections.end(), [](SightNodeConnection* c1, SightNodeConnection* c2) {
-            if (c1->priority < c2->priority) {
-                return false;
-            }
-            return true;
+            return c1->priority > c2->priority;
         });
 
     }
@@ -297,41 +294,57 @@ namespace sight {
         return nullptr;
     }
 
-    SightNode *SightNode::clone(bool generateId) const{
+    SightNode *SightNode::clone(bool generateId /* = true */) const{
         auto p = new SightNode();
-        p->copyFrom(this, CopyFromType::Clone);
-        
-        if (generateId) {
-            auto nodeFunc = [](std::vector<SightNodePort> & list){
-                for(auto& item: list){
-                    item.id = nextNodeOrPortId();
-                }
-            };
-
-            p->nodeId = nextNodeOrPortId();
-            CALL_NODE_FUNC(p);
-        }
+        p->graph = this->graph;
+        p->copyFrom(this, CopyFromType::Clone, generateId);
 
         return p;
     }
 
-    void SightNode::copyFrom(const SightNode* node, CopyFromType copyFromType) {
+    void SightNode::copyFrom(const SightNode* node, CopyFromType copyFromType, bool generateId /* = true */) {
+        assert(this->nodeId == 0);     // only empty node can copy from other node.
+        if (copyFromType == CopyFromType::Duplicate && !generateId) {
+            logWarning("duplicate a node, generateId must be true!");
+            generateId = true;
+        }
+
         this->nodeId = node->nodeId;
         this->nodeName = node->nodeName;
         this->position = node->position;
         this->templateNode = node->templateNode;
 
-        auto copyFunc = [copyFromType, this](std::vector<SightNodePort> const& src, std::vector<SightNodePort>& dst) {
+        if (generateId) {
+            graph->markDirty();
+            this->nodeId = nextNodeOrPortId();
+
+            if (copyFromType == CopyFromType::Duplicate) {
+                // ignore other types
+                graph->addNodeId(this);
+            }
+        }
+
+        auto copyFunc = [copyFromType, this, generateId](std::vector<SightNodePort> const& src, std::vector<SightNodePort>& dst) {
             for (const auto &item : src) {
                 dst.push_back(item);
-                dst.back().node = this;
-
+                auto& port = dst.back();
+                port.node = this;
+                if (generateId) {
+                    port.id = nextNodeOrPortId();
+                }
+                
                 if (copyFromType == CopyFromType::Instantiate) {
                     // init something
                     // auto& back = dst.back();
                     // if (back.getType() == IntTypeLargeString) {
                     //     back.value.stringInit();
                     // }
+                } else if (copyFromType == CopyFromType::Duplicate || copyFromType == CopyFromType::Component) {
+                    // 
+                    port.connections.clear();
+                    port.oldValue = {};
+                    
+                    graph->addPortId(port);
                 }
             }
         };
@@ -340,7 +353,56 @@ namespace sight {
         copyFunc(node->outputPorts, this->outputPorts);
         copyFunc(node->fields, this->fields);
 
-        // updateChainPortPointer();
+        // copy components
+        if (copyFromType != CopyFromType::Component && node->componentContainer) {
+            this->componentContainer = graph->deepClone(node->componentContainer);
+        }
+
+        if (copyFromType == CopyFromType::Duplicate) {
+            updateChainPortPointer();
+            graph->markDirty();
+        }
+    }
+
+    void SightNode::markAsDeleted(bool f) {
+
+        if (f) {
+            this->flags |= (uchar)SightNodeFlags::Deleted;
+        } else {
+            this->flags &= ~(uchar)SightNodeFlags::Deleted;
+        }
+    }
+
+    void SightNode::markAsComponent(bool f) {
+        if (f) {
+            this->flags |= (uchar)SightNodeFlags::Component;
+        } else {
+            this->flags &= ~(uchar)SightNodeFlags::Component;
+        }
+    }
+
+    bool SightNode::isDeleted() const {
+        return (this->flags & (uchar)SightNodeFlags::Deleted) != 0;
+        
+    }
+
+    bool SightNode::isComponent() const {
+        return (this->flags & (uchar)SightNodeFlags::Component) != 0;        
+    }
+
+    bool SightNode::hasConnections() const {
+
+        // check connections
+        auto hasConnections = [](std::vector<SightNodePort> const& list) {
+            for (auto& item : list) {
+                if (item.isConnect()) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        return hasConnections(inputPorts) || hasConnections(outputPorts);
     }
 
     SightNodePortConnection SightNode::findConnectionByProcess() {
@@ -457,15 +519,25 @@ namespace sight {
             }
         }
 
-        //
-        // for(auto& item: components){
-        //     delete item;
-        // }
-        // components.clear();
         if (this->componentContainer) {
-            graph->getComponentContainers().remove(this->componentContainer);
+            graph->removeComponentContainer(this->componentContainer);
             this->componentContainer = nullptr;
         }
+
+        auto nodeFunc = [this](std::vector<SightNodePort>& list) {
+            // loop
+            for (auto& item : list) {
+                if (item.isConnect()) {
+                    logError("node reset, but a port is connected.. $0, port: $1", this->nodeId, item.getId());
+                }
+            }
+            list.clear();
+        };
+
+        CALL_NODE_FUNC(this);
+
+        this->nodeId = 0;
+        this->nodeName = "";
     }
 
     SightNodePortHandle SightNode::findPort(const char* name, int orderSize, int order[]) {
@@ -544,7 +616,7 @@ namespace sight {
             return false;
         }
 
-        auto p = templateNode->instantiate();
+        auto p = templateNode->instantiate(this->graph);
         addComponent(p);
         
         return true;
@@ -555,7 +627,7 @@ namespace sight {
             return false;
         }
 
-        getComponentContainer()->addComponent(p, this->graph);
+        getComponentContainer()->setGraph(this->graph)->addComponent(p);
         return true;
     }
 
@@ -576,7 +648,7 @@ namespace sight {
     SightComponentContainer* SightNode::getComponentContainer() {
         if (!componentContainer) {
             
-            this->componentContainer = graph->getComponentContainers().add();
+            this->componentContainer = graph->createComponentContainer();
         }
         return componentContainer;
     }
@@ -667,45 +739,15 @@ namespace sight {
         logDebug(this->nodeName);
         auto p = new SightNode();
         
-        auto portCopyFunc = [](std::vector<SightJsNodePort*> const& src, std::vector<SightNodePort> & dst){
-            for( const auto& item: src){
-                auto copy = item->instantiate();
-                copy.templateNodePort = item;
-                dst.push_back(copy);
-                dst.back().oldValue = dst.back().value;
-            }
-        };
-        portCopyFunc(this->inputPorts, p->inputPorts);
-        portCopyFunc(this->outputPorts, p->outputPorts);
-        portCopyFunc(this->fields, p->fields);
-        p->nodeName = this->nodeName;
-        p->templateNode = this;
-        p->tryAddChainPorts(this->options.titleBarPortType);
-        assert(CURRENT_GRAPH);
-        p->graph = CURRENT_GRAPH;
+        this->instantiate(p, generateId);
+        return p;
+    }
 
-        if (generateId) {
-            // generate id
-            auto nodeFunc = [](std::vector<SightNodePort>& list) {
-                for (auto& item : list) {
-                    item.id = nextNodeOrPortId();
+    SightNode* SightJsNode::instantiate(SightNodeGraph* graph, bool generateId) const {
+        auto p = graph->getNodes().add();
+        p->graph = graph;
 
-                    // check type
-                    auto t = item.getType();
-                    if (!isBuiltInType(t)) {
-                        bool isFind = false;
-                        auto typeInfo = currentProject()->getTypeInfo(t, &isFind);
-                        if (isFind) {
-                            typeInfo.initValue(item.value);
-                        }
-                    }
-                }
-            };
-
-            p->nodeId = nextNodeOrPortId();
-            CALL_NODE_FUNC(p);
-        }
-
+        this->instantiate(p, generateId);
         return p;
     }
 
@@ -847,10 +889,56 @@ namespace sight {
         return component.active;
     }
 
-    void SightNodeConnection::removeRefs(SightNodeGraph *graph) {
-        if (!graph) {
-            graph = CURRENT_GRAPH;
+    void SightJsNode::instantiate(SightNode* p, bool generateId) const {
+        auto portCopyFunc = [](std::vector<SightJsNodePort*> const& src, std::vector<SightNodePort>& dst) {
+            for (const auto& item : src) {
+                auto copy = item->instantiate();
+                copy.templateNodePort = item;
+                dst.push_back(copy);
+                dst.back().oldValue = dst.back().value;
+            }
+        };
+        portCopyFunc(this->inputPorts, p->inputPorts);
+        portCopyFunc(this->outputPorts, p->outputPorts);
+        portCopyFunc(this->fields, p->fields);
+        p->nodeName = this->nodeName;
+        p->templateNode = this;
+        p->tryAddChainPorts(this->options.titleBarPortType);
+        assert(CURRENT_GRAPH);
+        p->graph = CURRENT_GRAPH;
+
+        if (generateId) {
+            // generate id
+            auto nodeFunc = [](std::vector<SightNodePort>& list) {
+                for (auto& item : list) {
+                    item.id = nextNodeOrPortId();
+
+                    // check type
+                    auto t = item.getType();
+                    if (!isBuiltInType(t)) {
+                        bool isFind = false;
+                        auto typeInfo = currentProject()->getTypeInfo(t, &isFind);
+                        if (isFind) {
+                            typeInfo.initValue(item.value);
+                        }
+                    }
+                }
+            };
+
+            p->nodeId = nextNodeOrPortId();
+            CALL_NODE_FUNC(p);
         }
+
+    }
+
+    SightNodeConnection::SightNodeConnection() {
+    }
+    SightNodeConnection::SightNodeConnection(uint id, uint left, uint right, uint leftColor, int priority)
+        : connectionId(id), left(left), right(right), leftColor(leftColor), priority(priority) {
+    }
+
+    void SightNodeConnection::removeRefs() {
+        
         auto leftPort = graph->findPort(leftPortId());
         auto rightPort = graph->findPort(rightPortId());
 
@@ -861,6 +949,36 @@ namespace sight {
         if (rightPort) {
             auto & c = rightPort->connections;
             c.erase(std::remove(c.begin(), c.end(), this), c.end());
+        }
+    }
+
+    void SightNodeConnection::makeRefs() {
+    
+        auto leftPort = graph->findPort(leftPortId());
+        auto rightPort = graph->findPort(rightPortId());
+
+        if (leftPort) {
+            auto& c = leftPort->connections;
+            // check has already ?
+            if (std::find(c.begin(), c.end(), this) == c.end()) {
+                c.push_back(this);
+                leftPort->sortConnections();
+            } else {
+                // already exists
+                logError("connection already exists, port: $0, connection: $1", leftPortId(), connectionId);
+            }
+            
+        }
+        if (rightPort) {
+            auto& c = rightPort->connections;
+            // check has already ?
+            if (std::find(c.begin(), c.end(), this) == c.end()) {
+                c.push_back(this);
+                rightPort->sortConnections();
+            } else {
+                // already exists
+                logError("connection already exists, port: $0, connection: $1", rightPortId(), connectionId);
+            }            
         }
     }
 
@@ -880,21 +998,61 @@ namespace sight {
         return right > 0 ? CURRENT_GRAPH->findPort(right) : nullptr;
     }
 
-    SightComponentContainer*         SightNodeConnection::getComponentContainer() {
+    SightComponentContainer*   SightNodeConnection::getComponentContainer() {
         if (!componentContainer) {
-            componentContainer = graph->getComponentContainers().add();
+            componentContainer = graph->createComponentContainer();
         }
         return componentContainer;
     }
 
-    bool SightNodeConnection::addComponent(SightJsNode* templateNode) {    
-        return getComponentContainer()->addComponent(templateNode, this->graph);
+    bool SightNodeConnection::addComponent(SightJsNode* templateNode) {
+        return getComponentContainer()->setGraph(this->graph)-> addComponent(templateNode);
     }
 
     bool SightNodeConnection::addComponent(SightNode* sightNode) {
-        return getComponentContainer()->addComponent(sightNode, this->graph);
+        return getComponentContainer()->setGraph(this->graph)->addComponent(sightNode);
     }
 
+    void SightNodeConnection::reset() {
+        this->connectionId = 0;
+        this->left = this->right = 0;
+        this->priority = 10;
+        this->generateCode = true;
+        this->leftColor = IM_COL32_WHITE;
+
+        if (this->componentContainer) {
+            graph->removeComponentContainer(this->componentContainer);
+            this->componentContainer = nullptr;
+        }
+    }
+
+    void SightNodeConnection::markAsDeleted(bool f) {
+
+        if (f) {
+            this->flags |= (uchar)SightNodeFlags::Deleted;
+        } else {
+            this->flags &= ~(uchar)SightNodeFlags::Deleted;
+        }
+    }
+
+    void SightNodeConnection::markAsComponent(bool f) {
+
+        if (f) {
+            this->flags |= (uchar)SightNodeFlags::Component;
+        } else {
+            this->flags &= ~(uchar)SightNodeFlags::Component;
+        }
+    }
+
+    bool SightNodeConnection::isDeleted() const {
+        return (this->flags & (uchar)SightNodeFlags::Deleted) != 0;
+    }
+
+    bool SightNodeConnection::isComponent() const {
+        return (this->flags & (uchar)SightNodeFlags::Component) != 0;
+    }
+
+    
     int SightNodeGraph::saveToFile(const char* path, bool set, bool saveAnyway, SaveReason saveReason) {
         if (set) {
             this->setFilePath(path);
@@ -911,19 +1069,20 @@ namespace sight {
         // nodes
         out << YAML::Key << "nodes";
         out << YAML::Value << YAML::BeginMap;
-        for (const auto &node : nodes) {
-            out << YAML::Key << node.nodeId;
-            out << YAML::Value << node;
-            // out << node;
-        }
+        
+        loopOf([&out](SightNode* node) {
+            out << YAML::Key << node->nodeId;
+            out << YAML::Value << *node;
+        });
         out << YAML::EndMap;
 
         // connections
         out << YAML::Key << "connections";
         out << YAML::Value << YAML::BeginMap;
-        for (const auto &connection : connections) {
-            out << YAML::Key << connection.connectionId << YAML::Value << connection;
-        }
+
+        loopOf([&out](SightNodeConnection* connection) {
+            out << YAML::Key << connection->connectionId << YAML::Value << *connection;
+        });
         out << YAML::EndMap;
 
         // other info
@@ -1251,7 +1410,7 @@ namespace sight {
         set connectionIdSet;
 
         int status = CODE_OK;
-        const int maxNodeOrPortId = currentProject()->maxNodeOrPortId();
+        const uint maxNodeOrPortId = currentProject()->maxNodeOrPortId();
 
         auto isIdInvalid = [&nodeIdSet, &portIdSet, &connectionIdSet, maxNodeOrPortId](uint id) {
             return nodeIdSet.contains(id) || portIdSet.contains(id) || connectionIdSet.contains(id) 
@@ -1367,9 +1526,50 @@ namespace sight {
         return this->connections;
     }
 
-    SightArray<SightNode> & SightNodeGraph::getComponents() {
-        return components;
+    void SightNodeGraph::loopOf(std::function<void(SightNode const*)> func) const {
+    
+        // loop of this->nodes, and call func
+        for (auto& item : this->nodes) {
+            if (item.isDeleted() || item.isComponent()) {
+                continue;
+            }
+            func(&item);
+        }
     }
+
+    void SightNodeGraph::loopOf(std::function<void(SightNode*)> func) {
+        for (auto& item : this->nodes) {
+            if (item.isDeleted() || item.isComponent()) {
+                continue;
+            }
+            func(&item);
+        }
+    }
+
+    void SightNodeGraph::loopOf(std::function<void(SightNodeConnection*)> func) {
+    
+        // loop of this->connections, and call func
+        for (auto& item : this->connections) {
+            if (item.isDeleted()) {
+                continue;
+            }
+            func(&item);
+        }
+    }
+
+    void SightNodeGraph::loopOf(std::function<void(SightNodeConnection const*)> func) const {
+
+        for (auto& item : this->connections) {
+            if (item.isDeleted()) {
+                continue;
+            }
+            func(&item);
+        }
+    }
+
+    // SightArray<SightNode> & SightNodeGraph::getComponents() {
+    //     return components;
+    // }
 
     SightNodePort* SightNodeGraph::findPort(uint id) {
         return findSightAnyThing(id).asPort();
@@ -1399,6 +1599,10 @@ namespace sight {
     }
 
     const SightAnyThingWrapper& SightNodeGraph::findSightAnyThing(uint id) const {
+        if (id <= 0) {
+            return invalidAnyThingWrapper;
+        }
+
         auto iter = idMap.find(id);
         if (iter == idMap.end()) {
             return invalidAnyThingWrapper;
@@ -1406,35 +1610,23 @@ namespace sight {
         return iter->second;
     }
 
-    int SightNodeGraph::delNode(int id, SightNode* copyTo) {
+    int SightNodeGraph::delNode(int id) {
         auto result = std::find_if(nodes.begin(), nodes.end(), [id](const SightNode& n){ return n.nodeId == id; });
         if (result == nodes.end()) {
             return CODE_FAIL;
         }
 
-        // check connections
-        auto hasConnections = [](std::vector<SightNodePort>& list){
-            for(auto& item: list){
-                if (item.isConnect()) {
-                    return true;
-                }
-            }
-            return false;
-        };
-        if (hasConnections(result->fields) || hasConnections(result->inputPorts) || hasConnections(result->outputPorts)) {
+        if (result->hasConnections()) {
             return CODE_NODE_HAS_CONNECTIONS;
         }
 
         idMap.erase(id);
-        if (copyTo) {
-            *copyTo = *result;
-        }
         nodes.erase(result);
         markDirty();
         return CODE_OK;
     }
 
-    int SightNodeGraph::delConnection(int id, bool removeRefs,SightNodeConnection* copyTo) {
+    int SightNodeGraph::delConnection(int id, bool removeRefs) {
         auto result = std::find_if(connections.begin(), connections.end(),
                                    [id](const SightNodeConnection &c) { return c.connectionId == id; });
         if (result == connections.end()) {
@@ -1447,9 +1639,6 @@ namespace sight {
         }
         idMap.erase(id);
 
-        if (copyTo) {
-            *copyTo = *result;
-        }
         connections.erase(result);
         markDirty();
         return CODE_OK;
@@ -1542,11 +1731,29 @@ namespace sight {
     }
 
     void SightNodeGraph::addPortId(SightNodePort const& port) {
+        if (idMap.find(port.getId()) != idMap.end()) {
+            logError("port id already exists: $0", port.getId());
+            return;
+        }
         idMap[port.getId()] = {
             SightAnyThingType::Port,
             port.node,
             port.getId()
         };
+    }
+
+    void SightNodeGraph::addNodeId(SightNode* node) {
+
+        if (idMap.find(node->getNodeId()) != idMap.end()) {
+            logError("node id already exists: $0", node->getNodeId());
+            return;
+        }
+
+        idMap[node->getNodeId()] = {
+            SightAnyThingType::Node,
+            node
+        };
+
     }
 
     int SightNodeGraph::outputJson(std::string_view path, bool overwrite, SightNodeGraphOutputJsonConfig const& config) const {
@@ -1717,14 +1924,86 @@ namespace sight {
         return CODE_OK;
     }
 
+    SightComponentContainer* SightNodeGraph::createComponentContainer() {
+
+        auto c = this->componentContainers.add();
+        c->graph = this;
+        return c;
+    }
+
+    bool SightNodeGraph::removeComponentContainer(SightComponentContainer* container) {
+        return this->componentContainers.remove(container);
+    }
+
     std::vector<std::string> const& SightNodeGraph::getSaveAsJsonHistory() const {
     
         return saveAsJsonHistory;
-    
     }
 
-    SightArray<SightComponentContainer> & SightNodeGraph::getComponentContainers() {
-        return this->componentContainers;
+    int SightNodeGraph::fakeDeleteNode(uint id) {
+
+        auto n = findNode(id);
+        if (n) {
+            return fakeDeleteNode(n);
+        }
+
+        return CODE_GRAPH_INVALID_ID;
+    }
+
+    int SightNodeGraph::fakeDeleteNode(SightNode* node) {
+        if (node->hasConnections()) {
+            return CODE_NODE_HAS_CONNECTIONS;
+        }
+
+        node->markAsDeleted();
+        return CODE_OK;
+    }
+
+    int SightNodeGraph::fakeDeleteConnection(SightNodeConnection* connection) {
+        connection->removeRefs();
+        connection->markAsDeleted();
+        return CODE_OK;
+    }
+
+    int SightNodeGraph::fakeDeleteConnection(uint id) {
+    
+        auto c = findConnection(id);
+        if (c) {
+            return fakeDeleteConnection(c);
+        }
+    
+        return CODE_GRAPH_INVALID_ID;
+
+    }
+
+    // SightArray<SightComponentContainer> & SightNodeGraph::getComponentContainers() {
+    //     return this->componentContainers;
+    // }
+
+    SightComponentContainer* SightNodeGraph::deepClone(SightComponentContainer *original) {
+        auto target = this->componentContainers.add();
+        target->setGraph(this);
+
+        for (auto& item : original->components) {
+            auto n = this->nodes.add();
+            n->graph = this;
+            n->copyFrom(item, SightNode::CopyFromType::Component, true);
+
+            target->addComponent(n);
+        }
+        
+        return target;
+    }
+
+    SightNode* SightNodeGraph::deepClone(SightNode* original) {
+        // if (original->templateNode) {
+        //     // use template node ? 
+        // }
+
+        auto target = this->nodes.add();
+        target->graph = this;
+        target->copyFrom(original, SightNode::CopyFromType::Duplicate, true);
+        return target;
     }
 
     void SightNodeGraph::addSaveAsJsonHistory(std::string_view path) {
@@ -2229,6 +2508,7 @@ namespace sight {
         auto componentsNode = node["components"];
         if (componentsNode.IsDefined()) {
             auto componentsContainer = connection.getComponentContainer();
+            
             componentsNode >> *componentsContainer;
         }
         return true;
@@ -3012,22 +3292,19 @@ namespace sight {
         }
     }
 
-    bool SightComponentContainer::addComponent(SightJsNode* templateNode, SightNodeGraph* graph) {
-
+    bool SightComponentContainer::addComponent(SightJsNode* templateNode) {
+        
         if (!templateNode || !templateNode->checkAsComponent()) {
             return false;
         }
 
-        auto p = templateNode->instantiate();
-        addComponent(p, graph);
+        auto p = templateNode->instantiate(this->graph);
+        addComponent(p);
         return true;
     }
 
-    bool SightComponentContainer::addComponent(SightNode* p, SightNodeGraph* graph) {
-        // if (graph) {
-        //     p->graph = graph;
-        // }
-
+    bool SightComponentContainer::addComponent(SightNode* p) {
+        
         auto nodeFunc = [p](std::vector<SightNodePort>& list) {
             for (auto& item : list) {
                 item.node = p;
@@ -3035,10 +3312,9 @@ namespace sight {
         };
         CALL_NODE_FUNC(p);
         components.push_back(p);
-        if (graph) {
-            p->graph = graph;
-            graph->markDirty();
-        }
+        p->graph = graph;
+        p->markAsComponent();
+        graph->markDirty();
         return true;
     }
 
@@ -3048,7 +3324,8 @@ namespace sight {
         if (!this->components.empty()) {
             //delete all elements
             for (auto& item : this->components) {
-                delete item;
+                // delete item;
+                graph->getNodes().remove(item);
             }
 
             this->components.clear();

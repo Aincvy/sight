@@ -73,6 +73,12 @@ namespace sight {
         Automatic,
     };
 
+    enum class SightNodeFlags : uchar {
+        None = 0,
+        Component = 1 << 0,
+        Deleted = 1 << 1,
+    };
+
     struct SightNodeConnection;
     class SightNodeGraph;
     struct SightNode;
@@ -296,6 +302,12 @@ namespace sight {
 
     struct SightComponentContainer : ResetAble {
         std::vector<SightNode*> components;
+        SightNodeGraph* graph;
+
+        inline SightComponentContainer* setGraph(SightNodeGraph* graph) {
+            this->graph = graph;
+            return this;
+        }
 
         /**
          * @brief 
@@ -304,9 +316,17 @@ namespace sight {
          * @return true 
          * @return false 
          */
-        bool addComponent(SightJsNode* templateNode, SightNodeGraph* graph = nullptr);
+        bool addComponent(SightJsNode* templateNode);
 
-        bool addComponent(SightNode* p, SightNodeGraph* graph = nullptr);
+        /**
+         * @brief 
+         * 
+         * @param p   should be a memory-managed node(e.g SightNodeGraph's node)
+         * @param graph 
+         * @return true 
+         * @return false 
+         */
+        bool addComponent(SightNode* p);
 
         void reset() override;
     };
@@ -314,7 +334,7 @@ namespace sight {
     /**
      * a connection.
      */
-    struct SightNodeConnection {
+    struct SightNodeConnection : ResetAble {
         uint connectionId;
         uint left;
         uint right;
@@ -327,14 +347,21 @@ namespace sight {
         // should this connection generate code ?
         bool generateCode = true;
 
+        uchar flags = (uchar)SightNodeFlags::None;
+
         SightNodeGraph* graph = nullptr;
         
         SightComponentContainer* componentContainer = nullptr;
+
+        SightNodeConnection();
+        SightNodeConnection(uint id, uint left, uint right, uint leftColor, int priority);
         
         /**
          * Remove from left and right port.
          */
-        void removeRefs(SightNodeGraph *graph = nullptr);
+        void removeRefs();
+
+        void makeRefs();
 
         uint leftPortId() const;
         uint rightPortId() const;
@@ -347,6 +374,17 @@ namespace sight {
         bool addComponent(SightJsNode* templateNode);
 
         bool addComponent(SightNode* sightNode);
+
+        // reset
+        void reset() override;
+
+        void markAsDeleted(bool f = true);
+
+        void markAsComponent(bool f = true);
+
+        bool isDeleted() const;
+
+        bool isComponent() const;
     };
 
     /**
@@ -386,12 +424,26 @@ namespace sight {
         uint titleBarPortType = IntTypeProcess;
     };
 
+
     /**
      * a real node.
      */
     struct SightNode : public ResetAble {
+
+        enum class CopyFromType {
+            Clone,
+            Instantiate,
+
+            // current node as a component.
+            Component,
+
+            // duplicate this node, this will clear port's connections.
+            Duplicate,
+        };
+
         std::string nodeName;
         uint nodeId;
+        uchar flags = (uchar)SightNodeFlags::None;
         // this node's template node.  Real template node's `templateNode` must be nullptr.
         const SightJsNode* templateNode = nullptr;
         SightNodeGraph* graph = nullptr;
@@ -443,7 +495,7 @@ namespace sight {
         SightNodePort* getOppositePortByType(NodePortType kind, uint type);
 
         /**
-         * clone this node
+         * clone this node,  use `new` to alloc memory.
          * you should `delete` this function's return value.
          * @return
          */
@@ -540,19 +592,29 @@ namespace sight {
          */
         v8::Local<v8::Object> toV8Object(v8::Isolate* ) const;
 
-        
-    protected:
-        enum class CopyFromType {
-            Clone,
-            Instantiate,
-        };
+        /**
+         * 
+         * @param node copy all data from this node.
+         */
+        void copyFrom(const SightNode* node, CopyFromType copyFromType = CopyFromType::Clone, bool generateId = true);
+
+        void markAsDeleted(bool f = true);
+
+        void markAsComponent(bool f = true);
+
+        bool isDeleted() const;
+
+        bool isComponent() const;
 
         /**
-         *
-         * @param node
-         * @param isTemplate   if true, node will as a template node.
+         * @brief Any port that has a connection ? 
+         * 
+         * @return true 
+         * @return false 
          */
-        void copyFrom(const SightNode* node, CopyFromType copyFromType = CopyFromType::Clone);
+        bool hasConnections() const;
+        
+    protected:
     };
 
     enum class JsEventType {
@@ -625,6 +687,7 @@ namespace sight {
      */
     struct SightJsComponent {
         bool active = false;
+        bool onlyComponent = true;       // cannot as a independent node ?
         bool allowNode = true;
         bool allowConnection = false;     // allow add this component to connection?
         bool activeOnReverse = false;     // call functions on `onReverseActive` ?
@@ -750,6 +813,8 @@ namespace sight {
          * @return a new node, you should `delete` the object when you do not need it.
          */
         SightNode* instantiate(bool generateId = true) const;
+
+        SightNode* instantiate(SightNodeGraph* graph, bool generateId = true) const;
         
         void resetTo(SightJsNode const* node);
         void resetTo(SightJsNode const& node);
@@ -762,6 +827,9 @@ namespace sight {
         void callEventOnInstantiate(SightNode* p) const;
 
         bool checkAsComponent() const;
+
+    private:
+        void instantiate(SightNode* p, bool generateId = true) const;
     };
 
     enum class SightAnyThingType {
@@ -909,14 +977,14 @@ namespace sight {
          * @param id
          * @return
          */
-        int delNode(int id, SightNode* copyTo = nullptr);
+        int delNode(int id);
 
         /**
          *
          * @param id
          * @return
          */
-        int delConnection(int id, bool removeRefs = true, SightNodeConnection* copyTo = nullptr);
+        int delConnection(int id, bool removeRefs = true);
 
         /**
          * Find a node by id
@@ -972,12 +1040,30 @@ namespace sight {
         const char* getFilePath() const;
         std::string getFileName(std::string_view replaceExt = {}) const;
 
-        SightArray <SightNode> & getNodes();
+        /**
+         * @brief try `addNode`, `delNode`, `fakeDeleteNode`, `loopOf` and .. functions first.
+         * 
+         * @return SightArray <SightNode>& 
+         */
+        SightArray<SightNode>& getNodes();
+
+        /**
+         * @brief try `loopOf` function first.
+         * 
+         * @return const SightArray <SightNode>& 
+         */
         const SightArray <SightNode> & getNodes() const;
         const SightArray<SightNodeConnection>& getConnections() const;
 
+        void loopOf(std::function<void(SightNode const*)> func) const;
+        void loopOf(std::function<void(SightNode*)> func);
+
+        void loopOf(std::function<void(SightNodeConnection const*)> func) const;
+        void loopOf(std::function<void(SightNodeConnection*)> func);
+
+        
         // NOT USED
-        SightArray<SightNode> & getComponents();
+        // SightArray<SightNode> & getComponents();
 
         SightNodeGraphExternalData& getExternalData();
 
@@ -1030,6 +1116,10 @@ namespace sight {
          */
         void addPortId(SightNodePort const& port);
 
+        
+        void addNodeId(SightNode* node);
+
+        
         /**
          * @brief need use js thread to run.
          * 
@@ -1040,11 +1130,42 @@ namespace sight {
          */
         int outputJson(std::string_view path, bool overwrite, SightNodeGraphOutputJsonConfig const& config) const;
 
-        SightArray<SightComponentContainer> & getComponentContainers() ;
+        // SightArray<SightComponentContainer>& getComponentContainers();
 
+        // create container
+        SightComponentContainer* createComponentContainer();
+
+        // remove container
+        bool removeComponentContainer(SightComponentContainer* container);
+
+
+        /**
+         * @brief Result belongs to this graph.
+         * 
+         * @param original 
+         * @return SightComponentContainer* 
+         */
+        SightComponentContainer* deepClone(SightComponentContainer* original);
+
+        /**
+         * @brief Result belongs to this graph.
+         * 
+         * @param original 
+         * @return SightNode* 
+         */
+        SightNode* deepClone(SightNode* original);
+
+        
         void addSaveAsJsonHistory(std::string_view path);
 
         std::vector<std::string> const& getSaveAsJsonHistory() const;
+
+        int fakeDeleteNode(uint id);
+        int fakeDeleteNode(SightNode* node);
+
+        int fakeDeleteConnection(uint id);
+        int fakeDeleteConnection(SightNodeConnection* connection);
+
         
     private:
 
@@ -1059,7 +1180,7 @@ namespace sight {
         SightArray<SightNodeConnection> connections{ MEDIUM_ARRAY_SIZE };
 
         // NOT USED
-        SightArray<SightNode> components{ LITTLE_ARRAY_SIZE };
+        // SightArray<SightNode> components{ LITTLE_ARRAY_SIZE };
         SightArray<SightComponentContainer> componentContainers{ LITTLE_ARRAY_SIZE };
         // key: node/port/connection id, value: the pointer of the instance.
         std::map<uint, SightAnyThingWrapper> idMap;

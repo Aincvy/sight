@@ -108,9 +108,9 @@ namespace sight {
         logDebug("lastMainWindowWidth: $0, lastMainWindowHeight: $1", 
             sightSettings.lastMainWindowWidth, sightSettings.lastMainWindowHeight);
 
-        for (const auto& tmp : root) {
-            logDebug("root child: $0", tmp.first.as<std::string>());
-        }
+        // for (const auto& tmp : root) {
+        //     logDebug("root child: $0", tmp.first.as<std::string>());
+        // }
         
         return CODE_OK;
     }

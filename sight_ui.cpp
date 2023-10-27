@@ -82,9 +82,10 @@ namespace sight {
          */
         void saveAnyThing(){
             int i ;
-            if ((i = currentGraph()->save()) != CODE_OK) {
-                logDebug(i);
-            }
+            // if ((i = currentGraph()->save(SaveReason::User)) != CODE_OK) {
+            //     logDebug(i);
+            // }
+            trySaveCurrentGraph();
             if ((i = currentProject()->save()) != CODE_OK) {
                 logDebug(i);
             }
@@ -163,7 +164,7 @@ namespace sight {
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.windows)) {
-                if (ImGui::MenuItem("Demo")) {
+                if (ImGui::MenuItem("Test")) {
                     g_UIStatus->windowStatus.testWindow = true;
                 }
                 if (ImGui::MenuItem("Terminal")) {
@@ -371,7 +372,7 @@ for(const item of a) {
             }
         }
 
-        void showDemoWindow(bool needInit){
+        void showTestWindow(bool needInit){
             // terminal test
             // static bool initTerminal = false;
             // TerminalRuntimeArgs customCommand;
@@ -486,7 +487,11 @@ for(const item of a) {
             
             auto graph = currentGraph();
             if (graph) {
-                for (const auto & node : graph->getNodes()) {
+                for (const auto& node : graph->getNodes()) {
+                    if (node.isDeleted() || node.isComponent()) {
+                        continue;
+                    }
+                    
                     ImGui::TextColored(g_UIStatus->uiColors->nodeIdText, "%d ", node.nodeId);
                     ImGui::SameLine();
                 
@@ -1149,6 +1154,31 @@ for(const item of a) {
                         }
                         ImGui::EndDisabled();
 
+                        ImGui::SameLine();
+                        ImGui::BeginDisabled(plugin->getName() == "sight-base-plugin" || plugin->isDisabled());
+                        labelBuf = plugin->isDisabledByProject() ? ICON_MD_EXTENSION : ICON_MD_EXTENSION_OFF;
+                        labelBuf += "##disable-";
+                        labelBuf += key;
+                        if (ImGui::Button(labelBuf.c_str())) {
+                            auto project = currentProject();
+                            auto & disabledPluginNames = project->getDisabledPluginNames();
+                            if (plugin->isDisabledByProject()) {
+                                // turn on
+                                disabledPluginNames.erase(plugin->getName());
+                                addJsCommand(JsCommandType::PluginEnable, CommandArgs::copyFrom(plugin->getName()));
+                                logInfo("enabled plugin: $0", plugin->getName());
+                            }
+                            else {
+                                // turn off
+                                disabledPluginNames.insert(plugin->getName());
+                                addJsCommand(JsCommandType::PluginDisable, CommandArgs::copyFrom(plugin->getName()));
+                                logInfo("disabled plugin: $0, but need a restart.", plugin->getName());
+                            }
+
+                            project->saveConfigFile();
+                        }
+                        ImGui::EndDisabled();
+
                         ImGui::Separator();
                     }
                 }
@@ -1391,7 +1421,7 @@ for(const item of a) {
             showCreateEntityWindow();
         }
         if (windowStatus.testWindow) {
-            showDemoWindow(false);
+            showTestWindow(false);
         }
         if (windowStatus.aboutWindow) {
             showAboutWindow();

@@ -28,16 +28,17 @@ namespace sight {
         : id(id),
           recordType(recordType)
     {
-        connectionData.connectionId = 0;
-        nodeData.nodeId = 0;
+        connectionData = nullptr;
+        nodeData = nullptr;
     }
 
     UndoCommand::UndoCommand(uint id, UndoRecordType recordType, uint anyThingId)
         : UndoCommand(id, recordType)
     {
         this->anyThingId = anyThingId;
+        nodeData = nullptr;
+        connectionData = nullptr;
     }
-
 
     void UndoCommand::undo() {
         switch (recordType) {
@@ -47,9 +48,18 @@ namespace sight {
             if (g) {
                 auto thing = g->findSightAnyThing(anyThingId);
                 if (thing.type == SightAnyThingType::Node) {
-                    g->delNode(anyThingId, &nodeData);
+                    // g->delNode(anyThingId, nodeData);
+                    auto n = thing.asNode();
+                    if (n) {
+                        g->fakeDeleteNode(n);
+                        nodeData = n;
+                    }
                 } else if (thing.type == SightAnyThingType::Connection) {
-                    g->delConnection(anyThingId, true, &connectionData);
+                    // g->delConnection(anyThingId, true, connectionData);
+                    if (!connectionData) {
+                        connectionData = thing.asConnection();
+                    }
+                    g->fakeDeleteConnection(connectionData);
                 }
             }
             break;
@@ -58,11 +68,13 @@ namespace sight {
         {
             auto g = currentGraph();
             if (g) {
-                if (connectionData.connectionId > 0) {
-                    g->addConnection(connectionData);
-                } else if (nodeData.nodeId > 0) {
-                    g->addNode(nodeData);
-                    ed::SetNodePosition(nodeData.nodeId, position);
+                if (connectionData) {
+                    // g->addConnection(connectionData);
+                    connectionData->makeRefs();
+                    connectionData->markAsDeleted(false);
+                } else if (nodeData) {
+                    nodeData->markAsDeleted(false);
+                    ed::SetNodePosition(nodeData->nodeId, position);
                 }
             }
             break;
@@ -90,11 +102,14 @@ namespace sight {
         {
             auto g = currentGraph();
             if (g) {
-                if (nodeData.nodeId > 0) {
-                    g->addNode(nodeData);
-                    ed::SetNodePosition(nodeData.nodeId, position);
-                } else if (connectionData.connectionId > 0) {
-                    g->addConnection(connectionData);
+                if (nodeData) {
+                    // g->addNode(nodeData);
+                    nodeData->markAsDeleted(false);
+                    ed::SetNodePosition(nodeData->nodeId, position);
+                } else if (connectionData) {
+                    // g->addConnection(connectionData);
+                    connectionData->makeRefs();
+                    connectionData->markAsDeleted(false);
                 }
             }
             break;
@@ -103,10 +118,13 @@ namespace sight {
         {
             auto g = currentGraph();
             if (g) {
-                if (connectionData.connectionId > 0) {
-                    g->delConnection(connectionData.connectionId);
-                } else if (nodeData.nodeId > 0) {
-                    g->delNode(nodeData.getNodeId());
+                if (connectionData) {
+                    // g->delConnection(connectionData.connectionId);
+                    // g->fakeDeleteConnection(connectionData);
+                    connectionData->markAsDeleted();
+                } else if (nodeData) {
+                    // g->delNode(nodeData->getNodeId());
+                    nodeData->markAsDeleted(true);
                 }
             }
             break;
@@ -125,6 +143,13 @@ namespace sight {
             }
             break;
         }
+        }
+    }
+
+    void UndoCommand::freeNodeData() {
+        if (nodeData) {
+            nodeData->graph->delNode(nodeData->nodeId);     // real delete.
+            nodeData = nullptr;
         }
     }
 
@@ -156,6 +181,7 @@ namespace sight {
         undoList.emplace_back(getRuntimeId(), recordType, anyThingId);
 
         while (undoList.size() > UNDO_LIST_COUNT) {
+            undoList.begin()->freeNodeData();
             undoList.erase(undoList.begin());
         }
         return CODE_OK;
@@ -168,19 +194,19 @@ namespace sight {
         return CODE_OK;
     }
 
-    int recordUndo(UndoRecordType recordType, uint anyThingId, ImVec2 pos, SightAnyThingWrapper anyThing) {
-        int t = recordUndo(recordType, anyThingId);
-        assert(t == CODE_OK);
+    // int recordUndo(UndoRecordType recordType, uint anyThingId, ImVec2 pos, SightAnyThingWrapper anyThing) {
+    //     int t = recordUndo(recordType, anyThingId);
+    //     assert(t == CODE_OK);
 
-        auto c = lastUndoCommand();
-        c->position = pos;
-        if (anyThing.type == SightAnyThingType::Connection) {
-            c->connectionData = *anyThing.asConnection();
-        } else if (anyThing.type == SightAnyThingType::Node) {
-            c->nodeData = *anyThing.asNode();
-        }
-        return CODE_OK;
-    }
+    //     auto c = lastUndoCommand();
+    //     c->position = pos;
+    //     if (anyThing.type == SightAnyThingType::Connection) {
+    //         c->connectionData = *anyThing.asConnection();
+    //     } else if (anyThing.type == SightAnyThingType::Node) {
+    //         c->nodeData = *anyThing.asNode();
+    //     }
+    //     return CODE_OK;
+    // }
 
     UndoCommand* lastUndoCommand() {
         if (!undoList.empty()) {

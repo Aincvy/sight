@@ -15,6 +15,7 @@
 #include "sight_js_parser.h"
 #include "sight_nodes.h"
 
+#include "sight_plugin.h"
 #include "v8.h"
 #include "v8pp/module.hpp"
 
@@ -44,6 +45,8 @@ namespace sight{
         Test,
         // try to reload a plugin
         PluginReload,
+        PluginEnable,
+        PluginDisable,
 
         ProjectBuild,
         ProjectClean,

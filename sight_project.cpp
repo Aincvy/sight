@@ -306,7 +306,7 @@ namespace sight {
 
     int Project::saveConfigFile() {
         std::string path = pathConfigFile();
-        logDebug("save project config file: $0", path.c_str());
+        // logDebug("save project config file: $0", path.c_str());
 
         YAML::Emitter out;
 
@@ -329,6 +329,10 @@ namespace sight {
 
         // code settings
         out << YAML::Key << "codeSetSettings" << codeSetSettings;
+
+        // disabledPluginNames
+        std::vector<std::string> tmpArray(disabledPluginNames.begin(), disabledPluginNames.end());
+        out << YAML::Key << "disabledPluginNames" << YAML::Value << tmpArray;
 
         out << YAML::EndMap;
 
@@ -421,6 +425,13 @@ namespace sight {
             temp = root["codeSetSettings"];
             if(temp.IsDefined()) {
                 temp >> this->codeSetSettings;
+            }
+
+            temp = root["disabledPluginNames"];
+            if (temp.IsDefined()) {
+                for (const auto& item : temp) {
+                    this->disabledPluginNames.insert(item.as<std::string>());
+                }
             }
 
         } catch (const YAML::BadConversion & e){
@@ -680,6 +691,16 @@ namespace sight {
 
     SightCodeSetSettings const& Project::getSightCodeSetSettings() const {
         return this->codeSetSettings;
+    }
+
+    absl::flat_hash_set<std::string> const& Project::getDisabledPluginNames() const {
+
+        return disabledPluginNames;
+    }
+
+    absl::flat_hash_set<std::string>& Project::getDisabledPluginNames() {
+    
+        return disabledPluginNames;    
     }
 
     void Project::resetTypeListCache() {

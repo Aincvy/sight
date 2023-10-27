@@ -54,6 +54,8 @@ static struct {
 
     bool contextMenuCreateNodeOpen = false;
     bool needSaveGraph = false;
+    sight::SaveReason lastSaveGraphReason = sight::SaveReason::Automatic;
+
     sight::SightNodePortHandle portForCreateNode;
 
     ImVec2 nextNodePosition{0,0};
@@ -228,6 +230,7 @@ namespace sight {
                 if (g_ContextStatus->isNextNodePositionEmpty()) {
                     g_ContextStatus->nextNodePosition = ImGui::GetMousePos();
                 }
+                g_ContextStatus->componentForWhich = 0;
                 for (auto& item : currentNodeStatus()->templateAddressList) {
                     item.showContextMenu(g_ContextStatus->createComponents);
                 }
@@ -704,9 +707,13 @@ namespace sight {
             }
             ImGui::SameLine();
             if (ImGui::Button(ICON_MD_SAVE)) {
+                // save button
                 syncPositionFrom = true;
                 syncPositionTo = false;
+
+                graph->markDirty();
                 g_ContextStatus->needSaveGraph = true;
+                g_ContextStatus->lastSaveGraphReason = SaveReason::User;
             }
             ImGui::SameLine();
             ImGui::Checkbox("Auto Save", &(sightSettings->autoSave));
@@ -763,14 +770,18 @@ namespace sight {
             ed::Begin("My Editor", ImVec2(0.0, 0.0f));
 
             // nodes
-            for (auto& node : graph->getNodes()) {
-                showNode(&node, syncPositionTo, syncPositionFrom);
-            }
+            graph->loopOf([syncPositionTo, syncPositionFrom](SightNode* node) {
+                showNode(node, syncPositionTo, syncPositionFrom);
+            });
 
             // Submit Links
-            for (const auto& connection : graph->getConnections()) {
-                ed::Link(connection.connectionId, connection.leftPortId(), connection.rightPortId(), ImColor(connection.leftColor));
-            }
+            graph->loopOf([](SightNodeConnection* connection) {
+                ed::Link(connection->connectionId, connection->leftPortId(),
+                         connection->rightPortId(), ImColor(connection->leftColor));
+            });
+            // for (const auto& connection : graph->getConnections()) {
+            //     ed::Link(connection.connectionId, connection.leftPortId(), connection.rightPortId(), ImColor(connection.leftColor));
+            // }
 
             //
             // 2) Handle interactions
@@ -914,35 +925,40 @@ namespace sight {
                     logDebug("duplicate node");
                     if (uiStatus.selection.selectedNodeOrLinks.size() == 1) {
                         auto tmpNode = uiStatus.selection.getSelectedNode();
-                        if (tmpNode && tmpNode->templateNode) {
-                            auto node = tmpNode->clone();
+                        if (tmpNode) {
+                            // auto node = tmpNode->clone();
+                            auto node = graph->deepClone(tmpNode);
                             auto pos = ed::GetNodePosition(tmpNode->nodeId);
                             auto size = ed::GetNodeSize(tmpNode->nodeId);
                             auto nodeId = node->getNodeId();
                             ed::SetNodePosition(node->nodeId, ImVec2(pos.x, pos.y + size.y + 10));
-                            uiAddNode(node);
+                            // uiAddNode(node);
+                            recordUndo(UndoRecordType::Create, node->getNodeId(), convert(node->position));
 
                             // change selected
                             ed::SelectNode(nodeId);
+                        } else {
+                            logError("cannot find node by id: $0", *uiStatus.selection.selectedNodeOrLinks.begin());
                         }
                     } else {
-                        std::vector<SightNode*> nodes;
-                        std::vector<SightNodeConnection> connections;
-                        uiStatus.selection.getSelected(nodes, connections);
+                        logError("not supported yet!");
+                        // std::vector<SightNode*> nodes;
+                        // std::vector<SightNodeConnection> connections;
+                        // uiStatus.selection.getSelected(nodes, connections);
 
-                        if (!nodes.empty()) {
-                            std::vector<SightNode*> targetNodes;
-                            targetNodes.reserve(nodes.size());
-                            for (const auto& item : nodes) {
-                                targetNodes.push_back(item->clone(false));
-                            }
-                            regenerateId(targetNodes, connections, true);
-                            ed::ClearSelection();
-                            for (auto& item : targetNodes) {
-                                ed::SelectNode(item->nodeId, true);
-                            }
-                            uiAddMultipleNodes(targetNodes, connections, openPopupPosition);
-                        }
+                        // if (!nodes.empty()) {
+                        //     std::vector<SightNode*> targetNodes;
+                        //     targetNodes.reserve(nodes.size());
+                        //     for (const auto& item : nodes) {
+                        //         targetNodes.push_back(item->clone(false));
+                        //     }
+                        //     regenerateId(targetNodes, connections, true);
+                        //     ed::ClearSelection();
+                        //     for (auto& item : targetNodes) {
+                        //         ed::SelectNode(item->nodeId, true);
+                        //     }
+                        //     uiAddMultipleNodes(targetNodes, connections, openPopupPosition);
+                        // }
                     }
                     
                 } else if (keybindings->paste) {
@@ -1362,16 +1378,39 @@ namespace sight {
 
     void SightNodeTemplateAddress::showContextMenu(bool createComponent) {
         if (children.empty()) {
-            if (createComponent && !this->templateNode->checkAsComponent()) {
+            // if (createComponent && !this->templateNode->checkAsComponent()) {
+            //     return;
+            // }
+            
+            auto graph = currentGraph();
+            auto anyThing = graph->findSightAnyThing(g_ContextStatus->componentForWhich);
+
+            if (templateNode->checkAsComponent()) {
+                const auto& c = templateNode->component;
+
+                if (g_ContextStatus->componentForWhich == 0) {
+                    // create nodes
+                    if (c.onlyComponent) {
+                        return;
+                    }
+                }
+
+                // node, connection
+                if (anyThing.type == SightAnyThingType::Node && !c.allowNode) {
+                    return;
+                }
+
+                if (anyThing.type == SightAnyThingType::Connection && !c.allowConnection) {
+                    return;
+                }
+            } else if (createComponent) {
                 return;
             }
-
+            
             if (ImGui::MenuItem(name.c_str())) {
-                auto graph = currentGraph();
                 //
                 if (createComponent) {
                     //
-                    auto anyThing = graph->findSightAnyThing(g_ContextStatus->componentForWhich);
                     if (anyThing.type == SightAnyThingType::Node) {
                         auto n = anyThing.asNode();
                         n->addComponent(this->templateNode);
@@ -1429,7 +1468,7 @@ namespace sight {
         }
     }
 
-    int uiAddNode(SightNode* node, bool freeMemory) {
+    int uiAddNode(SightNode* node, bool freeMemory /* = true */) {
 
         currentGraph()->addNode(*node);
         recordUndo(UndoRecordType::Create, node->getNodeId(), convert(node->position));
@@ -1517,18 +1556,51 @@ namespace sight {
     }
 
     int uiDelNode(uint id) {
+        logDebug("try delete node: $0", id);
+        auto graph = currentGraph();
+        auto node = graph->findNode(id);
+        if (!node) {
+            return CODE_GRAPH_INVALID_ID;
+        }
+
+        // delete connection manually
+        auto nodeFunc = [](std::vector<SightNodePort>& list) {
+            // loop
+            for (auto& port : list) {
+                // delete connection
+                if (!port.isConnect()) {
+                    continue;
+                }
+
+                // make a copy of port.connections, and loop
+                auto connections = port.connections;
+                for (auto& connection : connections) {
+                    uiDelConnection(connection->connectionId);
+                }
+                connections.clear();
+
+            }
+        };
+
+        nodeFunc(node->inputPorts);
+        nodeFunc(node->outputPorts);
+
         recordUndo(UndoRecordType::Delete, 0, ed::GetNodePosition(id));
-        int status = currentGraph()->delNode(id, &(lastUndoCommand()->nodeData));
+        int status = currentGraph()->fakeDeleteNode(node);
         assert(status == CODE_OK);
+        lastUndoCommand()->nodeData = node;
         return CODE_OK;
     }
 
     int uiDelConnection(uint connectionId) {
+        logDebug("try delete connection: $0", connectionId);
         auto connection = currentGraph()->findConnection(connectionId);
         OnDisconnect(connection);
 
         recordUndo(UndoRecordType::Delete, connectionId);
-        currentGraph()->delConnection(connectionId, true, &(lastUndoCommand()->connectionData));
+        int status = currentGraph()->fakeDeleteConnection(connection);
+        assert(status == CODE_OK);
+        lastUndoCommand()->connectionData = connection;
         return CODE_OK;
     }
 
@@ -1854,11 +1926,18 @@ namespace sight {
 
     void uiSaveGraph() {
         auto g = currentGraph();
-        g->markDirty();
-        g->save();
+        if (g->isDirty()) {
+            currentProject()->saveConfigFile();
+        }
 
-        // ed::Detail::EditorContext* editor = reinterpret_cast<ed::Detail::EditorContext*>(ed::GetCurrentEditor());
-        // editor->MakeDirty(ed::SaveReasonFlags::User);
+        g->save(g_ContextStatus->lastSaveGraphReason);
+        g_ContextStatus->lastSaveGraphReason = SaveReason::Automatic;     // change to auto        
+    }
+
+    void trySaveCurrentGraph() {
+        currentGraph()->markDirty();
+        g_ContextStatus->needSaveGraph = true;
+        g_ContextStatus->lastSaveGraphReason = SaveReason::User;
     }
 
     bool isNodeEditorReady() {
