@@ -10,7 +10,8 @@
 #include "sight_ui_node_editor.h"
 #include "sight_util.h"
 #include "sight.h"
-#include "sight_nodes.h"
+#include "sight_node.h"
+#include "sight_node_graph.h"
 #include "sight_memory.h"
 #include "sight_widgets.h"
 #include "sight_code_set.h"
@@ -600,13 +601,13 @@ namespace sight {
         return baseDir;
     }
 
-    SightNodeGraph* Project::createGraph(std::string_view path, char* pathWithoutExtOut) {
-        auto g = openGraph(path,pathWithoutExtOut);
+    SightNodeGraph* Project::createGraph(std::string_view path, char* pathWithoutExtOut, v8::Isolate* isolate) {
+        auto g = openGraph(path,pathWithoutExtOut, isolate);
         buildFilesCache();
         return g;
     }
 
-    SightNodeGraph* Project::openGraph(std::string_view path, char* pathWithoutExtOut) {
+    SightNodeGraph* Project::openGraph(std::string_view path, char* pathWithoutExtOut, v8::Isolate* isolate) {
         std::string targetPath{path};
         std::filesystem::path temp(targetPath);
         if (temp.has_extension()) {
@@ -616,7 +617,7 @@ namespace sight {
             }
         }
         logDebug(targetPath);
-        changeGraph(targetPath.c_str());
+        changeGraph(targetPath.c_str(), isolate);
         if (pathWithoutExtOut) {
             sprintf(pathWithoutExtOut, "%s", targetPath.c_str());
         }

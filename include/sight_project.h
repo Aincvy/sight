@@ -18,7 +18,7 @@
 #include "v8.h"
 #include "sight.h"
 
-#include "sight_nodes.h"
+#include "sight_node.h"
 #include "sight_code_set.h"
 
 namespace sight {
@@ -286,8 +286,8 @@ namespace sight {
          * @param fixPath if true it will be add pathGraphFolder as prefix. `openGraph` is same.
          * @return SightNodeGraph* 
          */
-        SightNodeGraph* createGraph(std::string_view path, char* pathWithoutExtOut = nullptr);
-        SightNodeGraph* openGraph(std::string_view path, char* pathWithoutExtOut = nullptr);
+        SightNodeGraph* createGraph(std::string_view path, char* pathWithoutExtOut = nullptr, v8::Isolate* isolate = nullptr);
+        SightNodeGraph* openGraph(std::string_view path, char* pathWithoutExtOut = nullptr, v8::Isolate* isolate = nullptr);
 
         /**
          * @brief if has last open graph, then open it.

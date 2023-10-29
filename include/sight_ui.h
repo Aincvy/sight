@@ -11,7 +11,7 @@
 #include "sight_widgets.h"
 #include "sight_language.h"
 #include "sight_project.h"
-#include "sight_nodes.h"
+#include "sight_node.h"
 #include "sight_terminal.h"
 #include "imterm/terminal.hpp"
 

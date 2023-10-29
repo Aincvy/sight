@@ -12,7 +12,8 @@
 #include "sight_keybindings.h"
 #include "sight_plugin.h"
 #include "sight_ui.h"
-#include "sight_nodes.h"
+#include "sight_node.h"
+#include "sight_node_graph.h"
 #include "sight_ui_node_editor.h"
 #include "sight_ui_project.h"
 #include "sight_js.h"
@@ -110,7 +111,7 @@ namespace sight {
                     std::string path = saveFileDialog(currentProject()->pathGraphFolder().c_str());
                     if (!path.empty()) {
                         // create
-                        currentProject()->createGraph(path.c_str());
+                        currentProject()->createGraph(path.c_str(), nullptr, g_UIStatus->isolate);
                     }
                 }
                 ImGui::Separator();

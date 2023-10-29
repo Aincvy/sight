@@ -12,32 +12,34 @@ set(CMAKE_EXPORT_COMPILECOMMANDS ON)
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 set( CMAKE_VERBOSE_MAKEFILE ON )
 
-add_executable(sight program.cpp)
+add_executable(sight src/program.cpp)
 
 # source
 target_include_directories(
         sight PRIVATE
-        ${PROJECT_SOURCE_DIR}
+        ${PROJECT_SOURCE_DIR}/include
 )
 target_sources(sight PRIVATE
-        sight_ui.cpp
-        sight_ui_node_editor.cpp
-        sight_ui_project.cpp
-        sight_nodes.cpp
-        sight_js.cpp
-        sight_js_parser.cpp
-        sight_project.cpp
-        sight.cpp
-        sight_plugin.cpp
-        sight_widgets.cpp
-        sight_keybindings.cpp
-        sight_external_widgets.cpp
-        sight_network.cpp
-        sight_undo.cpp
-        sight_object.cpp
-        sight_terminal.cpp
-        sight_colors.cpp
-        sight_code_set.cpp
+        src/sight_ui.cpp
+        src/sight_ui_node_editor.cpp
+        src/sight_ui_project.cpp
+        src/sight_nodes.cpp
+        src/sight_js.cpp
+        src/sight_js_parser.cpp
+        src/sight_project.cpp
+        src/sight.cpp
+        src/sight_plugin.cpp
+        src/sight_widgets.cpp
+        src/sight_keybindings.cpp
+        src/sight_external_widgets.cpp
+        src/sight_network.cpp
+        src/sight_undo.cpp
+        src/sight_object.cpp
+        src/sight_terminal.cpp
+        src/sight_colors.cpp
+        src/sight_code_set.cpp
+        src/sight_node_graph.cpp
+
         # dependencies/imgui/imgui_demo.cpp           # for debug
 )
 
@@ -62,7 +64,7 @@ if(WIN32)
         MESSAGE(STATUS "WIN32 Env")
         target_compile_definitions(sight PRIVATE DirectX11)
 
-        target_sources(sight PRIVATE sight_render_directx11.cpp)
+        target_sources(sight PRIVATE src/sight_render_directx11.cpp)
 
         # v8
         SET(V8_DIR "F:/Library/v8-libs-files")
@@ -112,7 +114,7 @@ if(WIN32)
         
 else()
   target_compile_definitions(sight PRIVATE OPENGL NOT_WIN32)
-  target_sources(sight PRIVATE sight_render_opengl.cpp)
+  target_sources(sight PRIVATE src/sight_render_opengl.cpp)
 
   # V8
   SET(V8_DIR "/opt/v8")

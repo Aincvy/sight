@@ -5,7 +5,7 @@
 
 #include "imgui.h"
 #include "sight_ui.h"
-#include "sight_nodes.h"
+#include "sight_node.h"
 #include <string_view>
 
 #include "imgui_node_editor.h"

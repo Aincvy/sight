@@ -3,7 +3,9 @@
 #include "imgui_node_editor.h"
 #include "sight.h"
 #include "sight_defines.h"
-#include "sight_nodes.h"
+#include "sight_log.h"
+#include "sight_node.h"
+#include "sight_node_graph.h"
 #include "sight_ui_node_editor.h"
 
 #include <atomic>
@@ -89,6 +91,8 @@ namespace sight {
                     port->value = portValueData;
                     onNodePortValueChange(port);
                     portValueData = oldValue;
+                } else {
+                    logWarning("maybe a bug, port $0 not found!",  anyThingId);
                 }
             }
             break;

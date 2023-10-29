@@ -21,7 +21,8 @@
 #include "sight_address.h"
 #include "sight_keybindings.h"
 #include "sight_colors.h"
-#include "sight_nodes.h"
+#include "sight_node.h"
+#include "sight_node_graph.h"
 #include "sight_project.h"
 #include "sight_undo.h"
 #include "sight_widgets.h"
@@ -755,15 +756,18 @@ namespace sight {
             }
             helpMarker("Reset Zoom");
 
-            ImGui::SameLine();
             // SaveAsJson
-            auto const& saveAsJsonHistory= graph->getSaveAsJsonHistory();
-            if (!saveAsJsonHistory.empty()) {
-                if (ImGui::Button("SaveAsJson")) {
+            ImGui::SameLine();
+            if (ImGui::Button("SaveAsJson")) {
+                auto const& saveAsJsonHistory = graph->getSaveAsJsonHistory();
+                if (!saveAsJsonHistory.empty()) {
                     std::string_view path = saveAsJsonHistory.front();
                     uiGraphToJson(graph, path);
+                } else {
+                    uiGraphToJson(graph, "", true);
                 }
-            } 
+            }
+
             ImGui::Separator();
 
             // Start interaction with editor.
@@ -1179,6 +1183,7 @@ namespace sight {
         }
 
         auto callOnValueChange = [port]() {
+            logDebug("port value changed: $0", port->getId());
             recordUndo(UndoRecordType::Update, port->getId());
             lastUndoCommand()->portValueData = port->oldValue;
 
@@ -1609,7 +1614,7 @@ namespace sight {
 
         auto openGraphFunc = [path]() {
             char tmp[FILENAME_BUF_SIZE]{ 0 };
-            auto t = currentProject()->openGraph(path, tmp);
+            auto t = currentProject()->openGraph(path, tmp, currentUIStatus()->isolate);
             if (t) {
                 // 
                 if (t->verifyId() != CODE_OK) {

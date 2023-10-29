@@ -6,7 +6,7 @@
 
 #include "imgui.h"
 
-#include "sight_nodes.h"
+#include "sight_node.h"
 #include "sight_ui.h"
 
 

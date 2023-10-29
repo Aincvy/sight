@@ -13,7 +13,7 @@
 #include "sight.h"
 #include "shared_queue.h"
 #include "sight_js_parser.h"
-#include "sight_nodes.h"
+#include "sight_node.h"
 
 #include "sight_plugin.h"
 #include "v8.h"
