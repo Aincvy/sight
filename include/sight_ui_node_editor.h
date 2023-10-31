@@ -20,6 +20,8 @@ namespace sight {
     ImVec2 convert(Vector2 v);
     Vector2 convert(ImVec2 v);
 
+    struct SightNodeGraphOutputJsonConfig;
+
     /**
      * init
      * @return
@@ -38,6 +40,12 @@ namespace sight {
 
     int showNodeEditorGraph(UIStatus const& uiStatus);
 
+    /**
+     * @brief call this function before show main window.  only once is fine.
+     * 
+     */
+    void prepareNodeEditorToShow();
+    
     /**
      * @brief 
      * 
@@ -153,5 +161,13 @@ namespace sight {
     void uiSaveGraph();
 
     void trySaveCurrentGraph();
-    
+
+    /**
+     * @brief 
+     * 
+     * @param config 
+     * @return true   `ok`  has been pressed.
+     * @return false 
+     */
+    bool showOutputJsonConfigPanel(SightNodeGraph* graph, SightNodeGraphOutputJsonConfig* config);
 }

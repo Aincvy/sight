@@ -22,6 +22,7 @@
 #include <sys/types.h>
 #include <v8.h>
 #include <string_view>
+#include <vcruntime.h>
 #include <vector>
 
 
@@ -57,6 +58,7 @@ namespace sight {
     struct MyUILabels{
         // static ids
         static constexpr const char* modalAskData = "###modalAskData";
+        static constexpr const char* modalAsk1FieldData = "###modalAsk1FieldData";
         static constexpr const char* modalSaveData = "###modalSaveData";
         static constexpr const char* modalAlertData = "###modalAlertData";
 
@@ -162,7 +164,7 @@ namespace sight {
         
     public:
 
-        absl::btree_set<std::string> selectedFiles;
+        std::vector<ProjectFile*> selectedFiles;
         // node or port or connection
         absl::btree_set<uint> selectedNodeOrLinks;
 
@@ -224,6 +226,20 @@ namespace sight {
         std::function<void(SaveOperationResult)> callback;
     };
 
+    struct ModalInputField {
+        std::string label;
+        char* buf = nullptr;
+        size_t bufLength = 0;
+    };
+
+    struct Modal1InputFieldAskData {
+        std::string title;
+        std::string content;
+        ModalInputField field;
+        
+        std::function<void(bool)> callback;
+    };
+
     struct EntityOperations{
         absl::flat_hash_map<std::string, CommonOperation> map;
         std::vector<std::string> names;
@@ -257,6 +273,7 @@ namespace sight {
         struct ModalAskData modalAskData;
         struct ModalSaveData modalSaveData;
         struct ModalAlertData modalAlertData;
+        struct Modal1InputFieldAskData modal1InputFieldAskData;
         struct ToastController toastController;
         struct GenerateResultData generateResultData;
         struct StatusBarData statusBarData;
@@ -375,9 +392,12 @@ namespace sight {
      */
     void openSaveModal(const char* title, const char* content, std::function<void(SaveOperationResult)> const& callback);
 
+    
     bool isUICommandFree();
 
     void openAskModal(std::string_view title, std::string_view content, std::function<void(bool)> callback);
+
+    void openOneInputAskModal(std::string_view title, std::string_view content, std::string_view label, char* buf, size_t size, std::function<void(bool)> callback);
 
     void openAlertModal(std::string_view title = "Alert!", std::string_view content = "");
 

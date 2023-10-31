@@ -1538,10 +1538,8 @@ namespace sight {
                 return;
             }
 
-            SightNodeGraphOutputJsonConfig jsonConfig;
-            jsonConfig.includeNodeIdOnConnectionData = true;
-            jsonConfig.fieldNameCaseType = CaseTypes::PascalCase;
-            int code = g->outputJson(filepath, true, jsonConfig);
+            auto p = currentProject();
+            int code = g->outputJson(filepath, true, *( p->getGraphOutputJsonConfig() ));
             logDebug("output json result: $0", code);
         }
 

@@ -10,6 +10,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <filesystem>
 
 
 namespace sight {
@@ -129,7 +130,13 @@ namespace sight {
         s1 += s2;
         return s1;
     }
-    
+
+    /**
+     * @brief 
+     * 
+     * @param str 
+     * @return std::string 
+     */
     inline std::string removeExt(std::string const& str){
         return std::string(str, 0, str.rfind('.'));
     }
@@ -174,6 +181,12 @@ namespace sight {
         return {};
     }
 
+    
+    template<class T>
+    inline bool contains(std::vector<T> vector, T e) {
+        return std::find(vector.begin(), vector.end(), e) != vector.end();
+    }
+    
     /**
      * @brief 
      * 
@@ -207,6 +220,6 @@ namespace sight {
 #endif
 
 
-
+    bool isValidPath(const std::filesystem::path& p);
     
 }

@@ -134,12 +134,14 @@ namespace sight {
         bool generateResultWindow = false;
         bool terminalWindow = false;
         bool codeSetSettingsWindow = false;
+        bool graphOutputJsonConfigWindow = false;
 
         bool layoutReset = false;
 
         // popups
         bool popupGraphName = false;
         bool popupAskModal = false;
+        bool popup1InputFieldAskModal = false;
         bool popupSaveModal = false;
         bool popupAlertModal = false;
     };

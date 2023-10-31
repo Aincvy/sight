@@ -81,10 +81,10 @@ namespace sight {
         
     };
 
-        /**
+    /**
      * The ui text.
      */
-        struct LanguageKeys {
+    struct LanguageKeys {
         struct LanguageWindowNames windowNames;
         struct LanguageCommonKeys commonKeys;
         struct LanguageMenuKeys menuKeys;

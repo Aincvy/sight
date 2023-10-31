@@ -1,7 +1,27 @@
 
+#pragma once
+
 #include "sight_node.h"
 
 namespace sight {
+
+    struct SightNodeGraphOutputJsonConfig {
+        std::string nodeRootName = "nodes";
+        std::string connectionRootName = "connections";
+
+        bool includeRightConnections = false;
+        bool includeNodeIdOnConnectionData = false;
+
+        /**
+         * @brief make a new child called `data`.
+         * Put `fieldName = fieldValue` into `data`. The seq is `fields, input, output`, ignore the later same name.
+         * If port is connected, then ignore the port.
+         */
+        bool exportData = false;
+
+        // fields
+        CaseTypes fieldNameCaseType = CaseTypes::None;
+    };
 
     /**
      * A graph contains many nodes.
@@ -226,6 +246,12 @@ namespace sight {
         void addSaveAsJsonHistory(std::string_view path);
 
         std::vector<std::string> const& getSaveAsJsonHistory() const;
+        inline std::string getSaveAsJsonPath() const {
+            if (saveAsJsonHistory.empty()) {
+                return {};
+            }
+            return saveAsJsonHistory.front();
+        }
 
         int fakeDeleteNode(uint id);
         int fakeDeleteNode(SightNode* node);

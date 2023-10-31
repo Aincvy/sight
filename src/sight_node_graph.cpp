@@ -12,9 +12,11 @@
 #include "crude_json.h"
 #include "v8-isolate.h"
 
+#define VALUE_STR 	"value"
+
 
 namespace sight {
-
+    
     int SightNodeGraph::saveToFile(const char* path, bool set, bool saveAnyway, SaveReason saveReason) {
         if (set) {
             this->setFilePath(path);
@@ -61,7 +63,7 @@ namespace sight {
 
         // this->saveAsJsonHistory
         out << YAML::Key << "saveAsJsonHistory" << YAML::Value << this->saveAsJsonHistory;
-
+        
         out << YAML::EndMap;     // end of 1st begin map
 
         // save file
@@ -736,25 +738,26 @@ namespace sight {
         auto setValue = [](crude_json::value& tmp, const SightNodeValue& value) {
             switch (value.getType()) {
             case IntTypeString:
-                tmp["value"] = value.getString();
+                tmp[VALUE_STR] = value.getString();
                 break;
             case IntTypeLargeString:
-                tmp["value"] = value.getLargeStringCopy();
+                tmp[VALUE_STR] = value.getLargeStringCopy();
                 break;
             case IntTypeFloat:
-                tmp["value"] = value.u.f;
+                tmp[VALUE_STR] = value.u.f;
                 break;
             case IntTypeInt:
-                tmp["value"] = value.u.i * 1.0;
+                tmp[VALUE_STR] = value.u.i * 1.0;
                 break;
             case IntTypeDouble:
             case IntTypeLong:
-                tmp["value"] = value.u.d;
+                tmp[VALUE_STR] = value.u.d;
                 break;
             case IntTypeBool:
-                tmp["value"] = value.u.b;
+                tmp[VALUE_STR] = value.u.b;
                 break;
             default:
+                tmp[VALUE_STR] = crude_json::value();
                 logError("output json,unknown int type: $0", value.getType());
                 break;
             }
@@ -834,11 +837,36 @@ namespace sight {
                 tmp["name"] = changeStringToCase(item.portName, config.fieldNameCaseType);
                 tmp["id"] = item.id * 1.0;
                 if (item.templateNodePort) {
-                    auto const& value = item.value;
-                    setValue(tmp, value);
+                    setValue(tmp, item.value);
                 }
 
                 root.push_back(tmp);
+            }
+        };
+
+        auto dataNodeFunc = [&config, &setValue](std::vector<SightNodePort> const& list, crude_json::value& root) {
+            for (auto& item : list) {
+                if (item.portName.empty()) {
+                    // title input/output port
+                    continue;
+                }
+
+                if (item.isConnect()) {
+                    continue;
+                }
+
+                crude_json::value tmp;
+                setValue(tmp, item.value);
+
+                auto key = changeStringToCase(item.portName, config.fieldNameCaseType);
+                // contains key, then ignore
+                auto const& map = root.underlyingObject();
+                if (map.find(key) != map.end()) {
+                    logDebug("key $0 repeat, so jump it." , key);
+                    continue;
+                }
+
+                root[key] = tmp[VALUE_STR];
             }
         };
 
@@ -850,11 +878,24 @@ namespace sight {
             crude_json::value node;
             node["id"] = item.nodeId * 1.0;
             node["name"] = item.nodeName;
+            if (item.templateNode) {
+                // templateName
+                node["templateName"] = item.templateNode->nodeName;
+            }
 
             //
             crude_json::value members{ crude_json::type_t::array };
             CALL_NODE_FUNC(&item, members);
             node["members"] = members;
+
+            if (config.exportData) {
+                crude_json::value data{ crude_json::type_t::object };
+                dataNodeFunc(item.fields, data);
+                dataNodeFunc(item.inputPorts, data);
+                dataNodeFunc(item.outputPorts, data);
+
+                node["data"] = data;
+            }
 
             nodes[index] = node;
         }

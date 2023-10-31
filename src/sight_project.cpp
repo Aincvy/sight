@@ -26,6 +26,7 @@
 #include <cstdio>
 #include <fstream>
 #include <iterator>
+#include <stdio.h>
 #include <string>
 #include <string_view>
 #include <sys/types.h>
@@ -35,6 +36,8 @@
 #include <yaml-cpp/emittermanip.h>
 
 #include "absl/strings/substitute.h"
+
+
 
 namespace sight {
 
@@ -176,6 +179,30 @@ namespace sight {
 
             out << YAML::EndMap;
             return out;
+        }
+
+        // Serialization
+        YAML::Emitter& operator<<(YAML::Emitter& out, const SightNodeGraphOutputJsonConfig& rhs) {
+            out << YAML::BeginMap;
+            out << YAML::Key << "nodeRootName" << YAML::Value << rhs.nodeRootName;
+            out << YAML::Key << "connectionRootName" << YAML::Value << rhs.connectionRootName;
+            out << YAML::Key << "includeRightConnections" << YAML::Value << rhs.includeRightConnections;
+            out << YAML::Key << "includeNodeIdOnConnectionData" << YAML::Value << rhs.includeNodeIdOnConnectionData;
+            out << YAML::Key << "exportData" << YAML::Value << rhs.exportData;
+            out << YAML::Key << "fieldNameCaseType" << YAML::Value << static_cast<int>(rhs.fieldNameCaseType);
+            out << YAML::EndMap;
+            return out;
+        }
+
+        // Deserialization
+        bool operator>>(YAML::Node const& node, SightNodeGraphOutputJsonConfig& rhs) {
+            rhs.nodeRootName = node["nodeRootName"].as<std::string>();
+            rhs.connectionRootName = node["connectionRootName"].as<std::string>();
+            rhs.includeRightConnections = node["includeRightConnections"].as<bool>();
+            rhs.includeNodeIdOnConnectionData = node["includeNodeIdOnConnectionData"].as<bool>();
+            rhs.exportData = node["exportData"].as<bool>();
+            rhs.fieldNameCaseType = static_cast<CaseTypes>(node["fieldNameCaseType"].as<int>());
+            return true;
         }
 
         SightEntity loadEntity(std::string const& templateAddress, YAML::Node const& node){
@@ -335,6 +362,10 @@ namespace sight {
         std::vector<std::string> tmpArray(disabledPluginNames.begin(), disabledPluginNames.end());
         out << YAML::Key << "disabledPluginNames" << YAML::Value << tmpArray;
 
+        // graphOutputJsonConfig
+        out << YAML::Key << "graphOutputJsonConfig" << YAML::Value << graphOutputJsonConfig;
+
+
         out << YAML::EndMap;
 
         // save file
@@ -433,6 +464,11 @@ namespace sight {
                 for (const auto& item : temp) {
                     this->disabledPluginNames.insert(item.as<std::string>());
                 }
+            }
+
+            temp = root["graphOutputJsonConfig"];
+            if (temp.IsDefined()) {
+                temp >> this->graphOutputJsonConfig;
             }
 
         } catch (const YAML::BadConversion & e){
@@ -608,7 +644,7 @@ namespace sight {
     }
 
     SightNodeGraph* Project::openGraph(std::string_view path, char* pathWithoutExtOut, v8::Isolate* isolate) {
-        std::string targetPath{path};
+        std::string targetPath = std::filesystem::absolute(path).generic_string();
         std::filesystem::path temp(targetPath);
         if (temp.has_extension()) {
             std::string ext = temp.extension().generic_string();
@@ -634,6 +670,10 @@ namespace sight {
     }
 
     ProjectFile const& Project::getFileCache() const {
+        return fileCache;
+    }
+
+    ProjectFile& Project::getFileCache() {    
         return fileCache;
     }
 
@@ -702,6 +742,10 @@ namespace sight {
     absl::flat_hash_set<std::string>& Project::getDisabledPluginNames() {
     
         return disabledPluginNames;    
+    }
+
+    SightNodeGraphOutputJsonConfig* Project::getGraphOutputJsonConfig() {
+        return &(this->graphOutputJsonConfig);
     }
 
     void Project::resetTypeListCache() {
@@ -1339,5 +1383,129 @@ namespace sight {
 
     int SightEntityFieldOptions::portTypeValue() const {
         return static_cast<int>(portType);
+    }
+
+    bool ProjectFile::deleteFile() {
+        if (fileType == ProjectFileType::Deleted) {
+            return true;
+        }
+
+        if (fileType == ProjectFileType::Directory) {
+            logWarning("delete file, unsupported type, path: $0", this->path);
+            return false;
+        }
+
+        if (fileType == ProjectFileType::Regular) {
+            if (std::filesystem::remove(this->path)) {
+                this->fileType = ProjectFileType::Deleted;
+                return true;
+            }
+        } else if (fileType == ProjectFileType::Graph) {
+            // delete this and json file
+            // close graph first.
+            auto deleteAsGraph = [this]() -> bool{
+                std::string tmp = removeExt(this->path);
+                tmp += ".json";
+                return std::filesystem::remove(this->path) && std::filesystem::remove(tmp);
+            };
+            auto graphOpened = this->isGraph(currentGraph());
+            if (graphOpened) {
+                disposeGraph();
+            } 
+            return deleteAsGraph();
+        }
+        return false;
+    }
+
+    bool ProjectFile::rename(std::string_view newName) {
+        if (fileType == ProjectFileType::Deleted || fileType == ProjectFileType::Plugin) {
+            return false;
+        }
+
+        if (fileType == ProjectFileType::Graph) {
+
+            std::filesystem::path newPath(newName);
+            if (newPath.has_extension()) {
+                auto str = newPath.extension().generic_string();
+                if (str == "yaml") {
+                
+                } else if (str == "json") {
+                    // change to yaml
+                    newPath.replace_extension("yaml");
+                } else {
+                    logError("wrong ext name: $0", str);
+                    return false;
+                }
+            } else {
+                newPath += ".yaml";
+            }
+
+            // rename yaml and json, and graph name
+            auto openedGraph = currentGraph();
+            bool isCurrentGraph = false;
+            if (this->isGraph(openedGraph)) {
+                disposeGraph();
+                isCurrentGraph = true;
+            }
+
+            SightNodeGraph graph;
+            if (graph.load(this->path) != CODE_OK) {
+                logError("load graph failed at: $0", this->path);
+                return false;
+            }
+
+            std::filesystem::path oldPath(this->path);
+            auto p = graph.getSettings().graphName;
+            if (oldPath.filename() == p) {
+                snprintf(p, std::size(graph.getSettings().graphName), "%ls", newPath.filename().c_str());
+                graph.save(SaveReason::Script);
+            }
+
+            auto jsonPath = removeExt(this->path);
+            jsonPath += ".json";
+
+            std::filesystem::path newJsonPath(newPath);
+            newJsonPath.replace_extension("json");
+
+            // rename
+            try {
+                std::filesystem::rename(this->path, newPath);
+                std::filesystem::rename(jsonPath, newJsonPath);
+            } catch (std::filesystem::filesystem_error& e) {
+                logError("rename file failed, path: $0, error: $1", this->path, e.what());
+                return false;
+            }
+
+            if (isCurrentGraph) {
+                // open
+                auto project = currentProject();
+                this->refreshInfo(newPath.generic_string());
+                project->openGraph(this->path);
+            }
+            return true;
+
+        } else {
+            // just rename
+            try {
+                std::filesystem::rename(this->path, newName);
+                this->refreshInfo(newName);
+            } catch (std::filesystem::filesystem_error& e) {
+                logError("rename file failed, path: $0, error: $1", this->path, e.what());
+                return false;
+            }
+        }
+        return false;
+    }
+
+    bool ProjectFile::isGraph(SightNodeGraph* graph) const {
+        if (!graph) {
+            return false;
+        }
+        return graph->getFilePath() == this->path;
+    }
+
+    void ProjectFile::refreshInfo(std::string_view newPath) {
+        this->path = newPath;
+        this->filename = std::filesystem::path(newPath).filename().generic_string();
     }
 }

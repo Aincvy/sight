@@ -927,17 +927,6 @@ namespace sight {
         char graphName[LITTLE_NAME_BUF_SIZE] = { 0 };
     };
 
-    struct SightNodeGraphOutputJsonConfig {
-        std::string nodeRootName = "nodes";
-        std::string connectionRootName = "connections";
-
-        bool includeRightConnections = false;
-        bool includeNodeIdOnConnectionData = false;
-        
-        // fields
-        CaseTypes fieldNameCaseType = CaseTypes::None;
-    };
-
     /**
      * sight  node editor status
      */

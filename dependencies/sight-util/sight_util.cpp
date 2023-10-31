@@ -233,5 +233,19 @@ namespace sight {
         return res;
     }
 
+    bool isValidPath(const std::filesystem::path& p) {
+        if (std::filesystem::exists(p)) {
+            return true;
+        }
+
+        std::filesystem::path parent_path = p.parent_path();
+
+        if (std::filesystem::exists(parent_path)) {
+            return true;
+        }
+
+        return false;
+    }
+
 
 }

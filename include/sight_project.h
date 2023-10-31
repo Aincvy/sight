@@ -19,7 +19,9 @@
 #include "sight.h"
 
 #include "sight_node.h"
+#include "sight_node_graph.h"
 #include "sight_code_set.h"
+
 
 namespace sight {
 
@@ -180,6 +182,12 @@ namespace sight {
         Directory,
         Graph,
         Plugin,
+
+        /**
+         * @brief already deleted.
+         * 
+         */
+        Deleted,
     };
 
     /**
@@ -193,6 +201,25 @@ namespace sight {
         std::string filename;
         // if this is a directory.
         std::vector<ProjectFile> files;
+
+        /**
+         * @brief delete current file
+         * 
+         */
+        bool deleteFile();
+
+        /**
+         * @brief 
+         * 
+         * @param newName   need a full path. If this is a graph file, path must be end with .yaml
+         * @return true 
+         * @return false 
+         */
+        bool rename(std::string_view newName);
+
+        bool isGraph(SightNodeGraph* graph) const;
+
+        void refreshInfo(std::string_view newPath);
     };
 
     /**
@@ -300,6 +327,8 @@ namespace sight {
         int openFile(ProjectFile const& file);
 
         ProjectFile const& getFileCache() const;
+        ProjectFile& getFileCache();
+
 
         std::string pathGraphFolder() const;
         std::string pathPluginsFolder() const;
@@ -348,6 +377,8 @@ namespace sight {
 
         absl::flat_hash_set<std::string>& getDisabledPluginNames();
 
+        SightNodeGraphOutputJsonConfig* getGraphOutputJsonConfig();
+
     private:
         std::string baseDir;
         bool createIfNotExist;
@@ -371,7 +402,9 @@ namespace sight {
         std::vector<std::string> typeListCache;
 
         absl::flat_hash_set<std::string> disabledPluginNames;
-        
+
+        SightNodeGraphOutputJsonConfig graphOutputJsonConfig;
+
         // file locations
         std::string pathConfigFile() const;
         std::string pathStyleConfigFile() const;
