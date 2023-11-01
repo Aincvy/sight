@@ -807,6 +807,7 @@ namespace sight {
         void compact();
 
         /**
+         * TODO  this function should be DELETED!
          * instantiate a node by this node.
          * if this node is a template, then instantiate one.
          * else it will instantiate one by this node's template.
@@ -829,7 +830,7 @@ namespace sight {
         bool checkAsComponent() const;
 
     private:
-        void instantiate(SightNode* p, bool generateId = true) const;
+        void instantiate(SightNode* p, bool generateId = true, SightNodeGraph* graph = nullptr) const;
     };
 
     enum class SightAnyThingType {

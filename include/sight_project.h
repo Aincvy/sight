@@ -15,6 +15,7 @@
 
 #include "absl/container/btree_map.h"
 #include "absl/container/flat_hash_set.h"
+#include "v8-isolate.h"
 #include "v8.h"
 #include "sight.h"
 
@@ -202,6 +203,9 @@ namespace sight {
         // if this is a directory.
         std::vector<ProjectFile> files;
 
+        ProjectFile() = default;
+        ProjectFile(ProjectFileType fileType, std::string path, std::string filename);
+        
         /**
          * @brief delete current file
          * 
@@ -215,11 +219,30 @@ namespace sight {
          * @return true 
          * @return false 
          */
-        bool rename(std::string_view newName);
+        bool rename(std::string_view newName, v8::Isolate * isolate);
 
         bool isGraph(SightNodeGraph* graph) const;
 
         void refreshInfo(std::string_view newPath);
+
+        ProjectFile* findChild(std::string_view filename);
+
+        /**
+         * @brief Create a Child Directory object, and create a real directory.
+         * 
+         * @param filename 
+         * @return ProjectFile* 
+         */
+        ProjectFile* createChildDirectory(std::string_view directoryName);
+
+        /**
+         * @brief Only add child directory item to this.files
+         * 
+         * @param filename 
+         * @return ProjectFile* 
+         */
+        ProjectFile* addChildDirectory(std::string_view directoryName);
+
     };
 
     /**
@@ -313,8 +336,8 @@ namespace sight {
          * @param fixPath if true it will be add pathGraphFolder as prefix. `openGraph` is same.
          * @return SightNodeGraph* 
          */
-        SightNodeGraph* createGraph(std::string_view path, char* pathWithoutExtOut = nullptr, v8::Isolate* isolate = nullptr);
-        SightNodeGraph* openGraph(std::string_view path, char* pathWithoutExtOut = nullptr, v8::Isolate* isolate = nullptr);
+        SightNodeGraph* createGraph(std::string_view path, v8::Isolate* isolate, char* pathWithoutExtOut = nullptr);
+        SightNodeGraph* openGraph(std::string_view path, v8::Isolate* isolate, char* pathWithoutExtOut = nullptr);
 
         /**
          * @brief if has last open graph, then open it.
@@ -328,6 +351,9 @@ namespace sight {
 
         ProjectFile const& getFileCache() const;
         ProjectFile& getFileCache();
+
+        void addNewGraphToFileCache(std::string_view graphName);
+        void addToFileCache(std::string_view name, ProjectFileType fileType);
 
 
         std::string pathGraphFolder() const;

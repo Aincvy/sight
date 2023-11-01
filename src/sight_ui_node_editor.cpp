@@ -1643,7 +1643,7 @@ namespace sight {
 
         auto openGraphFunc = [path]() {
             char tmp[FILENAME_BUF_SIZE]{ 0 };
-            auto t = currentProject()->openGraph(path, tmp, currentUIStatus()->isolate);
+            auto t = currentProject()->openGraph(path, currentUIStatus()->isolate, tmp);
             if (t) {
                 //
                 if (t->verifyId() != CODE_OK) {

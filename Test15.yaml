@@ -1,0 +1,113 @@
+who-am-i: sight-graph
+nodes:
+  3389:
+    name: EnterNode
+    id: 3389
+    position: [238, 318]
+    template: sounds/EnterNode
+    inputs:
+      3390:
+        name: ""
+        type: 1
+        value: ~
+        options:
+          customPortName: ""
+          dynamicPort: false
+    outputs:
+      3391:
+        name: ""
+        type: 1
+        value: ~
+        options:
+          customPortName: ""
+          dynamicPort: false
+    fields:
+      3392:
+        name: priority
+        type: 100
+        value: 0
+        options:
+          customPortName: ""
+          dynamicPort: false
+      3393:
+        name: identifier
+        type: 104
+        value: ""
+        options:
+          customPortName: ""
+          dynamicPort: false
+  3394:
+    name: DelayNode
+    id: 3394
+    position: [563, 338]
+    template: sounds/DelayNode
+    inputs:
+      3395:
+        name: ""
+        type: 1
+        value: ~
+        options:
+          customPortName: ""
+          dynamicPort: false
+    outputs:
+      3396:
+        name: ""
+        type: 1
+        value: ~
+        options:
+          customPortName: ""
+          dynamicPort: false
+    fields:
+      3397:
+        name: delay
+        type: 101
+        value: 0
+        options:
+          customPortName: ""
+          dynamicPort: false
+  3399:
+    name: FinishNode
+    id: 3399
+    position: [936, 334]
+    template: sounds/FinishNode
+    inputs:
+      3400:
+        name: ""
+        type: 1
+        value: ~
+        options:
+          customPortName: ""
+          dynamicPort: false
+    outputs:
+      3401:
+        name: ""
+        type: 1
+        value: ~
+        options:
+          customPortName: ""
+          dynamicPort: false
+    fields:
+      {}
+connections:
+  3398:
+    id: 3398
+    left: 3391
+    right: 3395
+    priority: 10
+    generateCode: true
+  3402:
+    id: 3402
+    left: 3396
+    right: 3400
+    priority: 10
+    generateCode: true
+settings:
+  lang.type: 0
+  lang.version: 0
+  outputFilePath: ""
+  codeTemplate: ""
+  graphName: Test2
+  connectionCodeTemplate: ""
+  enterNode: 0
+saveAsJsonHistory:
+  []

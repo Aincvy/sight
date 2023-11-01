@@ -6,6 +6,7 @@
 
 #include "imgui_node_editor.h"
 
+#include "sight_popup_modal.h"
 #include "sight_terminal.h"
 #include "sight_defines.h"
 #include "sight_external_widgets.h"
@@ -104,17 +105,38 @@ namespace sight {
             }
         }
 
+        void createGraphUsingLittleName() {
+            if (strlen(g_UIStatus->buffer.littleName) > 0) {
+                logDebug(g_UIStatus->buffer.littleName);
+                auto p = currentProject();
+                std::string path = p->pathGraph(g_UIStatus->buffer.littleName);
+                uiChangeGraph(path);
+                auto g = currentGraph();
+                if (g) {
+                    // todo add new graph file to project file cache.
+                    p->addNewGraphToFileCache(g_UIStatus->buffer.littleName);
+                }
+                g_UIStatus->buffer.littleName[0] = '\0';
+            }
+        }
+
         void showMainFileMenu(UIStatus& uiStatus){
             if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS._new)) {
                 if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.graph)) {
-                    g_UIStatus->windowStatus.popupGraphName = true;
+                    openOneInputAskModal("Graph name", "Please input a graph name", "name",
+                                         g_UIStatus->buffer.littleName, std::size(g_UIStatus->buffer.littleName),
+                                         [](bool r) {
+                                             if (r) {
+                                                createGraphUsingLittleName();
+                                             }
+                                         });
                 }
 
                 if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.graphByPath)) {
                     std::string path = saveFileDialog(currentProject()->pathGraphFolder().c_str());
                     if (!path.empty()) {
                         // create
-                        currentProject()->createGraph(path.c_str(), nullptr, g_UIStatus->isolate);
+                        currentProject()->createGraph(path.c_str(), g_UIStatus->isolate);
                     }
                 }
                 ImGui::Separator();
@@ -307,19 +329,10 @@ for(const item of a) {
                 )";
                 parseSource(source);
             }
-            
+
             if (ImGui::MenuItem("Test1")) {
-                auto g = currentGraph();
-
-                crude_json::value a;
-                a["hello"] = 1.0;
-                a["world"] = 2.0;
-
-                crude_json::value root;
-                root["a"] = a;
-                root["version"] = "1.1";
-                auto jsonStr = root.dump(2);
-                logDebug("json: $0", jsonStr);
+                auto p = currentProject();
+                p->addNewGraphToFileCache("xpxpp");
             }
         }
 
@@ -607,6 +620,9 @@ for(const item of a) {
             auto selection = &g_UIStatus->selection;
 
             for (auto& item : folder.files) {
+                if (item.fileType == ProjectFileType::Deleted) {
+                    continue;
+                }
                 auto pointer = &item;
                 if (item.fileType == ProjectFileType::Directory) {
                     if (ImGui::TreeNode(item.path.c_str(), "%s %s", ICON_MD_FOLDER, item.filename.c_str())) {
@@ -667,19 +683,21 @@ for(const item of a) {
 
                     }
                     if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
-                        logDebug("right click: $0", name);
+                        // logDebug("right click: $0", name);
 
-                        selection->selectedFiles.clear();
+                        if (!g_UIStatus->io->KeyCtrl) {
+                            selection->selectedFiles.clear();
+                        }
                         selection->selectedFiles.push_back(pointer);
-
-                        // show a context menu
-                        ImGui::OpenPopup(PROJECT_FILE_CONTEXT_MENU);
                     }
                 }
             }
         }
 
         void showProjectFilePopup() {
+
+            bool operationPerformed = false;
+
             if (ImGui::BeginPopup(PROJECT_FILE_CONTEXT_MENU)) {
                 auto& selection = g_UIStatus->selection;
                 if (selection.selectedFiles.size() <= 0) {
@@ -692,51 +710,65 @@ for(const item of a) {
                 
                 if (ImGui::Selectable("say-hello")) {
                     logDebug("say hello");
+                    operationPerformed = true;
+
                 }
                 ImGui::Separator();
 
+                if (selection.selectedFiles.size() == 1) {
+                    // only effect 1 file
 
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-                if (ImGui::Button(ICON_MD_FILE_OPEN)) {
-                    logDebug("open");
-                }
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+                    if (ImGui::Button(ICON_MD_FILE_OPEN)) {
+                        logDebug("open");
+                        operationPerformed = true;
+                    }
 
-                ImGui::SameLine();
-                if (ImGui::Button(ICON_MD_EDIT)) {
-                    logDebug("rename");
-                    const int size = NAME_BUF_SIZE;
-                    char* tmpBuf = new char[size];
-                    std::string content("Original file: ");
-                    content += removeExt(projectFile->path);
-                    openOneInputAskModal("Rename File", content.c_str(), "New name: ", tmpBuf, size, [tmpBuf, projectFile](bool r) {
-                        if (r) {
-                            if (projectFile->rename(tmpBuf)) {
-                                logDebug("rename file success!");
-                            } else {
-                                logError("rename file failed!");
+                    ImGui::SameLine();
+                    if (ImGui::Button(ICON_MD_EDIT)) {
+                        operationPerformed = true;
+                        logDebug("try rename file");
+                        const int size = NAME_BUF_SIZE * 2;
+                        char* tmpBuf = new char[size]{ '\0'};
+                        std::string content("Original file: ");
+                        std::string pathWithoutExt = removeExt(projectFile->path);
+                        content += pathWithoutExt;
+                        snprintf(tmpBuf, size, "%s", pathWithoutExt.c_str());
+                        openOneInputAskModal("Rename File", content.c_str(), "New name: ", tmpBuf, size, [tmpBuf, projectFile](bool r) {
+                            if (r) {
+                                if (projectFile->rename(tmpBuf, g_UIStatus->isolate)) {
+                                    logDebug("rename file success!");
+                                } else {
+                                    logError("rename file failed!");
+                                }
                             }
-                        }
-                        delete [] tmpBuf;
-                    });
-                }
+                            delete[] tmpBuf;
+                        });
+                    }
 
-                ImGui::SameLine();
-                if (ImGui::Button(ICON_MD_DELETE)) {
-                    logDebug("delete");
-                    std::string str("Do you want delete file: ");
-                    str += projectFile->path;
-                    openAskModal("Delete File?", str.c_str(), [projectFile, &selection](bool b) {
-                        if (b) {
-                            if (projectFile->deleteFile()) {
-                                logDebug("delete file success!");
-                                selection.selectedFiles.clear();
+                    ImGui::SameLine();
+                    if (ImGui::Button(ICON_MD_DELETE)) {
+                        operationPerformed = true;
+                        logDebug("delete");
+                        std::string str("Do you want delete file: ");
+                        str += projectFile->path;
+                        openAskModal("Delete File?", str.c_str(), [projectFile, &selection](bool b) {
+                            if (b) {
+                                if (projectFile->deleteFile()) {
+                                    logDebug("delete file success!");
+                                    selection.selectedFiles.clear();
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
+
+                    ImGui::PopStyleColor();
+
+                    if (operationPerformed) {
+                        ImGui::CloseCurrentPopup();
+                    }
                 }
-
-                ImGui::PopStyleColor();
-
+                
                 ImGui::EndPopup();
             }
         }
@@ -751,11 +783,25 @@ for(const item of a) {
             if (ImGui::Begin(WINDOW_LANGUAGE_KEYS.project)) {
                 showProjectFolder(currentProject()->getFileCache());
 
+
+                if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+                    logDebug(" !!! right click !!! ");
+                    auto& selection = g_UIStatus->selection;
+                    if (!selection.selectedFiles.empty()) {
+                        // check if popup PROJECT_FILE_CONTEXT_MENU open, if yes, then close it, if no, then open it
+                        if (ImGui::IsPopupOpen(PROJECT_FILE_CONTEXT_MENU)) {
+                            ImGui::CloseCurrentPopup();
+                        } else {
+                            ImGui::OpenPopup(PROJECT_FILE_CONTEXT_MENU);
+                        }
+                    }
+                    
+                }
+                showProjectFilePopup();
             }
 
             ImGui::End();
             
-            showProjectFilePopup();
         }
 
         void showGenerateResultWindow(){
@@ -1269,174 +1315,16 @@ for(const item of a) {
 
     void showModals(){
         // modals
-        auto& windowStatus = g_UIStatus->windowStatus;
-        if (windowStatus.popupGraphName) {
-            windowStatus.popupGraphName = false;
-            ImGui::OpenPopup("graphName");
-
-            // Always center this window when appearing
-            ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-            ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        if (!g_UIStatus->modalStack.empty()) {
+            auto& stack = g_UIStatus->modalStack;
+            auto p = stack.front();
+            p->show();
+            if (!p->enabled) {
+                //remove
+                stack.erase(stack.begin());
+            }
         }
 
-        if (ImGui::BeginPopupModal("graphName", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::Text("Please input a graph name");
-            ImGui::Separator();
-
-            ImGui::InputText("name", g_UIStatus->buffer.littleName, std::size(g_UIStatus->buffer.littleName));
-            if (buttonOK(COMMON_LANGUAGE_KEYS.ok)) {
-                // create
-
-                if (strlen(g_UIStatus->buffer.littleName) > 0) {
-                    logDebug(g_UIStatus->buffer.littleName);
-                    auto p = currentProject();
-                    std::string path = p->pathGraph(g_UIStatus->buffer.littleName);
-                    uiChangeGraph(path);
-                    p->buildFilesCache();
-                    g_UIStatus->buffer.littleName[0] = '\0';
-                }
-                ImGui::CloseCurrentPopup();
-            }
-
-            ImGui::SameLine();
-            if (ImGui::Button(COMMON_LANGUAGE_KEYS.cancel)) {
-                ImGui::CloseCurrentPopup();
-            }
-            
-            ImGui::EndPopup();
-            return;
-        }
-
-        // ask
-        auto& modalAskData = g_UIStatus->modalAskData;
-        if (windowStatus.popupAskModal) {
-            windowStatus.popupAskModal = false;
-
-            if (!endsWith(modalAskData.title, MyUILabels::modalAskData)) {
-                modalAskData.title += MyUILabels::modalAskData;
-            }
-            ImGui::OpenPopup(MyUILabels::modalAskData);
-
-            // Always center this window when appearing
-            ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-            ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        }
-        if (ImGui::BeginPopupModal(modalAskData.title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::Text("%s", modalAskData.content.c_str());
-            ImGui::Dummy(ImVec2(0, 18));
-
-            if (buttonOK(COMMON_LANGUAGE_KEYS.ok)) {
-                modalAskData.callback(true);
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::SameLine();
-            if (ImGui::Button(COMMON_LANGUAGE_KEYS.cancel)) {
-                modalAskData.callback(false);
-                ImGui::CloseCurrentPopup();
-            }
-
-            ImGui::EndPopup();
-            return;
-        }
-
-        // ask1Field
-        auto ask1FieldData = g_UIStatus->modal1InputFieldAskData;
-        if (windowStatus.popup1InputFieldAskModal) {
-            windowStatus.popup1InputFieldAskModal = false;
-
-
-            if (!endsWith(ask1FieldData.title, MyUILabels::modalAsk1FieldData)) {
-                ask1FieldData.title += MyUILabels::modalAsk1FieldData;
-            }
-            ImGui::OpenPopup(MyUILabels::modalAsk1FieldData);
-
-            // Always center this window when appearing
-            ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-            ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        }
-        if (ImGui::BeginPopupModal(ask1FieldData.title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::Text("%s", ask1FieldData.content.c_str());
-            ImGui::Dummy(ImVec2(0, 18));
-
-            const auto& fieldData = ask1FieldData.field;
-            ImGui::InputText(fieldData.label.c_str(), fieldData.buf, fieldData.bufLength);
-            
-            if (buttonOK(COMMON_LANGUAGE_KEYS.ok)) {
-                ask1FieldData.callback(true);
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::SameLine();
-            if (ImGui::Button(COMMON_LANGUAGE_KEYS.cancel)) {
-                ask1FieldData.callback(false);
-                ImGui::CloseCurrentPopup();
-            }
-
-            ImGui::EndPopup();
-            return;
-        }
-
-
-        // alert
-        auto& modalAlertData = g_UIStatus->modalAlertData;
-        if (windowStatus.popupAlertModal) {
-            windowStatus.popupAlertModal = false;
-
-            if (!endsWith(modalAlertData.title, MyUILabels::modalAlertData)) {
-                modalAlertData.title += MyUILabels::modalAlertData;
-            }
-            ImGui::OpenPopup(MyUILabels::modalAlertData);
-
-            // Always center this window when appearing
-            ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-            ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        }
-        if (ImGui::BeginPopupModal(modalAlertData.title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::Text("%s", modalAlertData.content.c_str());
-            ImGui::Dummy(ImVec2(0, 18));
-
-            if (buttonOK(COMMON_LANGUAGE_KEYS.ok)) {
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::EndPopup();
-            return;
-        }
-
-        // save
-        auto& modalSaveData = g_UIStatus->modalSaveData;
-        if (windowStatus.popupSaveModal) {
-            windowStatus.popupSaveModal = false;
-
-            if (!endsWith(modalSaveData.title, MyUILabels::modalSaveData)) {
-                modalSaveData.title += MyUILabels::modalSaveData;
-            }
-            ImGui::OpenPopup(MyUILabels::modalSaveData);
-
-            // Always center this window when appearing
-            ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-            ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        }
-
-        if (ImGui::BeginPopupModal(modalSaveData.title.c_str())) {
-            ImGui::Text("%s", modalSaveData.content.c_str());
-            ImGui::Dummy(ImVec2(0, 18));
-
-            if (buttonOK(MENU_LANGUAGE_KEYS.save)) {
-                modalSaveData.callback(SaveOperationResult::Save);
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::SameLine();
-            if (ImGui::Button(COMMON_LANGUAGE_KEYS.cancel)) {
-                modalSaveData.callback(SaveOperationResult::Cancel);
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::SameLine();
-            if (ImGui::Button(COMMON_LANGUAGE_KEYS.drop)) {
-                modalSaveData.callback(SaveOperationResult::Drop);
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::EndPopup();
-            return;
-        }
     }
 
     /**
@@ -1872,6 +1760,11 @@ for(const item of a) {
 
         g_UIStatus->io = &io;
 
+        auto ctx = ImGui::GetCurrentContext();
+        // ctx->DebugLogFlags |= ImGuiDebugLogFlags_EventPopup;
+        // ctx->DebugLogFlags |= ImGuiDebugLogFlags_EventSelection;
+
+
         // Setup Dear ImGui style
         ImGui::StyleColorsDark();
         
@@ -2075,12 +1968,12 @@ for(const item of a) {
     }
 
     void openSaveModal(const char* title, const char* content, std::function<void(SaveOperationResult)> const& callback) {
-        auto& askData = g_UIStatus->modalSaveData;
-        askData.title = title;
-        askData.content = content;
-        askData.callback = callback;
+        auto p = new SaveModal();
+        p->title = title;
+        p->content = content;
+        p->callback = callback;
 
-        g_UIStatus->windowStatus.popupSaveModal = true;
+        g_UIStatus->modalStack.push_back(p);
     }
 
     bool isUICommandFree() {
@@ -2088,34 +1981,35 @@ for(const item of a) {
     }
 
     void openAskModal(std::string_view title, std::string_view content, std::function<void(bool)> callback) {
-        auto& data = g_UIStatus->modalAskData;
-        data.title = title;
-        data.content = content;
-        data.callback = callback;
+        auto p = new AskModal();
+        p->title = title;
+        p->content = content;
+        p->callback = callback;
 
-        g_UIStatus->windowStatus.popupAskModal = true;
+        g_UIStatus->modalStack.push_back(p);
+
     }
 
     void openOneInputAskModal(std::string_view title, std::string_view content, std::string_view label, char* buf, size_t size, std::function<void(bool)> callback) {
-        auto& data = g_UIStatus->modal1InputFieldAskData;
+        auto p = new AskModal();
+        p->title = title;
+        p->content = content;
+        p->inputFields.emplace_back(label, buf, size);
 
-        data.title = title;
-        data.content = content;
+        p->callback = callback;
+        g_UIStatus->modalStack.push_back(p);
 
-        data.field.label = label;
-        data.field.buf = buf;
-        data.field.bufLength = size;
-        data.callback = callback;
-
-        g_UIStatus->windowStatus.popup1InputFieldAskModal = true;
+        logDebug("open one input ask modal, title: $0, content: $1, label: $2, buf: $3", title, content, label, buf);
     }
 
     void openAlertModal(std::string_view title, std::string_view content) {
-        auto& data = g_UIStatus->modalAlertData;
-        data.title = title;
-        data.content = content;
+        auto p = new AlertModal();
 
-        g_UIStatus->windowStatus.popupAlertModal = true;
+        p->title = title;
+        p->content = content;
+
+        g_UIStatus->modalStack.push_back(p);
+
     }
 
     void openGenerateResultWindow(std::string const& source, std::string const& text) {

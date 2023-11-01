@@ -39,6 +39,7 @@ target_sources(sight PRIVATE
         src/sight_colors.cpp
         src/sight_code_set.cpp
         src/sight_node_graph.cpp
+        src/sight_popup_modal.cpp
 
         # dependencies/imgui/imgui_demo.cpp           # for debug
 )

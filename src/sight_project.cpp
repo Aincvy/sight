@@ -17,6 +17,7 @@
 #include "sight_code_set.h"
 
 
+#include "yaml-cpp/node/parse.h"
 #include "yaml-cpp/yaml.h"
 
 #include <filesystem>
@@ -81,14 +82,7 @@ namespace sight {
                 }
                 std::string fullpath = std::filesystem::canonical(item.path()).string();
                 if (item.is_directory()) {
-                    parent.files.push_back(
-                        {
-                            ProjectFileType::Directory,
-                            fullpath,
-                            item.path().filename().generic_string(),
-                            {}
-                        }
-                    );
+                    parent.files.emplace_back(ProjectFileType::Directory, fullpath, item.path().filename().generic_string());
                     fillFiles(parent.files.back());
                     continue;
                 }
@@ -103,12 +97,7 @@ namespace sight {
                         if (ext == ".yaml") {
                             // check the is a graph or not.
                             if (isGraphFile(item.path().generic_string())) {
-                                parent.files.push_back({
-                                    ProjectFileType::Graph,
-                                    fullpath,
-                                    removeExt(filename.generic_string()),
-                                    {}
-                                });
+                                parent.files.emplace_back(ProjectFileType::Graph, fullpath, removeExt(filename.generic_string()));
 
                                 continue;
                             }
@@ -129,12 +118,7 @@ namespace sight {
                         }
                     }
 
-                    parent.files.push_back({
-                        ProjectFileType::Regular,
-                        fullpath,
-                        filename.generic_string(),
-                        {}
-                    });
+                    parent.files.emplace_back(ProjectFileType::Regular, fullpath, filename.generic_string());
                 }
             }
 
@@ -637,13 +621,13 @@ namespace sight {
         return baseDir;
     }
 
-    SightNodeGraph* Project::createGraph(std::string_view path, char* pathWithoutExtOut, v8::Isolate* isolate) {
-        auto g = openGraph(path,pathWithoutExtOut, isolate);
+    SightNodeGraph* Project::createGraph(std::string_view path, v8::Isolate* isolate, char* pathWithoutExtOut) {
+        auto g = openGraph(path, isolate, pathWithoutExtOut);
         buildFilesCache();
         return g;
     }
 
-    SightNodeGraph* Project::openGraph(std::string_view path, char* pathWithoutExtOut, v8::Isolate* isolate) {
+    SightNodeGraph* Project::openGraph(std::string_view path, v8::Isolate* isolate, char* pathWithoutExtOut) {
         std::string targetPath = std::filesystem::absolute(path).generic_string();
         std::filesystem::path temp(targetPath);
         if (temp.has_extension()) {
@@ -675,6 +659,38 @@ namespace sight {
 
     ProjectFile& Project::getFileCache() {    
         return fileCache;
+    }
+
+    void Project::addToFileCache(std::string_view name, ProjectFileType fileType) {
+        std::filesystem::path filepath(name);
+        std::filesystem::path projectFolder(baseDir);
+
+        std::filesystem::path relativePath = std::filesystem::relative(filepath, projectFolder);
+        logDebug("relativePath: $0", relativePath.generic_string());
+
+        std::vector<std::string> tmpArray;
+        for (const auto& child : relativePath) {
+            tmpArray.push_back(child.generic_string());
+        }
+
+        auto parent = &this->fileCache;
+        for (int i = 0; i < tmpArray.size() - 1; i++) {
+            parent = parent->findChild(tmpArray[i]);
+            if (parent == nullptr) {
+                parent = parent->createChildDirectory(tmpArray[i]);
+            }
+        }
+
+        // parent->files.push_back({});
+        // auto& f = parent->files.back();
+        // f.filename = filepath.filename().generic_string();
+        // f.fileType = fileType;
+        // f.path = filepath.generic_string();
+        parent->files.emplace_back(fileType, filepath.generic_string(), filepath.filename().generic_string());
+    }
+
+    void Project::addNewGraphToFileCache(std::string_view graphName) {
+        this->addToFileCache(pathGraph(graphName), ProjectFileType::Graph);
     }
 
     void Project::buildFilesCache() {
@@ -1385,6 +1401,14 @@ namespace sight {
         return static_cast<int>(portType);
     }
 
+    ProjectFile::ProjectFile(ProjectFileType fileType, std::string path, std::string filename)
+        : fileType(fileType),
+          path(std::move(path)),
+          filename(std::move(filename))
+    {
+        
+    }
+
     bool ProjectFile::deleteFile() {
         if (fileType == ProjectFileType::Deleted) {
             return true;
@@ -1411,18 +1435,26 @@ namespace sight {
             auto graphOpened = this->isGraph(currentGraph());
             if (graphOpened) {
                 disposeGraph();
-            } 
-            return deleteAsGraph();
+            }
+            if (deleteAsGraph()) {
+                this->fileType = ProjectFileType::Deleted;
+                return true;
+            }
         }
         return false;
     }
 
-    bool ProjectFile::rename(std::string_view newName) {
+    bool ProjectFile::rename(std::string_view newName, v8::Isolate* isolate) {
+
         if (fileType == ProjectFileType::Deleted || fileType == ProjectFileType::Plugin) {
             return false;
         }
 
         if (fileType == ProjectFileType::Graph) {
+            if (!isValidPath(newName)) {
+                logDebug("$0 is not a valid path!", newName);
+                return false;
+            }
 
             std::filesystem::path newPath(newName);
             if (newPath.has_extension()) {
@@ -1440,6 +1472,8 @@ namespace sight {
                 newPath += ".yaml";
             }
 
+            logDebug("newPath: $0", newPath.generic_string());
+
             // rename yaml and json, and graph name
             auto openedGraph = currentGraph();
             bool isCurrentGraph = false;
@@ -1448,17 +1482,20 @@ namespace sight {
                 isCurrentGraph = true;
             }
 
-            SightNodeGraph graph;
-            if (graph.load(this->path) != CODE_OK) {
-                logError("load graph failed at: $0", this->path);
-                return false;
-            }
+            // load this.path as ifstream
+            std::ifstream ifs(this->path);
+            if (ifs.good()) {
+                auto node = YAML::Load(ifs);
+                node["settings"]["graphName"] = removeExt(newPath.filename().generic_string());
 
-            std::filesystem::path oldPath(this->path);
-            auto p = graph.getSettings().graphName;
-            if (oldPath.filename() == p) {
-                snprintf(p, std::size(graph.getSettings().graphName), "%ls", newPath.filename().c_str());
-                graph.save(SaveReason::Script);
+                // write back to file
+                YAML::Emitter emitter;
+                emitter << node;
+                ifs.close();
+
+                std::ofstream outToFile(path, std::ios::out | std::ios::trunc);
+                outToFile << emitter.c_str() << std::endl;
+                outToFile.close();
             }
 
             auto jsonPath = removeExt(this->path);
@@ -1476,12 +1513,13 @@ namespace sight {
                 return false;
             }
 
+
             if (isCurrentGraph) {
                 // open
                 auto project = currentProject();
-                this->refreshInfo(newPath.generic_string());
-                project->openGraph(this->path);
+                project->openGraph(this->path, isolate);
             }
+            this->refreshInfo(newPath.generic_string());
             return true;
 
         } else {
@@ -1501,11 +1539,52 @@ namespace sight {
         if (!graph) {
             return false;
         }
-        return graph->getFilePath() == this->path;
+
+        return std::filesystem::path(graph->getFilePath()) == std::filesystem::path(this->path);
     }
 
     void ProjectFile::refreshInfo(std::string_view newPath) {
         this->path = newPath;
         this->filename = std::filesystem::path(newPath).filename().generic_string();
+        this->filename = removeExt(this->filename);
     }
+
+    ProjectFile* ProjectFile::findChild(std::string_view filename) {
+        // loop of this->files
+        for (auto& file : this->files) {
+            if (file.filename == filename) {
+                return &file;
+            }
+        }
+
+        return nullptr;
+    }
+
+    ProjectFile* ProjectFile::createChildDirectory(std::string_view directoryName) {
+        // todo
+        assert(this->fileType == ProjectFileType::Directory);
+
+        std::filesystem::path path(this->path);
+        try {
+            std::filesystem::create_directory(path / directoryName);
+        } catch (const std::exception& e) {
+            logError("create directory failed, path: $0, error: $1", this->path, e.what());
+        }
+
+        return addChildDirectory(directoryName);
+    }
+
+    ProjectFile* ProjectFile::addChildDirectory(std::string_view directoryName) {
+        // Only add child directory item to this.files
+        assert(this->fileType == ProjectFileType::Directory);
+
+        std::filesystem::path path(this->path);
+        path /= directoryName;
+
+        this->files.emplace_back(ProjectFileType::Directory, path.generic_string(), std::string(directoryName));
+        return &this->files.back();
+
+    }
+
+
 }

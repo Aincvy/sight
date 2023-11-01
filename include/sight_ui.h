@@ -14,6 +14,7 @@
 #include "sight_node.h"
 #include "sight_terminal.h"
 #include "imterm/terminal.hpp"
+#include "sight_popup_modal.h"
 
 #include "absl/container/btree_set.h"
 #include "absl/container/flat_hash_map.h"
@@ -49,20 +50,6 @@ namespace sight {
         RunScriptFile,
         PluginReloadOver, 
 
-    };
-
-    /**
-     * @brief Imgui ids
-     * 
-     */
-    struct MyUILabels{
-        // static ids
-        static constexpr const char* modalAskData = "###modalAskData";
-        static constexpr const char* modalAsk1FieldData = "###modalAsk1FieldData";
-        static constexpr const char* modalSaveData = "###modalSaveData";
-        static constexpr const char* modalAlertData = "###modalAlertData";
-
-        // dynamic ids, strcat on program load.
     };
 
     struct UICommand {
@@ -198,47 +185,6 @@ namespace sight {
         char customPortName[NAME_BUF_SIZE] {0};
     };
 
-    struct ModalAskData {
-        std::string title;
-        std::string content;
-
-        std::function<void(bool)> callback;
-    };
-
-    struct ModalAlertData {
-        std::string title;
-        std::string content;
-    };
-
-    enum class SaveOperationResult {
-        // save file
-        Save,
-        // do not do anything
-        Cancel,
-        // do not save file
-        Drop,
-    };
-
-    struct ModalSaveData {
-        std::string title;
-        std::string content;
-
-        std::function<void(SaveOperationResult)> callback;
-    };
-
-    struct ModalInputField {
-        std::string label;
-        char* buf = nullptr;
-        size_t bufLength = 0;
-    };
-
-    struct Modal1InputFieldAskData {
-        std::string title;
-        std::string content;
-        ModalInputField field;
-        
-        std::function<void(bool)> callback;
-    };
 
     struct EntityOperations{
         absl::flat_hash_map<std::string, CommonOperation> map;
@@ -270,10 +216,7 @@ namespace sight {
         struct LoadingStatus loadingStatus;
         class Selection selection;
         struct UIBuffer buffer;
-        struct ModalAskData modalAskData;
-        struct ModalSaveData modalSaveData;
-        struct ModalAlertData modalAlertData;
-        struct Modal1InputFieldAskData modal1InputFieldAskData;
+        std::vector<BaseModal*> modalStack;
         struct ToastController toastController;
         struct GenerateResultData generateResultData;
         struct StatusBarData statusBarData;

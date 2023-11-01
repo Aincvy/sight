@@ -740,7 +740,7 @@ namespace sight {
         logDebug(this->nodeName);
         auto p = new SightNode();
         
-        this->instantiate(p, generateId);
+        this->instantiate(p, generateId, currentGraph());
         return p;
     }
 
@@ -748,7 +748,7 @@ namespace sight {
         auto p = graph->getNodes().add();
         p->graph = graph;
 
-        this->instantiate(p, generateId);
+        this->instantiate(p, generateId, graph);
         return p;
     }
 
@@ -890,7 +890,7 @@ namespace sight {
         return component.active;
     }
 
-    void SightJsNode::instantiate(SightNode* p, bool generateId) const {
+    void SightJsNode::instantiate(SightNode* p, bool generateId, SightNodeGraph* graph) const {
         auto portCopyFunc = [](std::vector<SightJsNodePort*> const& src, std::vector<SightNodePort>& dst) {
             for (const auto& item : src) {
                 auto copy = item->instantiate();
@@ -905,8 +905,11 @@ namespace sight {
         p->nodeName = this->nodeName;
         p->templateNode = this;
         p->tryAddChainPorts(this->options.titleBarPortType);
-        assert(CURRENT_GRAPH);
-        p->graph = CURRENT_GRAPH;
+
+        if (!graph) {
+            graph = currentGraph();
+        }
+        p->graph = graph;
 
         if (generateId) {
             // generate id
@@ -929,7 +932,6 @@ namespace sight {
             p->nodeId = nextNodeOrPortId();
             CALL_NODE_FUNC(p);
         }
-
     }
 
     SightNodeConnection::SightNodeConnection() {
@@ -2187,6 +2189,7 @@ namespace sight {
         }
 
         graph = new SightNodeGraph();
+        graph->markDirty();
         graph->saveToFile(path, true);
         return 0;
     }
@@ -2207,6 +2210,7 @@ namespace sight {
 
             // create one.
             graph->setName(graph->getFileName());
+            graph->markDirty();
             graph->save();
         }
 
