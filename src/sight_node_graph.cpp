@@ -872,9 +872,10 @@ namespace sight {
 
         // fill nodes data
         auto index = -1;
-        for (auto& item : this->nodes) {
+        auto nodeWork = [&](const SightNode* np) {
             index++;
 
+            const auto& item = *np;
             crude_json::value node;
             node["id"] = item.nodeId * 1.0;
             node["name"] = item.nodeName;
@@ -898,12 +899,17 @@ namespace sight {
             }
 
             nodes[index] = node;
-        }
+        };
+        
+        this->loopOf(nodeWork);
 
+        
         // fill connections data
         index = -1;
-        for (auto& item : this->connections) {
+        auto connWork = [&](const SightNodeConnection* c) {
             index++;
+
+            const auto& item = *c;
 
             crude_json::value connection;
 
@@ -925,7 +931,9 @@ namespace sight {
 
             doComponents(connection, item.componentContainer);
             connections[index] = connection;
-        }
+        };
+
+        this->loopOf(connWork);
 
         root[config.nodeRootName] = nodes;
         root[config.connectionRootName] = connections;

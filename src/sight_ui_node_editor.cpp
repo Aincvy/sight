@@ -1214,7 +1214,7 @@ namespace sight {
         }
 
         auto callOnValueChange = [port]() {
-            logDebug("port value changed: $0", port->getId());
+            // logDebug("port value changed: $0", port->getId());
             recordUndo(UndoRecordType::Update, port->getId());
             lastUndoCommand()->portValueData = port->oldValue;
 
