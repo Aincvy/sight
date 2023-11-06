@@ -26,6 +26,7 @@
 #include "sight_log.h"
 #include "sight_widgets.h"
 #include "sight_render.h"
+#include "sight_ui_hierarchy.h"
 
 #include "v8pp/convert.hpp"
 
@@ -68,8 +69,6 @@
 
 #define PROJECT_FILE_CONTEXT_MENU "project_file_menu"
 
-
-namespace ed = ax::NodeEditor;
 
 static sight::UIStatus* g_UIStatus = nullptr;
 static std::atomic<bool> uiCommandFree = true;
@@ -441,106 +440,6 @@ for(const item of a) {
 
             ImGui::End();
 
-        }
-
-        void updateSelectedNodeFromED(){
-            auto& selection = g_UIStatus->selection;
-
-            int selectedCount = ed::GetSelectedObjectCount();
-            if (selectedCount > 0) {
-                selection.selectedNodeOrLinks.clear();
-
-                std::vector<ed::NodeId> selectedNodes;
-                std::vector<ed::LinkId> selectedLinks;
-                selectedNodes.resize(selectedCount);
-                selectedLinks.resize(selectedCount);
-
-                int c = ed::GetSelectedNodes(selectedNodes.data(), selectedCount);
-                int d = ed::GetSelectedLinks(selectedLinks.data(), selectedCount);
-                selectedNodes.resize(c);
-                selectedLinks.resize(d);
-
-                uint lastNodeId = 0;
-                for (const auto& item : selectedNodes) {
-                    lastNodeId = static_cast<uint>(item.Get());
-                    selection.selectedNodeOrLinks.insert(lastNodeId);
-                }
-                for (const auto& item : selectedLinks) {
-                    selection.selectedNodeOrLinks.insert(static_cast<uint>(item.Get()));
-                }
-
-                // update node name buffer.
-                if (selectedNodes.size() == 1) {
-                    auto n = currentGraph()->findNode(lastNodeId);
-                    if (n) {
-                        sprintf(g_UIStatus->buffer.inspectorNodeName, "%s", n->nodeName.c_str());
-                    }
-                }
-            } else {
-                selection.selectedNodeOrLinks.clear();
-            }
-        }
-
-        void showHierarchyWindow(){
-            if (g_UIStatus->windowStatus.layoutReset) {
-                ImGui::SetNextWindowPos(ImVec2(0,20));
-                ImGui::SetNextWindowSize(ImVec2(300, 285));
-            }
-
-            auto & selection = g_UIStatus->selection;
-
-            ImGui::Begin(WINDOW_LANGUAGE_KEYS.hierarchy);
-            // check and update node editor status
-            if (!isNodeEditorReady()) {
-                ImGui::End();
-                return;
-            }
-
-            updateSelectedNodeFromED();
-            
-            auto graph = currentGraph();
-            if (graph) {
-                for (const auto& node : graph->getNodes()) {
-                    if (node.isDeleted() || node.isComponent()) {
-                        continue;
-                    }
-                    
-                    ImGui::TextColored(g_UIStatus->uiColors->nodeIdText, "%d ", node.nodeId);
-                    ImGui::SameLine();
-                
-                    auto nodeId = node.nodeId;
-                    bool isSelected = selection.selectedNodeOrLinks.contains(nodeId);
-                    if (Selectable(static_cast<int>(nodeId), node.nodeName.c_str(), isSelected)) {
-                        auto pointer = graph->findNode(nodeId);
-                        assert(pointer);
-
-                        bool anySelect = !selection.selectedNodeOrLinks.empty();
-                        bool appendNode = false;
-                        if (anySelect) {
-                            if (!g_UIStatus->keybindings->controlKey.isKeyDown()) {
-                                // not control
-                                selection.selectedNodeOrLinks.clear();
-                                ed::ClearSelection();
-                            } else {
-                                appendNode = true;
-                            }
-                        }
-                        if (isSelected && appendNode) {
-                            // deselect 
-                            selection.selectedNodeOrLinks.erase(nodeId);
-                            ed::DeselectNode(nodeId);
-                        } else {
-                            selection.selectedNodeOrLinks.insert(nodeId);
-                            sprintf(g_UIStatus->buffer.inspectorNodeName, "%s", node.nodeName.c_str());
-
-                            ed::SelectNode(nodeId, appendNode);
-                            ed::NavigateToSelection();
-                        }
-                    }
-                }
-            }
-
-            ImGui::End();
         }
 
         void showInspectorWindow(){
@@ -1563,6 +1462,8 @@ for(const item of a) {
         // init node editor.
         initNodeEditor();
 
+        initHierarchy();
+
         // init keys
         initKeys();
         g_UIStatus->keybindings = loadKeyBindings("./keybindings.yaml");
@@ -1797,6 +1698,8 @@ for(const item of a) {
         // Cleanup
         cleanUpWindow(sightWindow);
 
+        disposeHierarchy();
+        
         return 0;
     }
 

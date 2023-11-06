@@ -3,6 +3,7 @@
 #include "sight_log.h"
 #include "sight_project.h"
 #include "sight_js.h"
+#include "sight_event_bus.h"
 
 #include <iostream>
 #include <string_view>
@@ -195,6 +196,7 @@ namespace sight {
     }
 
     void SightNodeGraph::dispose() {
+        SimpleEventBus::graphDisposed()->dispatch(*this);
     }
 
     const char* SightNodeGraph::getFilePath() const {
@@ -221,6 +223,7 @@ namespace sight {
         p->updateChainPortPointer();
         registerNodeIds(p);
         p->callEventOnInstantiate();
+        SimpleEventBus::nodeAdded()->dispatch(p);
 
         this->editing = true;
     }
@@ -977,6 +980,7 @@ namespace sight {
         }
 
         node->markAsDeleted();
+        SimpleEventBus::nodeRemoved()->dispatch(*node);
         return CODE_OK;
     }
 

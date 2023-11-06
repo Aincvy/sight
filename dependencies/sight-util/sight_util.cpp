@@ -12,6 +12,7 @@
 #include <string>
 #include <string_view>
 #include <sys/stat.h>
+#include <random>
 
 #ifdef __APPLE__
 #    include <mach/mach.h>
@@ -245,6 +246,18 @@ namespace sight {
         }
 
         return false;
+    }
+
+    int normalRandomInt(int min, int max) {
+        
+        std::random_device rd;
+        std::mt19937 gen(rd());
+
+        std::uniform_int_distribution<> dis(0, 99999999);
+
+        int randomNum = dis(gen);
+        return randomNum;
+        
     }
 
 

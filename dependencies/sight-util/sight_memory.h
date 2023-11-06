@@ -270,6 +270,7 @@ namespace sight {
                 ((ResetAble *) p)->reset();
             }
 
+            // todo perhaps this should be on the else block.
             *p = {};
         }
 

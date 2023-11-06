@@ -40,6 +40,8 @@ target_sources(sight PRIVATE
         src/sight_code_set.cpp
         src/sight_node_graph.cpp
         src/sight_popup_modal.cpp
+        src/sight_ui_hierarchy.cpp
+        src/sight_event_bus.cpp
 
         # dependencies/imgui/imgui_demo.cpp           # for debug
 )

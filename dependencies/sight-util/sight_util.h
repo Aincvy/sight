@@ -221,5 +221,7 @@ namespace sight {
 
 
     bool isValidPath(const std::filesystem::path& p);
-    
+
+
+    int normalRandomInt(int min = 0, int max = 99999999);
 }
