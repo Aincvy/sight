@@ -296,6 +296,7 @@ namespace sight {
         if (dataConnections.IsDefined() && dataConnections.IsSequence()) {
             for( const auto& item: dataConnections){
                 SightNodeConnection c;
+                c.graph = currentGraph();
                 if (item >> c) {
                     c.connectionId = nextNodeOrPortId();
                     connections.push_back(c);

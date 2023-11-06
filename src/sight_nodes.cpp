@@ -648,7 +648,7 @@ namespace sight {
 
     SightComponentContainer* SightNode::getComponentContainer() {
         if (!componentContainer) {
-            
+            assert(graph);
             this->componentContainer = graph->createComponentContainer();
         }
         return componentContainer;
@@ -1003,6 +1003,7 @@ namespace sight {
 
     SightComponentContainer*   SightNodeConnection::getComponentContainer() {
         if (!componentContainer) {
+            assert(graph);
             componentContainer = graph->createComponentContainer();
         }
         return componentContainer;

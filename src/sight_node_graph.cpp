@@ -949,7 +949,6 @@ namespace sight {
     }
 
     SightComponentContainer* SightNodeGraph::createComponentContainer() {
-
         auto c = this->componentContainers.add();
         c->graph = this;
         return c;
