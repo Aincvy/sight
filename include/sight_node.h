@@ -328,6 +328,11 @@ namespace sight {
          */
         bool addComponent(SightNode* p);
 
+        bool removeComponent(SightNode* p);
+        
+        bool removeComponent(size_t index);
+
+        
         void reset() override;
     };
 
@@ -813,7 +818,7 @@ namespace sight {
          * else it will instantiate one by this node's template.
          * @return a new node, you should `delete` the object when you do not need it.
          */
-        SightNode* instantiate(bool generateId = true) const;
+        // SightNode* instantiate(bool generateId = true) const;
 
         SightNode* instantiate(SightNodeGraph* graph, bool generateId = true) const;
         
@@ -1039,7 +1044,17 @@ namespace sight {
     bool operator>>(YAML::Node const&node, Vector2 &v);
     bool operator>>(YAML::Node const& node, SightNodeConnection& connection);
     bool operator>>(YAML::Node const& node, SightComponentContainer& componentContainer);
-    int loadNodeData(YAML::Node const& yamlNode, SightNode*& node, bool useOldId = true);
+
+    /**
+     * @brief 
+     * 
+     * @param yamlNode 
+     * @param node will be managed by graph.
+     * @param graph 
+     * @param useOldId 
+     * @return int 
+     */
+    int loadNodeData(YAML::Node const& yamlNode, SightNode*& node, SightNodeGraph* graph, bool useOldId = true);
 
 
     /**

@@ -70,14 +70,14 @@ namespace sight {
 
 
     /**
-     * add and delete node memory.  (use keyword delete)
+     * add a node to graph, and record undo .
      * @param node
      * @return CODE
      */
-    int uiAddNode(SightNode* node, bool freeMemory = true);
+    int uiAddNode(SightNode* node);
 
-    int uiAddMultipleNodes(std::vector<SightNode*>& nodes, std::vector<SightNodeConnection> const& connections, ImVec2 startPos, bool freeMemory = true, bool selectNode = true);
-    int uiAddMultipleNodes(std::vector<SightNode*>& nodes, std::vector<SightNodeConnection*> const& connections, ImVec2 startPos, bool freeMemory = true, bool selectNode = true);
+    int uiAddMultipleNodes(std::vector<SightNode*>& nodes, std::vector<SightNodeConnection> const& connections, ImVec2 startPos, bool selectNode = true);
+    int uiAddMultipleNodes(std::vector<SightNode*>& nodes, std::vector<SightNodeConnection*> const& connections, ImVec2 startPos, bool selectNode = true);
 
     /**
      * @brief 

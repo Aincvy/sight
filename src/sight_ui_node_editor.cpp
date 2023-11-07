@@ -1,3 +1,6 @@
+#define IMGUI_DEFINE_MATH_OPERATORS
+#include "imgui.h"
+
 #include "IconsMaterialDesign.h"
 #include "sight_log.h"
 #include "sight_util.h"
@@ -10,8 +13,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#define IMGUI_DEFINE_MATH_OPERATORS
-#include "imgui.h"
 #include "imgui_canvas.h"
 #include "imgui_internal.h"
 #include "imgui_node_editor.h"
@@ -31,6 +32,7 @@
 #include "sight_js.h"
 #include "sight_js_parser.h"
 #include "sight_ui.h"
+#include "sight_event_bus.h"
 
 #include <cassert>
 #include <iostream>
@@ -983,7 +985,7 @@ namespace sight {
                         auto c = CopyText::parse(str);
                         if (c.type == CopyTextType::Node) {
                             SightNode* nodePointer = nullptr;
-                            c.loadAsNode(nodePointer);
+                            c.loadAsNode(nodePointer, graph);
                             if (nodePointer) {
                                 // add node
                                 ed::SetNodePosition(nodePointer->getNodeId(), openPopupPosition);
@@ -993,8 +995,8 @@ namespace sight {
                         } else if (c.type == CopyTextType::Multiple) {
                             std::vector<SightNode*> nodes;
                             std::vector<SightNodeConnection> connections;
-                            c.loadAsMultiple(nodes, connections);
-                            regenerateId(nodes, connections);
+                            c.loadAsMultiple(nodes, connections, graph);
+                            regenerateId(nodes, connections, true);
                             uiAddMultipleNodes(nodes, connections, openPopupPosition);
                         }
                     }
@@ -1221,12 +1223,13 @@ namespace sight {
             onNodePortValueChange(port);
         };
 
+        const float dragFloatSpeed = 0.25f;
         auto& options = port->options;
         switch (type) {
         case IntTypeFloat:
         {
             int flags = options.readonly ? ImGuiSliderFlags_ReadOnly : 0;
-            if (ImGui::DragFloat(labelBuf, &port->value.u.f, 0.5f, 0, 0, "%.3f", flags)) {
+            if (ImGui::DragFloat(labelBuf, &port->value.u.f, dragFloatSpeed, 0, 0, "%.3f", flags)) {
             }
             if (ImGui::IsItemDeactivatedAfterEdit()) {
                 callOnValueChange();
@@ -1319,7 +1322,7 @@ namespace sight {
         {
             // fixme: vector3 and vector4 has a value change bug.
             int flags = options.readonly ? ImGuiSliderFlags_ReadOnly : 0;
-            if (ImGui::DragFloat3(labelBuf, port->value.u.vector3, 1, 0, 0, "%.3f", flags)) {
+            if (ImGui::DragFloat3(labelBuf, port->value.u.vector3, dragFloatSpeed, 0, 0, "%.3f", flags)) {
                 callOnValueChange();
             }
             break;
@@ -1327,7 +1330,7 @@ namespace sight {
         case IntTypeVector4:
         {
             int flags = options.readonly ? ImGuiSliderFlags_ReadOnly : 0;
-            if (ImGui::DragFloat4(labelBuf, port->value.u.vector4, 1, 0, 0, "%.3f", flags)) {
+            if (ImGui::DragFloat4(labelBuf, port->value.u.vector4, dragFloatSpeed, 0, 0, "%.3f", flags)) {
                 callOnValueChange();
             }
             break;
@@ -1459,7 +1462,7 @@ namespace sight {
 
                 } else {
                     // create node
-                    auto node = this->templateNode->instantiate();
+                    auto node = this->templateNode->instantiate(graph);
                     auto nodeId = node->getNodeId();
                     node->position = convert(g_ContextStatus->nextNodePosition);
                     ed::SetNodePosition(nodeId, g_ContextStatus->nextNodePosition);
@@ -1503,18 +1506,16 @@ namespace sight {
         }
     }
 
-    int uiAddNode(SightNode* node, bool freeMemory /* = true */) {
+    int uiAddNode(SightNode* node) {
 
-        currentGraph()->addNode(*node);
+        currentGraph()->registerNode(node);
         recordUndo(UndoRecordType::Create, node->getNodeId(), convert(node->position));
-        if (freeMemory) {
-            delete node;
-        }
         return CODE_OK;
     }
 
-    int uiAddMultipleNodes(std::vector<SightNode*>& nodes, std::vector<SightNodeConnection> const& connections, ImVec2 startPos, bool freeMemory, bool selectNode) {
+    int uiAddMultipleNodes(std::vector<SightNode*>& nodes, std::vector<SightNodeConnection> const& connections, ImVec2 startPos, bool selectNode) {
         getRuntimeId(StartOrStop::Start);
+        auto graph = currentGraph();
         if (!nodes.empty()) {
             // position
             // find left-most node.
@@ -1547,27 +1548,28 @@ namespace sight {
                 }
                 auto nodeId = item->getNodeId();
                 ed::SetNodePosition(nodeId, getNodePos(item));
-                uiAddNode(item, freeMemory);
+                uiAddNode(item);
                 if (selectNode) {
                     ed::SelectNode(nodeId, true);
                 }
             }
-            if (freeMemory) {
-                nodes.clear();
-            }
         }
         if (!connections.empty()) {
             for (const auto& item : connections) {
-                // graph->addConnection(item);
-                // graph->createConnection(item.left, item.right, item.connectionId, item.priority);
                 uiAddConnection(item.left, item.right, item.connectionId, item.priority);
+                auto connection = graph->findConnection(item.connectionId);
+                if (connection) {
+                    // componentContainer is required from graph, so just copy.
+                    // however, this is not a good design, should be refactored.
+                    connection->componentContainer = item.componentContainer;
+                }
             }
         }
         getRuntimeId(StartOrStop::Stop);
         return CODE_OK;
     }
 
-    int uiAddMultipleNodes(std::vector<SightNode*>& nodes, std::vector<SightNodeConnection*> const& connections, ImVec2 startPos, bool freeMemory, bool selectNode) {
+    int uiAddMultipleNodes(std::vector<SightNode*>& nodes, std::vector<SightNodeConnection*> const& connections, ImVec2 startPos, bool selectNode) {
         std::vector<SightNodeConnection> c;
         if (!connections.empty()) {
             c.reserve(connections.size());
@@ -1575,7 +1577,7 @@ namespace sight {
                 c.push_back(*item);
             }
         }
-        return uiAddMultipleNodes(nodes, c, startPos, freeMemory, selectNode);
+        return uiAddMultipleNodes(nodes, c, startPos, selectNode);
     }
 
     int uiAddConnection(uint left, uint right, uint id, int priority) {
@@ -1639,15 +1641,17 @@ namespace sight {
     }
 
     void uiChangeGraph(std::string_view path) {
-        auto g = currentGraph();
+        auto oldGraph = currentGraph();
 
         auto openGraphFunc = [path]() {
             char tmp[FILENAME_BUF_SIZE]{ 0 };
-            auto t = currentProject()->openGraph(path, currentUIStatus()->isolate, tmp);
-            if (t) {
+            auto graph = currentProject()->openGraph(path, currentUIStatus()->isolate, tmp);
+            if (graph) {
                 //
-                if (t->verifyId() != CODE_OK) {
-                    t->markBroken(true, " Id has error!");
+                if (graph->verifyId() != CODE_OK) {
+                    graph->markBroken(true, " Id has error!");
+                } else {
+                    SimpleEventBus::graphOpened()->dispatch(graph);
                 }
 
                 auto code = changeNodeEditorGraph(tmp);
@@ -1655,7 +1659,7 @@ namespace sight {
                     nodeEditorFrameBegin();     // update node editor context
 
                     if (strlen(g_ContextStatus->outputJsonFilePathBuf) <= 0) {
-                        auto tmpPath = t->getSaveAsJsonPath();
+                        auto tmpPath = graph->getSaveAsJsonPath();
                         if (!tmpPath.empty()) {
                             strcpy(g_ContextStatus->outputJsonFilePathBuf, tmpPath.c_str());
                         }
@@ -1664,17 +1668,17 @@ namespace sight {
                 }
             }
         };
-        if (g == nullptr || !g->editing) {
+        if (oldGraph == nullptr || !oldGraph->editing) {
             openGraphFunc();
             return;
         }
 
         std::string stringPath(path);
-        openSaveModal("Save File?", "Current Graph do not save, do you want save file?", [stringPath, openGraphFunc, g](SaveOperationResult r) {
+        openSaveModal("Save File?", "Current Graph do not save, do you want save file?", [stringPath, openGraphFunc, oldGraph](SaveOperationResult r) {
             if (r == SaveOperationResult::Cancel) {
                 return;
             } else if (r == SaveOperationResult::Save) {
-                g->save();
+                oldGraph->save();
             }
             openGraphFunc();
         });
@@ -1846,6 +1850,27 @@ namespace sight {
             // g_ContextStatus->contextMenuCreateNodeOpen = true;
             ImGui::OpenPopup(COMPONENT_CONTEXT_MENU);
         }
+
+        ImGui::SameLine();
+        if (ImGui::Button(ICON_MD_CONTENT_PASTE)) {
+            auto graph = currentGraph();
+
+            // copy clip board
+            auto ct = CopyText::parse(ImGui::GetClipboardText());
+            if (ct.type != CopyTextType::Component) {
+                // not a component
+                openAlertModal("Alert!", "Clipboard does not have a component.");
+                return;
+            }
+
+            SightNode* pointer;
+            if (ct.loadAsNode(pointer, graph) == CODE_OK) {
+                graph->getComponentContainer(id)->addComponent(pointer);
+            } else {
+                logError("load node from clip board error");
+            }
+        }
+        
     }
 
     int showNodeComponents(SightComponentContainer* container, SightNode* node, SightNodeGraph* graph, uint id, bool fromInspector) {
@@ -1862,6 +1887,7 @@ namespace sight {
 
         int delIndex = -1;
         int index = -1;
+        char labelBuf[NAME_BUF_SIZE] = {'\0'};
         for (const auto& item : container->components) {
             index++;
 
@@ -1869,8 +1895,16 @@ namespace sight {
                 ImGui::Separator();
                 ImGui::TextColored(currentUIStatus()->uiColors->nodeIdText, "%s", item->nodeName.c_str());
                 ImGui::SameLine();
-                if (ImGui::Button(ICON_MD_DELETE "##del-component")) {
+                sprintf(labelBuf, ICON_MD_DELETE "##del-component-%d", index);
+                if (ImGui::Button(labelBuf)) {
                     delIndex = index;
+                }
+                ImGui::SameLine();
+                
+                sprintf(labelBuf, ICON_MD_CONTENT_COPY "##copy-component-%d", index);
+                if (ImGui::Button(labelBuf)) {
+                    CopyText::copyComponent(*item);
+                    logInfo("copy component successfully!");
                 }
                 showNodePorts(item);
             } else if (node) {
@@ -1884,7 +1918,8 @@ namespace sight {
         }
 
         if (delIndex >= 0) {
-            container->components.erase(container->components.begin() + delIndex);
+            // container->components.erase(container->components.begin() + delIndex);
+            container->removeComponent(delIndex);
             graph->markDirty();
         }
 

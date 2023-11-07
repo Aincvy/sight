@@ -1,4 +1,5 @@
 #include "sight.h"
+#include "sight_node.h"
 #include "sight_node_graph.h"
 #include "sight_log.h"
 #include "sight_project.h"
@@ -6,6 +7,7 @@
 #include "sight_event_bus.h"
 
 #include <iostream>
+#include <stdexcept>
 #include <string_view>
 #include <filesystem>
 #include <fstream>
@@ -83,7 +85,7 @@ namespace sight {
 
         std::ifstream fin(path.data());
         if (!fin.is_open()) {
-            return -1;
+            return CODE_FILE_ERROR;
         }
 
         int status = CODE_OK;
@@ -98,21 +100,18 @@ namespace sight {
             SightNode* sightNode = nullptr;
             for (const auto& nodeKeyPair : nodeRoot) {
                 auto yamlNode = nodeKeyPair.second;
-                loadNodeStatus = loadNodeData(yamlNode, sightNode);
+                loadNodeStatus = loadNodeData(yamlNode, sightNode, this);
                 if (loadNodeStatus != CODE_OK) {
                     if (status == CODE_OK) {
                         status = loadNodeStatus;
                     }
 
                     broken = true;
+                    return CODE_FAIL;
                 }
 
-                if (sightNode) {
-                    sightNode->graph = this;
-                    addNode(*sightNode);
-                    delete sightNode;
-                    sightNode = nullptr;
-                }
+                // registerNodeIds(sightNode);
+                registerNode(sightNode);
             }
 
             // connections
@@ -123,9 +122,12 @@ namespace sight {
 
                 auto connectionId = item.first.as<int>();
                 item.second >> tmpConnection;
-                createConnection(tmpConnection.left, tmpConnection.right, connectionId, tmpConnection.priority);
+                int ret = createConnection(tmpConnection.left, tmpConnection.right, connectionId, tmpConnection.priority);
+                if (ret < 0) {
+                    broken = true;
+                    return CODE_FAIL;
+                }
                 auto con = findConnection(connectionId);
-                assert(con);     // find connection failed!
                 con->generateCode = tmpConnection.generateCode;
 
                 // tmpConnection will auto free when current loop ends, so let new connection have componentContainer
@@ -186,8 +188,9 @@ namespace sight {
             logDebug("load ok");
             return status;
         } catch (const YAML::BadConversion& e) {
-            fprintf(stderr, "read file %s error!\n", path.data());
-            fprintf(stderr, "%s\n", e.what());
+            logError("read file %s error!", path.data());
+            logError("%s", e.what() );
+
             this->reset();
             return CODE_FILE_ERROR;     // bad file
         }
@@ -215,19 +218,6 @@ namespace sight {
         this->filepath = path;
     }
 
-    void SightNodeGraph::addNode(const SightNode& node) {
-        // check id repeat?
-
-        auto p = this->nodes.add(node);
-        p->graph = this;
-        p->updateChainPortPointer();
-        registerNodeIds(p);
-        p->callEventOnInstantiate();
-        SimpleEventBus::nodeAdded()->dispatch(p);
-
-        this->editing = true;
-    }
-
     void SightNodeGraph::registerNodeIds(SightNode* p) {
 
         idMap[p->nodeId] = {
@@ -247,6 +237,20 @@ namespace sight {
         };
         CALL_NODE_FUNC(p);
     }
+
+    void SightNodeGraph::unregisterNodeIds(SightNode const* p) {
+
+        auto nodeFunc = [this](std::vector<SightNodePort> const& list) {
+            for (auto& item : list) {
+                idMap.erase(item.id);
+            }
+        };
+
+        idMap.erase(p->nodeId);
+        CALL_NODE_FUNC(p);
+    }
+
+
 
     SightNode* SightNodeGraph::findNode(uint id) {
         return findSightAnyThing(id).asNode();
@@ -336,6 +340,17 @@ namespace sight {
 
         right->connections.push_back(p);
         right->sortConnections();
+    }
+
+    void SightNodeGraph::registerNode(SightNode* p) {
+        p->graph = this;
+        p->updateChainPortPointer();
+        registerNodeIds(p);
+        p->callEventOnInstantiate();
+        SimpleEventBus::nodeAdded()->dispatch(p);
+
+        // this->editing = true;
+        markDirty();
     }
 
     const SightArray<SightNode>& SightNodeGraph::getNodes() const {
@@ -597,10 +612,14 @@ namespace sight {
             return CODE_NODE_HAS_CONNECTIONS;
         }
 
-        idMap.erase(id);
+        unregisterNodeIds(&(*result));
         nodes.erase(result);
         markDirty();
         return CODE_OK;
+    }
+
+    int SightNodeGraph::delNode(SightNode const* p) {
+        return this->delNode(p->getNodeId());
     }
 
     int SightNodeGraph::delConnection(int id, bool removeRefs) {
@@ -662,6 +681,9 @@ namespace sight {
         };
 
         for (auto& item : this->nodes) {
+            if (item.isDeleted()) {
+                continue;
+            }
             idMap[item.getNodeId()] = {
                 SightAnyThingType::Node,
                 &item
@@ -671,6 +693,10 @@ namespace sight {
             CALL_NODE_FUNC(p, p);
         }
         for (auto& item : this->connections) {
+            if (item.isDeleted()) {
+                continue;
+            }
+
             auto c = &item;
             idMap[item.connectionId] = {
                 SightAnyThingType::Connection,
@@ -978,6 +1004,7 @@ namespace sight {
             return CODE_NODE_HAS_CONNECTIONS;
         }
 
+        
         node->markAsDeleted();
         SimpleEventBus::nodeRemoved()->dispatch(*node);
         return CODE_OK;
@@ -987,6 +1014,16 @@ namespace sight {
         connection->removeRefs();
         connection->markAsDeleted();
         return CODE_OK;
+    }
+
+    SightComponentContainer* SightNodeGraph::getComponentContainer(uint anyThingId) {
+        auto anyThing = this->findSightAnyThing(anyThingId);
+        if (anyThing.type == SightAnyThingType::Node) {
+            return anyThing.asNode()->getComponentContainer();
+        } else if (anyThing.type == SightAnyThingType::Connection) {
+            return anyThing.asConnection()->getComponentContainer();
+        }
+        return nullptr;
     }
 
     int SightNodeGraph::fakeDeleteConnection(uint id) {

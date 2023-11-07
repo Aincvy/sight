@@ -108,12 +108,10 @@ namespace sight {
         auto graph = currentGraph();
         if (graph) {
             auto h = currentHierarchy();
-            h->root->showChildren();
-            // if (h->lastDoubleClickedNodeId != 0) {
-                
-            //     h->lastDoubleClickedNodeId = 0;
-
-            // }
+            if (h->root) {
+                h->root->showChildren();
+            }
+            
             if (h->lastDoubleClickedNode) {
                 doubleClickNodeOnHierarchy(h->lastDoubleClickedNode);
 
@@ -155,8 +153,10 @@ namespace sight {
     
     }
 
-    void Hierarchy::rebuildCache() {
-        logError("rebuildCache not implemented");
+    void Hierarchy::rebuildCache(SightNodeGraph* graph) {
+        graph->loopOf([this](SightNode* node) {
+            this->addNode(node);
+        });
 
     }
 
@@ -174,7 +174,6 @@ namespace sight {
         i->type = HierarchyItemType::Node;
         i->dataPointer.node = node;
 
-        // i->text = absl::Substitute("$0##$1", node->nodeName, node->nodeId);
         i->applyTextFromNode();
 
     }
@@ -248,6 +247,11 @@ namespace sight {
         // graphDisposed
         this->eventHandlerList.push_back(SimpleEventBus::graphDisposed()->addListener([this](SightNodeGraph const& graph) {
             this->clearItems();
+        }));
+
+        // graphOpened
+        this->eventHandlerList.push_back(SimpleEventBus::graphOpened()->addListener([this](SightNodeGraph* graph) {
+            // this->rebuildCache(graph);
         }));
     }
 

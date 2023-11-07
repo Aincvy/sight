@@ -1,5 +1,6 @@
 #include "sight_undo.h"
 
+#include "imgui.h"
 #include "imgui_node_editor.h"
 #include "sight.h"
 #include "sight_defines.h"
@@ -263,15 +264,15 @@ namespace sight {
         }
     }
 
-    int CopyText::loadAsNode(SightNode*& node) const {
-        return loadNodeData(this->data, node, false);
+    int CopyText::loadAsNode(SightNode*& node, SightNodeGraph* graph) const {
+        return loadNodeData(this->data, node, graph, false);
     }
 
     int CopyText::laodAsConnection(SightNodeConnection*& connection) {
         return CODE_NOT_IMPLEMENTED;
     }
 
-    int CopyText::loadAsMultiple(std::vector<SightNode*>& nodes, std::vector<SightNodeConnection>& connections) const {
+    int CopyText::loadAsMultiple(std::vector<SightNode*>& nodes, std::vector<SightNodeConnection>& connections, SightNodeGraph* graph) const {
         if (data.size() <= 0) {
             return CODE_FAIL;
         }
@@ -283,7 +284,7 @@ namespace sight {
         if (dataNodes.IsDefined() && dataNodes.IsSequence()) {
             for (const auto& item : dataNodes) {
                 SightNode* node = nullptr;
-                int flag = loadNodeData(item, node);
+                int flag = loadNodeData(item, node, graph);
                 if (status == CODE_OK && flag != CODE_OK) {
                     status = flag;
                 }
@@ -298,7 +299,7 @@ namespace sight {
                 SightNodeConnection c;
                 c.graph = currentGraph();
                 if (item >> c) {
-                    c.connectionId = nextNodeOrPortId();
+                    // c.connectionId = nextNodeOrPortId();
                     connections.push_back(c);
                 }
             }
@@ -322,6 +323,8 @@ namespace sight {
             return "Connection";
         case CopyTextType::Multiple:
             return "Multiple";
+        case CopyTextType::Component:
+            return "Component";
         }
         return "None";
     }
@@ -333,8 +336,14 @@ namespace sight {
             return CopyTextType::Connection;
         } else if (str == "Multiple") {
             return CopyTextType::Multiple;
+        } else if (str == "Component") {
+            return CopyTextType::Component;
         }
         return CopyTextType::None;
+    }
+
+    void appendNodeInfo(YAML::Emitter& out, SightNode const& node) {
+        out << YAML::Key << stringData << YAML::Value << node;
     }
 
     std::string CopyText::from(SightNode const& node) {
@@ -342,12 +351,25 @@ namespace sight {
         out << YAML::BeginMap;
         addHeader(out, CopyTextType::Node);
 
-        out << YAML::Key << stringData << YAML::Value << node;
+        appendNodeInfo(out, node);
+        out << YAML::EndMap;
+
+        return out.c_str();
+    }
+
+    std::string CopyText::fromComponent(SightNode const& node) {
+        YAML::Emitter out;
+        out << YAML::BeginMap;
+        addHeader(out, CopyTextType::Component);
+
+        appendNodeInfo(out, node);
         out << YAML::EndMap;
         return out.c_str();
     }
 
     std::string CopyText::from(SightNodeConnection const& connection) {
+        // this is NOT allowed.
+        logError("CopyText::from: connection is not allowed.");
         return {};
     }
 
@@ -403,6 +425,14 @@ namespace sight {
         }
         
         return {};
+    }
+
+    void CopyText::copyComponent(SightNode const& node) {
+        ImGui::SetClipboardText(fromComponent(node).c_str());
+    }
+
+    void CopyText::copyNode(SightNode const& node) {
+        ImGui::SetClipboardText(from(node).c_str());
     }
 
 }

@@ -2,6 +2,7 @@
 
 #include "sight_event_bus.h"
 #include "sight_node.h"
+#include "sight_node_graph.h"
 #include "sight_memory.h"
 
 #include <string>
@@ -55,7 +56,7 @@ namespace sight {
         Hierarchy();
         ~Hierarchy();
 
-        void rebuildCache();
+        void rebuildCache(SightNodeGraph* graph);
 
         void addNode(SightNode* node);
         void delNode(SightNode const* node);

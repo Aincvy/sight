@@ -52,12 +52,15 @@ namespace sight {
         void addConnection(const SightNodeConnection& connection, SightNodePort* left = nullptr, SightNodePort* right = nullptr);
 
         /**
-         *
-         * @param node
+         * @brief 
+         * 
+         * @param node memory should be managed by this SightNodeGraph.
+
          */
-        void addNode(const SightNode& node);
+        void registerNode(SightNode* node);
 
         void registerNodeIds(SightNode* p);
+        void unregisterNodeIds(SightNode const* p);
 
         /**
          *
@@ -66,6 +69,10 @@ namespace sight {
          */
         int delNode(int id);
 
+        int delNode(SightNode const* p);
+
+        // int delNodeByIndex(int index);
+        
         /**
          *
          * @param id
@@ -258,6 +265,15 @@ namespace sight {
 
         int fakeDeleteConnection(uint id);
         int fakeDeleteConnection(SightNodeConnection* connection);
+
+        /**
+         * @brief Get the Component Container object from a node or a connection
+         * 
+         * @param anyThingId 
+         * @return SightComponentContainer* 
+         */
+        SightComponentContainer* getComponentContainer(uint anyThingId);
+
 
 
     private:

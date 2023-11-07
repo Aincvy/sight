@@ -11,6 +11,7 @@
 #include <ios>
 #include <iterator>
 #include <set>
+#include <stdexcept>
 #include <stdio.h>
 #include <string>
 #include <string_view>
@@ -511,7 +512,7 @@ namespace sight {
     }
 
     void SightNode::reset() {
-        logDebug("node reset");
+        logDebug("node reset: $0", this->nodeName);
         // call events
         if (templateNode) {
             auto t = dynamic_cast<const SightJsNode*>(templateNode);
@@ -736,13 +737,15 @@ namespace sight {
         this->originalOutputPorts.clear();
     }
 
-    SightNode* SightJsNode::instantiate(bool generateId) const {
-        logDebug(this->nodeName);
-        auto p = new SightNode();
+    // SightNode* SightJsNode::instantiate(bool generateId) const {
+    //     throw std::runtime_error("not support instantiate");    // I do not want to use new operator.
+
+    //     logDebug(this->nodeName);
+    //     auto p = new SightNode();
         
-        this->instantiate(p, generateId, currentGraph());
-        return p;
-    }
+    //     this->instantiate(p, generateId, currentGraph());
+    //     return p;
+    // }
 
     SightNode* SightJsNode::instantiate(SightNodeGraph* graph, bool generateId) const {
         auto p = graph->getNodes().add();
@@ -891,12 +894,14 @@ namespace sight {
     }
 
     void SightJsNode::instantiate(SightNode* p, bool generateId, SightNodeGraph* graph) const {
-        auto portCopyFunc = [](std::vector<SightJsNodePort*> const& src, std::vector<SightNodePort>& dst) {
+        auto portCopyFunc = [p](std::vector<SightJsNodePort*> const& src, std::vector<SightNodePort>& dst) {
             for (const auto& item : src) {
                 auto copy = item->instantiate();
                 copy.templateNodePort = item;
                 dst.push_back(copy);
-                dst.back().oldValue = dst.back().value;
+                auto& element = dst.back();
+                // element.oldValue = element.value;    // what this line means?
+                element.node = p;
             }
         };
         portCopyFunc(this->inputPorts, p->inputPorts);
@@ -905,10 +910,6 @@ namespace sight {
         p->nodeName = this->nodeName;
         p->templateNode = this;
         p->tryAddChainPorts(this->options.titleBarPortType);
-
-        if (!graph) {
-            graph = currentGraph();
-        }
         p->graph = graph;
 
         if (generateId) {
@@ -1149,10 +1150,7 @@ namespace sight {
     }
 
     SightNodeTemplateAddress::~SightNodeTemplateAddress() {
-//        if (templateNode) {
-//            delete templateNode;
-//            templateNode = nullptr;
-//        }
+
     }
 
     SightNodeTemplateAddress::SightNodeTemplateAddress(std::string name) : name(std::move(name)) {
@@ -1559,7 +1557,7 @@ namespace sight {
         for (auto& item : node) {
             SightNode* tmp = nullptr;
 
-            if (loadNodeData(item.second, tmp) == CODE_OK) {
+            if (loadNodeData(item.second, tmp, componentContainer.graph) == CODE_OK) {
                 componentContainer.addComponent(tmp);
             }
         }
@@ -1694,7 +1692,7 @@ namespace sight {
         return CODE_OK;
     }
 
-    int loadNodeData(YAML::Node const& yamlNode, SightNode*& node, bool useOldId) {
+    int loadNodeData(YAML::Node const& yamlNode, SightNode*& node, SightNodeGraph* graph, bool useOldId) {
         auto yamlTemplateNode = yamlNode["template"];
         if (!yamlTemplateNode.IsDefined()) {
             return CODE_FAIL;
@@ -1710,7 +1708,7 @@ namespace sight {
         }
 
         int status = CODE_OK;
-        auto nodePointer = useOldId ? templateNode->instantiate(false) : templateNode->instantiate(true);
+        auto nodePointer = useOldId ? templateNode->instantiate(graph, false) : templateNode->instantiate(graph, true);
         auto& sightNode = *nodePointer;
         if (useOldId) {
             sightNode.nodeId = yamlNode["id"].as<int>();
@@ -2363,14 +2361,43 @@ namespace sight {
         return true;
     }
 
+    void tryRemoveNodeFromGraph(SightNode* p, SightNodeGraph* graph) {
+        // graph->fakeDeleteNode(p);     // if need record undo, then need fake delete.
+        graph->delNode(p);
+    }
+    
+    bool SightComponentContainer::removeComponent(SightNode* p) {
+
+        auto iter = find(components.begin(), components.end(), p);
+        if (iter != components.end()) {
+            tryRemoveNodeFromGraph(p, graph);
+            components.erase(iter);
+            return true;
+        }
+
+        return false;
+    }
+
+    bool SightComponentContainer::removeComponent(size_t index) {
+        if (index < 0 || index >= components.size()) {
+            return false;
+        }
+
+        auto iter = components.begin() + index;
+        auto p = *iter;
+
+        tryRemoveNodeFromGraph(p, graph);
+        components.erase(iter);
+        return true;
+    }
+
     void SightComponentContainer::reset() {
     
         // means delete
         if (!this->components.empty()) {
             //delete all elements
             for (auto& item : this->components) {
-                // delete item;
-                graph->getNodes().remove(item);
+                tryRemoveNodeFromGraph(item, graph);
             }
 
             this->components.clear();

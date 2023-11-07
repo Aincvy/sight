@@ -1,10 +1,8 @@
 # sight
 **WIP**
 
-A js code generate platform.  It parse a graph to a js file. 
-
-For macos only, now. 
-
+- Generate json from a graph. 
+- Generate js code from a graph.
 
 
 ## how to build

@@ -70,6 +70,7 @@ namespace sight {
         static EventPassage<SightNode*>* nodeAdded();
         static EventPassage<SightNode const&>* nodeRemoved();
         static EventPassage<SightNodeGraph const&>* graphDisposed();
+        static EventPassage<SightNodeGraph*>* graphOpened();
 
     };
     

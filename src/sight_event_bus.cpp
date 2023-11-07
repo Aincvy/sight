@@ -21,5 +21,10 @@ namespace sight {
         return &eventPassage;    
     }
 
+    EventPassage<SightNodeGraph*>* SimpleEventBus::graphOpened() {
+        static EventPassage<SightNodeGraph*> eventPassage;
+        return &eventPassage;    
+    }
+
 
 }
