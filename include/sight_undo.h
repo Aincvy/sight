@@ -19,9 +19,17 @@ namespace sight {
      * 
      */
     enum class UndoRecordType {
-        Create, 
+        Create,
         Delete,
         Update,
+
+        /**
+         * @brief 
+         * anyThingId = markedNodeId
+         * anyThingId2 = nodeId
+         * 
+         */
+        Replace,
     };
 
     struct UndoCommand {
@@ -41,9 +49,17 @@ namespace sight {
          */
         uint anyThingId = 0;
 
+        /**
+         * @brief second node connection, port id 
+         * 
+         */
+        uint anyThingId2 = 0;
+
+
         SightNodeConnection* connectionData = nullptr;
         SightNode* nodeData = nullptr;
         SightNodeValue portValueData;
+        // SightNode* nodeData2 = nullptr;
 
         UndoCommand() = default;
         UndoCommand(uint id, UndoRecordType recordType);

@@ -172,6 +172,51 @@ namespace sight {
         return count;
     }
 
+    bool SightNodePort::removeConnection(uint id) {
+        if (connections.empty()) {
+            return false;
+        }
+
+        // find and remove connection by id
+        auto it = std::find_if(connections.begin(), connections.end(), [id](SightNodeConnection* c) {
+            return c->connectionId == id;
+        } );
+        if (it == connections.end()) {
+            return false;
+        }
+
+        // remove connection
+        connections.erase(it);
+
+        return true;
+    }
+
+    bool SightNodePort::addConnection(SightNodeConnection* connection) {
+
+        // find
+        auto it = std::find_if(connections.begin(), connections.end(), [connection](SightNodeConnection* c) {
+            return c->connectionId == connection->connectionId;
+        } );
+
+        if (it != connections.end()) {
+            logError("connection already exists: ids: $0", connection->connectionId);
+            return false;
+        }
+
+        if (connection->left != this->getId() && connection->right != this->getId()) {
+            if (this->kind == NodePortType::Output) {
+                connection->left = this->getId();
+            } else if (this->kind == NodePortType::Input) {
+                connection->right = this->getId();
+            } else {
+                logError("invalid port type: $0, you need set connection port manually", this->kind);
+            }
+        }
+        connections.push_back(connection);
+        return true;
+    }
+
+
     void SightNodePort::sortConnections() {
         if (this->connections.size() <= 1) {
             return;
@@ -296,7 +341,9 @@ namespace sight {
         return nullptr;
     }
 
-    SightNode *SightNode::clone(bool generateId /* = true */) const{
+    SightNode* SightNode::clone(bool generateId /* = true */) const {
+        throw std::runtime_error("need more test!");
+        
         auto p = new SightNode();
         p->graph = this->graph;
         p->copyFrom(this, CopyFromType::Clone, generateId);
@@ -2402,7 +2449,9 @@ namespace sight {
 
             this->components.clear();
         }
-
     }
 
+    bool replaceNode(SightNodeGraph* graph, uint fromNode, uint toNode) {
+        return graph->replaceNode(fromNode, toNode);
+    }
 }

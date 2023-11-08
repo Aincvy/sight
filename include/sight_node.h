@@ -291,6 +291,26 @@ namespace sight {
          */
         void sortConnections();
 
+        /**
+         * @brief 
+         * Remove a connection from connections field. 
+         * Be careful, you should try SightNodeGraph::delConnection(int id, bool removeRefs = true) or SightNodeGraph::fakeDeleteConnection(uint id) first.
+         * 
+         * @param id 
+         * @return true 
+         * @return false 
+         */
+        bool removeConnection(uint id);
+
+        /**
+         * @brief Add a connection to connections field.
+         * 
+         * @param id 
+         * @return true 
+         * @return false 
+         */
+        bool addConnection(SightNodeConnection* connection);
+
         SightNode* getNode();
         uint getNodeId() const;
 
@@ -1071,5 +1091,15 @@ namespace sight {
         uint type = port.getType();
         return port.options.showValue && type != IntTypeProcess && type != IntTypeObject;
     }
+
+    /**
+     * @brief 把 fromNode 替换成 toNode
+     * 
+     * @param fromNode 
+     * @param toNode 
+     */
+    bool replaceNode(SightNodeGraph* graph, uint fromNode, uint toNode);
+
+
 
 }

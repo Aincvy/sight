@@ -1,4 +1,5 @@
 #include "sight.h"
+#include "sight_defines.h"
 #include "sight_node.h"
 #include "sight_node_graph.h"
 #include "sight_log.h"
@@ -11,9 +12,12 @@
 #include <string_view>
 #include <filesystem>
 #include <fstream>
+#include <vector>
 
 #include "crude_json.h"
 #include "v8-isolate.h"
+
+#include "absl/container/flat_hash_set.h"
 
 #define VALUE_STR 	"value"
 
@@ -1026,15 +1030,177 @@ namespace sight {
         return nullptr;
     }
 
-    int SightNodeGraph::fakeDeleteConnection(uint id) {
+    bool SightNodeGraph::replaceNode(uint fromNodeId, uint toNodeId) {
 
-        auto c = findConnection(id);
-        if (c) {
-            return fakeDeleteConnection(c);
+        auto from = findNode(fromNodeId);
+        auto to = findNode(toNodeId);
+
+        if (!from || !to) {
+            logError("replaceNode failed: node not found. fromNode=$0, toNode=$1", fromNodeId, toNodeId);
+            return false;
         }
 
-        return CODE_GRAPH_INVALID_ID;
+        // copy connection
+        auto connectionFunc = [this, fromNodeId](SightNodePort* fromPort, SightNodePort* toPort) {
+            if (!fromPort || !toPort) {
+                return;
+            }
+
+            if (!fromPort->isConnect()) {
+                return;
+            }
+            if (fromPort->getType() != toPort->getType()) {
+                return;
+            }
+
+            // loop fromPort->connections from back using rbegin
+            auto& connections = fromPort->connections;
+            if (connections.empty()) {
+                return;
+            }
+
+            for (auto& c : connections){
+                logDebug("try change connection: $0", c->connectionId);
+
+                if (c->leftPortId() == fromPort->getId()) {
+                    c->left = toPort->getId();     // this way will keep all connection info.
+
+                } else if (c->rightPortId() == fromPort->getId()) {
+                    c->right = toPort->getId();
+                } else {
+                    logError("connection $0 ids are not match. left=$0, right=$1", c->connectionId, c->leftPortId(), c->rightPortId());
+                }
+            }
+            connections.clear();
+
+        };
+
+        connectionFunc(from->chainInPort, to->chainInPort);
+        connectionFunc(from->chainOutPort, to->chainOutPort);
+
+        absl::flat_hash_set<uint> usedIds;
+        auto copyConnectionFunc = [&connectionFunc, &usedIds](std::vector<SightNodePort>& list, std::vector<SightNodePort>& searchList) {
+            for (auto& p : list) {
+                if (p.portName.empty()) {
+                    continue;
+                }
+
+                // name same also need type same
+                SightNodePort* nameSamePort = nullptr;
+                SightNodePort* typeSamePort = nullptr;
+                for (auto& search : searchList) {
+                    if (usedIds.contains(search.getId())) {
+                        continue;
+                    }
+                    if (search.type == p.type) {
+                        if (search.portName == p.portName) {
+                            nameSamePort = &search;
+                            break;
+                        }
+                        if (!typeSamePort) {
+                            typeSamePort = &search;
+                        }
+                    }
+                }
+
+                if (nameSamePort) {
+                    connectionFunc(&p, nameSamePort);
+                    usedIds.insert(nameSamePort->getId());
+                } else if (typeSamePort) {
+                    connectionFunc(&p, typeSamePort);
+                    usedIds.insert(typeSamePort->getId());
+                }
+            }
+        };
+
+        copyConnectionFunc(from->inputPorts, to->inputPorts);
+        copyConnectionFunc(from->outputPorts, to->outputPorts);
+
+        // clear from connections.
+        auto nodeFunc = [this](std::vector<SightNodePort>& list) {
+            for (auto& p : list) {
+                // loop of p.connections
+                p.clearLinks();
+            }
+        };
+        CALL_NODE_FUNC(from);
+
+        auto pos = to->position;
+        to->position = from->position;
+        from->position = pos;
+
+        return true;
     }
+
+    bool SightNodeGraph::insertNodeAtConnectionMid(uint nodeId, uint connectionId) {
+        auto node = findNode(nodeId);
+        if (!node) {
+            return false;
+        }
+        auto connection = findConnection(connectionId);
+        if (!connection) {
+            return false;
+        }
+
+        auto connectionLeftPort = connection->findLeftPort();
+        auto connectionRightPort = connection->findRightPort();
+
+
+        // find port.
+        SightNodePort* leftTypeSafePort = nullptr;
+        SightNodePort* rightTypeSafePort = nullptr;
+
+        for (auto& p : node->inputPorts) {
+            // find same type,  my input need connection left
+            if (connectionLeftPort->getType() == p.getType()) {
+                leftTypeSafePort = &p;
+                break;
+            }
+        }
+        if (!leftTypeSafePort) {
+            logError("can not found a valid left port on node $0", nodeId);
+            return false;
+        }
+
+        for (auto& p : node->outputPorts) {
+            // find same type,  my input need connection right
+            if (connectionRightPort->getType() == p.getType()) {
+                rightTypeSafePort = &p;
+                break;
+            }
+        }
+
+        if (!rightTypeSafePort) {
+            logError("can not found a valid right port on node $0", nodeId);
+            return false;
+        }
+        auto oldLeftConnectionSize = leftTypeSafePort->connectionsSize();
+        auto oldRightConnectionSize = rightTypeSafePort->connectionsSize();
+        
+        connectionRightPort->removeConnection(connectionId);
+        connection->right = leftTypeSafePort->getId();
+        leftTypeSafePort->addConnection(connection);
+
+        createConnection(rightTypeSafePort->getId(), connectionRightPort->getId());
+
+        if (leftTypeSafePort->connections.size() != oldLeftConnectionSize + 1) {
+            logError("something error left");
+        }
+        if (rightTypeSafePort->connections.size() != oldRightConnectionSize + 1) {
+            logError("something error right");
+        }
+        return true;
+    }
+
+    int SightNodeGraph::fakeDeleteConnection(uint id) {
+
+            auto c = findConnection(id);
+            if (c) {
+                return fakeDeleteConnection(c);
+            }
+
+            return CODE_GRAPH_INVALID_ID;
+        }
 
     // SightArray<SightComponentContainer> & SightNodeGraph::getComponentContainers() {
     //     return this->componentContainers;

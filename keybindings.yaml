@@ -21,3 +21,5 @@ copy: 'c'
 paste: 'v'
 
 delete: backspace
+
+insertNode: 'q'

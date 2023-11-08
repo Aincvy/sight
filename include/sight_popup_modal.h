@@ -39,6 +39,8 @@ namespace sight {
         bool callbackInvoked = false;
 
         BaseModal() = default;
+        virtual ~BaseModal() = default;
+
 
         void checkInit(std::string_view label);
 

@@ -39,7 +39,7 @@ namespace sight {
                 }
                 pointer = getFromKeyMap(str);
                 if (!pointer) {
-                    logDebug(keyName);
+                    logError("Invalid key: $0", str);
                     return false;
                 }
                 wrapper = pointer;
@@ -55,7 +55,8 @@ namespace sight {
                     } else if (temp == "ctrl") {
                         controlKey = ICON_MD_KEYBOARD_CONTROL_KEY;
                     } else if (temp == "shift") {
-                        controlKey = "⇧";
+                        // controlKey = "⇧";
+                        controlKey = ICON_MD_SHIFT;
                     }
                     else {
                         controlKey = str;
@@ -88,6 +89,7 @@ namespace sight {
         CHECK_RETURN("copy", keybindingds->copy);
         CHECK_RETURN("paste", keybindingds->paste);
         CHECK_RETURN("delete", keybindingds->_delete);
+        CHECK_RETURN("insertNode", keybindingds->insertNode);
 
         keybindingds->esc = getFromKeyMap("esc");
         return keybindingds;

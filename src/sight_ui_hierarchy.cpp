@@ -17,8 +17,12 @@ namespace ed = ax::NodeEditor;
 namespace sight {
 
     static Hierarchy* g_Hierarchy = nullptr;
-    
+
     void updateSelectedNodeFromED() {
+        if (!ed::HasSelectionChanged()) {
+            return;
+        }
+        
         auto uiStatus = currentUIStatus();
         auto& selection = uiStatus->selection;
 

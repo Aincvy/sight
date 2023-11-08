@@ -33,6 +33,12 @@ namespace sight {
 
         SightKeyWrapper copy;
         SightKeyWrapper paste;
+
+        /**
+         * @brief insert or replace node 
+         * 
+         */
+        SightKeyWrapper insertNode;
     };
 
 

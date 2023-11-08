@@ -91,7 +91,6 @@ namespace sight {
 
         /**
          *
-         * @param id
          * @return The element of vector, you should not free the result. If not find, nullptr.
          */
         SightNodeConnection* findConnection(int id);
@@ -274,7 +273,15 @@ namespace sight {
          */
         SightComponentContainer* getComponentContainer(uint anyThingId);
 
+        /**
+        * @brief 把 fromNode 替换成 toNode
+        * 
+        * @param fromNode 
+        * @param toNode 
+        */
+        bool replaceNode(uint fromNode, uint toNode);
 
+        bool insertNodeAtConnectionMid(uint nodeId, uint connectionId);
 
     private:
         // save and read path.

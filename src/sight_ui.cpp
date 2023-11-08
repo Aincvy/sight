@@ -63,9 +63,9 @@
 #endif
 
 
-#    define COMMON_LANGUAGE_KEYS g_UIStatus->languageKeys->commonKeys
-#    define WINDOW_LANGUAGE_KEYS g_UIStatus->languageKeys->windowNames
-#    define MENU_LANGUAGE_KEYS g_UIStatus->languageKeys->menuKeys
+#define COMMON_LANGUAGE_KEYS g_UIStatus->languageKeys->commonKeys
+#define WINDOW_LANGUAGE_KEYS g_UIStatus->languageKeys->windowNames
+#define MENU_LANGUAGE_KEYS g_UIStatus->languageKeys->menuKeys
 
 #define PROJECT_FILE_CONTEXT_MENU "project_file_menu"
 
@@ -84,8 +84,8 @@ namespace sight {
          * @brief save whatever file/graph, if it was opened and edited.
          * 
          */
-        void saveAnyThing(){
-            int i ;
+        void saveAnyThing() {
+            int i;
             // if ((i = currentGraph()->save(SaveReason::User)) != CODE_OK) {
             //     logDebug(i);
             // }
@@ -96,7 +96,7 @@ namespace sight {
             saveSightSettings();
         }
 
-        void activeWindowCreateEntity(){
+        void activeWindowCreateEntity() {
             if (g_UIStatus->windowStatus.createEntity) {
                 ImGui::SetWindowFocus(WINDOW_LANGUAGE_KEYS.createEntity);
             } else {
@@ -119,14 +119,14 @@ namespace sight {
             }
         }
 
-        void showMainFileMenu(UIStatus& uiStatus){
+        void showMainFileMenu(UIStatus& uiStatus) {
             if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS._new)) {
                 if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.graph)) {
                     openOneInputAskModal("Graph name", "Please input a graph name", "name",
                                          g_UIStatus->buffer.littleName, std::size(g_UIStatus->buffer.littleName),
                                          [](bool r) {
                                              if (r) {
-                                                createGraphUsingLittleName();
+                                                 createGraphUsingLittleName();
                                              }
                                          });
                 }
@@ -168,7 +168,7 @@ namespace sight {
             }
         }
 
-        void showMainEditMenu(){
+        void showMainEditMenu() {
             auto bindings = g_UIStatus->keybindings;
             if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.undo, bindings->undo.tipsText(), false, isUndoEnable())) {
                 undo();
@@ -179,7 +179,7 @@ namespace sight {
             }
         }
 
-        void showMainViewMenu(){
+        void showMainViewMenu() {
             if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.view)) {
             }
             if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.layout)) {
@@ -203,7 +203,7 @@ namespace sight {
             }
         }
 
-        void showMainProjectMenu(){
+        void showMainProjectMenu() {
             if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.build)) {
                 // currentProject()->build();
                 auto p = currentProject();
@@ -216,7 +216,7 @@ namespace sight {
 
                 ImGui::EndMenu();
             }
-            if(ImGui::MenuItem("codeSetBuild")) {
+            if (ImGui::MenuItem("codeSetBuild")) {
                 addJsCommand(JsCommandType::ProjectCodeSetBuild);
             }
             if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.rebuild)) {
@@ -253,7 +253,7 @@ namespace sight {
             }
         }
 
-        void showEntityMenu(){
+        void showEntityMenu() {
             if (ImGui::MenuItem("Create")) {
                 activeWindowCreateEntity();
             }
@@ -271,7 +271,7 @@ namespace sight {
                 auto graph = currentGraph();
                 if (ImGui::MenuItem(MENU_LANGUAGE_KEYS.parseGraph)) {
                     logError("parseGraph Not impl!");
-                } 
+                }
                 if (ImGui::MenuItem("VerifyId")) {
                     int c = currentGraph()->verifyId();
                     if (c == CODE_OK) {
@@ -319,7 +319,7 @@ namespace sight {
                 logInfo("info msg");
                 logWarning("warning msg");
                 logError(5.555f);
-                                     
+
                 std::string source = R"(
 let a = [1,2,3];
 for(const item of a) {
@@ -335,7 +335,7 @@ for(const item of a) {
             }
         }
 
-        void showHelpMenu(){
+        void showHelpMenu() {
             if (ImGui::MenuItem("About")) {
                 logDebug("sight WIP v0.1");
                 if (g_UIStatus->windowStatus.aboutWindow) {
@@ -349,8 +349,8 @@ for(const item of a) {
             }
         }
 
-        void showMainMenuBar(UIStatus& uiStatus){
-            if (ImGui::BeginMainMenuBar()){
+        void showMainMenuBar(UIStatus& uiStatus) {
+            if (ImGui::BeginMainMenuBar()) {
                 if (ImGui::BeginMenu(MENU_LANGUAGE_KEYS.file)) {
                     showMainFileMenu(uiStatus);
                     ImGui::EndMenu();
@@ -384,7 +384,7 @@ for(const item of a) {
             }
         }
 
-        void showTestWindow(bool needInit){
+        void showTestWindow(bool needInit) {
             // terminal test
             // static bool initTerminal = false;
             // TerminalRuntimeArgs customCommand;
@@ -410,7 +410,7 @@ for(const item of a) {
             };
             static int index = 0;
             if (ImGui::BeginCombo("Combo Test", a[index])) {
-                for( int i = 0; i < std::size(a); i++){
+                for (int i = 0; i < std::size(a); i++) {
                     if (ImGui::Selectable(a[i], i == index)) {
                         index = i;
                     }
@@ -439,12 +439,11 @@ for(const item of a) {
             }
 
             ImGui::End();
-
         }
 
-        void showInspectorWindow(){
+        void showInspectorWindow() {
             if (g_UIStatus->windowStatus.layoutReset) {
-                ImGui::SetNextWindowPos(ImVec2(0,305));
+                ImGui::SetNextWindowPos(ImVec2(0, 305));
                 ImGui::SetNextWindowSize(ImVec2(300, 300));
             }
 
@@ -454,9 +453,9 @@ for(const item of a) {
             }
 
             auto graph = currentGraph();
-            auto & selection = g_UIStatus->selection;
-            if(graph == nullptr) {
-                // 
+            auto& selection = g_UIStatus->selection;
+            if (graph == nullptr) {
+                //
             } else if (selection.selectedNodeOrLinks.empty()) {
                 // show settings
                 showGraphSettings();
@@ -471,22 +470,22 @@ for(const item of a) {
                     ImGui::Text("node id: ");
                     ImGui::SameLine();
                     ImGui::TextColored(g_UIStatus->uiColors->nodeIdText, "%d ", node->nodeId);
-                    ImGui::Text("name: " );
+                    ImGui::Text("name: ");
                     ImGui::SameLine();
-                    auto & nameBuf = g_UIStatus->buffer.inspectorNodeName;
+                    auto& nameBuf = g_UIStatus->buffer.inspectorNodeName;
                     ImGui::InputText("## node.name", nameBuf, std::size(nameBuf));
                     if (ImGui::IsItemDeactivatedAfterEdit()) {
                         node->nodeName = nameBuf;
                         node->graph->markDirty();
                     }
-            
+
                     // fields
                     ImGui::Text("Ports");
                     ImGui::Separator();
                     showNodePorts(node);
                     showNodeComponents(node->componentContainer, node, node->graph, node->getNodeId(), true);
                     showComponentContextMenu();
-                }  
+                }
                 if ((connection = selection.getSelectedConnection())) {
                     if (node) {
                         ImGui::Separator();
@@ -515,7 +514,7 @@ for(const item of a) {
             ImGui::End();
         }
 
-        void showProjectFolder(ProjectFile& folder){
+        void showProjectFolder(ProjectFile& folder) {
             auto selection = &g_UIStatus->selection;
 
             for (auto& item : folder.files) {
@@ -536,22 +535,22 @@ for(const item of a) {
                     bool selected = contains(selection->selectedFiles, pointer);
                     std::string name;
                     switch (item.fileType) {
-                        case ProjectFileType::Graph:
-                            name = ICON_MD_POLYLINE " ";
-                            name += item.filename;
-                            name += "##";
-                            name += item.path;
+                    case ProjectFileType::Graph:
+                        name = ICON_MD_POLYLINE " ";
+                        name += item.filename;
+                        name += "##";
+                        name += item.path;
                         break;
-                        case ProjectFileType::Regular:
-                            name = ICON_MD_INSERT_DRIVE_FILE " ";
-                            name += strJoin(item.filename, item.path);
+                    case ProjectFileType::Regular:
+                        name = ICON_MD_INSERT_DRIVE_FILE " ";
+                        name += strJoin(item.filename, item.path);
                         break;
-                        case ProjectFileType::Plugin:
-                        case ProjectFileType::Directory:
-                            name = strJoin(item.filename, item.path);
-                            break;
-                        case ProjectFileType::Deleted:
-                            break;
+                    case ProjectFileType::Plugin:
+                    case ProjectFileType::Directory:
+                        name = strJoin(item.filename, item.path);
+                        break;
+                    case ProjectFileType::Deleted:
+                        break;
                     }
                     if (ImGui::Selectable(name.c_str(), selected, ImGuiSelectableFlags_AllowDoubleClick)) {
                         logDebug(item.path);
@@ -570,7 +569,7 @@ for(const item of a) {
                                 logDebug("unHandle file type: $0", static_cast<int>(item.fileType));
                             }
                         } else {
-                            
+
                             if (!g_UIStatus->io->KeyCtrl) {
                                 selection->selectedFiles.clear();
                             }
@@ -579,7 +578,6 @@ for(const item of a) {
                                 selection->selectedFiles.push_back(pointer);
                             }
                         }
-
                     }
                     if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
                         // logDebug("right click: $0", name);
@@ -606,11 +604,10 @@ for(const item of a) {
                     return;
                 }
                 auto projectFile = selection.selectedFiles.front();
-                
+
                 if (ImGui::Selectable("say-hello")) {
                     logDebug("say hello");
                     operationPerformed = true;
-
                 }
                 ImGui::Separator();
 
@@ -628,7 +625,7 @@ for(const item of a) {
                         operationPerformed = true;
                         logDebug("try rename file");
                         const int size = NAME_BUF_SIZE * 2;
-                        char* tmpBuf = new char[size]{ '\0'};
+                        char* tmpBuf = new char[size]{ '\0' };
                         std::string content("Original file: ");
                         std::string pathWithoutExt = removeExt(projectFile->path);
                         content += pathWithoutExt;
@@ -667,15 +664,14 @@ for(const item of a) {
                         ImGui::CloseCurrentPopup();
                     }
                 }
-                
+
                 ImGui::EndPopup();
             }
         }
 
-        void showProjectWindow(){
-            if (g_UIStatus->windowStatus.layoutReset)
-            {
-                ImGui::SetNextWindowPos(ImVec2(0,605));
+        void showProjectWindow() {
+            if (g_UIStatus->windowStatus.layoutReset) {
+                ImGui::SetNextWindowPos(ImVec2(0, 605));
                 ImGui::SetNextWindowSize(ImVec2(300, 200));
             }
 
@@ -694,28 +690,26 @@ for(const item of a) {
                             ImGui::OpenPopup(PROJECT_FILE_CONTEXT_MENU);
                         }
                     }
-                    
                 }
                 showProjectFilePopup();
             }
 
             ImGui::End();
-            
         }
 
-        void showGenerateResultWindow(){
+        void showGenerateResultWindow() {
             static float showTipsTime = 0;
             static std::string tipsText{};
 
             if (ImGui::Begin(WINDOW_LANGUAGE_KEYS.generateResult, &g_UIStatus->windowStatus.generateResultWindow)) {
-                auto & data =g_UIStatus->generateResultData;
+                auto& data = g_UIStatus->generateResultData;
                 ImGui::Text("%s", data.source.c_str());
                 const auto windowWidth = ImGui::GetWindowWidth() - 13;
                 const auto windowHeight = ImGui::GetWindowHeight();
                 const auto lineHeight = ImGui::GetFrameHeightWithSpacing() + 2.5f;
                 const auto now = ImGui::GetTime();
 
-                ImGui::InputTextMultiline("##text", data.text.data(), data.text.size(), ImVec2(windowWidth, windowHeight - lineHeight*3), ImGuiInputTextFlags_ReadOnly);
+                ImGui::InputTextMultiline("##text", data.text.data(), data.text.size(), ImVec2(windowWidth, windowHeight - lineHeight * 3), ImGuiInputTextFlags_ReadOnly);
                 if (ImGui::Button(ICON_MD_CONTENT_COPY)) {
                     ImGui::SetClipboardText(data.text.c_str());
                     tipsText = "Copy Success!";
@@ -725,12 +719,11 @@ for(const item of a) {
                     ImGui::SameLine();
                     ImGui::Text("%s", tipsText.c_str());
                 }
-
             }
             ImGui::End();
         }
 
-        void showCreateEntityWindow(){
+        void showCreateEntityWindow() {
             int inputTextId = 0;
 
             auto& createEntityData = g_UIStatus->createEntityData;
@@ -777,7 +770,7 @@ for(const item of a) {
                 }
 
                 // fields
-                char buf[NAME_BUF_SIZE] = {0};
+                char buf[NAME_BUF_SIZE] = { 0 };
                 if (ImGui::BeginTable("fields", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable)) {
                     ImGui::TableSetupColumn(COMMON_LANGUAGE_KEYS.fieldType);
                     ImGui::TableSetupColumn(COMMON_LANGUAGE_KEYS.fieldName);
@@ -785,7 +778,7 @@ for(const item of a) {
                     ImGui::TableHeadersRow();
 
                     auto index = -1;
-                    for(auto& item: createEntityData.fields){
+                    for (auto& item : createEntityData.fields) {
                         index++;
                         auto p = &item;
 
@@ -840,7 +833,7 @@ for(const item of a) {
                     showPortOptions(field.fieldOptions.portOptions);
                 }
 
-                ImGui::Dummy(ImVec2(0,3));
+                ImGui::Dummy(ImVec2(0, 3));
                 ImGui::Separator();
 
                 auto resetDataAndCloseWindow = []() {
@@ -851,11 +844,11 @@ for(const item of a) {
                 // buttons
                 if (ImGui::Button(COMMON_LANGUAGE_KEYS.ok)) {
                     if (createEntityData.isEditMode()) {
-                        // 
+                        //
                         if (nameBuf.empty()) {
                             nameBuf = getLastAfter(fullName, ".");
                         }
-                        
+
                         // todo fix with raw
                         std::string nowTemplateAddress = createEntityData.templateAddress;
                         if (!endsWith(nowTemplateAddress, nameBuf)) {
@@ -871,12 +864,12 @@ for(const item of a) {
 
                         auto p = currentProject();
                         if (checkTemplateNodeIsUsed(p, createEntityData.editingEntity.templateAddress)) {
-                            // 
+                            //
                             if (createEntityData.editingEntity.templateAddress == createEntityData.templateAddress) {
                                 // only allow force update when template address does not changed.
                                 createEntityData.wantUpdateUsedEntity = true;
                             }
-                        }  else {
+                        } else {
                             // not used entity.
                             if (updateEntity(createEntityData) == CODE_OK) {
                                 resetDataAndCloseWindow();
@@ -925,7 +918,7 @@ for(const item of a) {
                                     g_UIStatus->toastController.toast("Update entity success " ICON_MD_DONE, "");
                                     uiReloadGraph();
                                 } else {
-                                    
+
                                     g_UIStatus->toastController.toast("Update entity fail " ICON_MD_ERROR, "Code: " + std::to_string(code));
                                 }
                             };
@@ -939,7 +932,7 @@ for(const item of a) {
             ImGui::End();
         }
 
-        void showEntityInfoWindow(){
+        void showEntityInfoWindow() {
             if (ImGui::Begin(WINDOW_LANGUAGE_KEYS.entityInfo, &g_UIStatus->windowStatus.entityInfoWindow)) {
                 auto& name = g_UIStatus->createEntityData.showInfoEntityName;
                 if (name.empty()) {
@@ -967,12 +960,12 @@ for(const item of a) {
                         uiDeleteEntity(name);
                         g_UIStatus->createEntityData.showInfoEntityName.clear();
                     }
-                }   
+                }
             }
             ImGui::End();
         }
 
-        void showEntityListWindow(){
+        void showEntityListWindow() {
             if (ImGui::Begin(WINDOW_LANGUAGE_KEYS.entityList, &g_UIStatus->windowStatus.entityListWindow)) {
                 ImGui::InputText(ICON_MD_SEARCH "##Filter", g_UIStatus->buffer.entityListSearch, std::size(g_UIStatus->buffer.entityListSearch));
                 const auto windowWidth = ImGui::GetWindowWidth();
@@ -991,8 +984,8 @@ for(const item of a) {
                 // also be a template address.
                 std::string delFullName{};
                 auto entityListSearch = g_UIStatus->buffer.entityListSearch;
-                
-                for( const auto& [name, info]: p->getEntitiesMap()){
+
+                for (const auto& [name, info] : p->getEntitiesMap()) {
                     if (strlen(entityListSearch) > 0) {
                         if (!absl::StrContains(name, entityListSearch)) {
                             continue;
@@ -1013,7 +1006,7 @@ for(const item of a) {
 
                     width = width - buttonSize - buttonInterval;
                     ImGui::SameLine(width);
-                    std::string editButtonLabel{ICON_MD_EDIT "##edit-"};
+                    std::string editButtonLabel{ ICON_MD_EDIT "##edit-" };
                     editButtonLabel += name;
                     if (ImGui::Button(editButtonLabel.c_str())) {
                         // edit
@@ -1022,13 +1015,11 @@ for(const item of a) {
 
                     width = width - buttonSize - buttonInterval;
                     ImGui::SameLine(width);
-                    std::string delButtonLabel{ICON_MD_DELETE "##del-" };
+                    std::string delButtonLabel{ ICON_MD_DELETE "##del-" };
                     delButtonLabel += name;
                     if (ImGui::Button(delButtonLabel.c_str())) {
                         delFullName = name;
                     }
-
-                    
                 }
 
                 if (!delFullName.empty()) {
@@ -1038,7 +1029,7 @@ for(const item of a) {
             ImGui::End();
         }
 
-        void showAboutWindow(){
+        void showAboutWindow() {
             if (ImGui::Begin(WINDOW_LANGUAGE_KEYS.about, &g_UIStatus->windowStatus.aboutWindow)) {
                 ImGui::Text("ImGui version: %s", ImGui::GetVersion());
                 ImGui::Text("v8 version: %s", v8::V8::GetVersion());
@@ -1046,7 +1037,7 @@ for(const item of a) {
 
                 ImGui::Text("Sight WIP v0.1");
                 ImGui::Text("Author: aincvy(aincvy@gmail.com)");
-                ImGui::Dummy(ImVec2(0,15));
+                ImGui::Dummy(ImVec2(0, 15));
                 if (ImGui::Button("Close")) {
                     g_UIStatus->windowStatus.aboutWindow = false;
                 }
@@ -1054,20 +1045,20 @@ for(const item of a) {
             }
         }
 
-        void showProjectSettingsWindow(){
+        void showProjectSettingsWindow() {
             static bool panelBasic = true, panelTypes = false, panelPlugins = false;
 
-            auto resetFlags = [&](){
+            auto resetFlags = [&]() {
                 panelBasic = false;
                 panelTypes = false;
                 panelPlugins = false;
             };
 
-            ImGui::SetNextWindowSize(ImVec2(600,440), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSize(ImVec2(600, 440), ImGuiCond_FirstUseEver);
             if (ImGui::Begin(WINDOW_LANGUAGE_KEYS.projectSettings, &g_UIStatus->windowStatus.projectSettingsWindow)) {
-                
+
                 // left panel
-                ImGui::BeginChild("left panel", ImVec2(150,0), true);
+                ImGui::BeginChild("left panel", ImVec2(150, 0), true);
                 if (ImGui::Selectable("Basic", panelBasic)) {
                     resetFlags();
                     panelBasic = true;
@@ -1099,7 +1090,7 @@ for(const item of a) {
                     auto p = currentProject();
                     ImGui::Text("Path: %s", p->getBaseDir().c_str());
                     ImGui::Text("Loaded Plugins: %u", pluginManager()->getLoadedPluginCount());
-                    
+
                     auto memUsage = currentProcessUsageInfo();
                     ImGui::Text("Memory Usage.");
                     ImGui::Text("   Virtual Memory(mb): %.2f", memUsage.virtualMemBytes / 1024.0 / 1024);
@@ -1107,8 +1098,8 @@ for(const item of a) {
 
                 } else if (panelTypes) {
                     // show types.
-                    auto typeInfoMap =currentProject()->getTypeInfoMap();
-                    for( const auto& [key, value]: typeInfoMap){
+                    auto typeInfoMap = currentProject()->getTypeInfoMap();
+                    for (const auto& [key, value] : typeInfoMap) {
                         ImGui::Text("%4d: %8s", key, value.name.c_str());
                         // show style
                         if (value.style) {
@@ -1125,7 +1116,7 @@ for(const item of a) {
                                         style->iconType = static_cast<IconType>(tmpIndex + i);
                                     }
                                 }
-                                
+
                                 ImGui::EndCombo();
                             }
 
@@ -1134,7 +1125,7 @@ for(const item of a) {
                             // ImGui::ColorEdit4("##style.color", ImColor());
                             ImGui::SetNextItemWidth(180);
                             ImVec4 color = ImColor(style->color);
-                            char colorLabelBuf[LITTLE_NAME_BUF_SIZE]{0};
+                            char colorLabelBuf[LITTLE_NAME_BUF_SIZE]{ 0 };
                             sprintf(colorLabelBuf, "##style.color-%d", key);
                             if (ImGui::ColorEdit3(colorLabelBuf, (float*)&color)) {
                                 style->color = ImColor(color);
@@ -1152,14 +1143,14 @@ for(const item of a) {
                         ImGui::Text("%7s: %s", "Version", plugin->getVersion());
                         ImGui::Text("%7s: %s", "Path", plugin->getPath());
                         ImGui::Text("%7s: %s", "Status", plugin->getPluginStatusString());
-                        
+
                         constexpr const char* reloadLabel = ICON_MD_REFRESH;
                         std::string labelBuf = reloadLabel;
                         labelBuf += "##reload-";
-                        labelBuf += key;        
+                        labelBuf += key;
                         ImGui::BeginDisabled(!plugin->isReloadAble());
                         if (ImGui::Button(labelBuf.c_str())) {
-                            // send reload 
+                            // send reload
                             addJsCommand(JsCommandType::PluginReload, strdup(key.c_str()), key.length(), true);
                         }
                         ImGui::EndDisabled();
@@ -1171,7 +1162,7 @@ for(const item of a) {
                         ImGui::SameLine();
                         ImGui::BeginDisabled(plugin->isUrlEmpty());
                         if (ImGui::Button(labelBuf.c_str())) {
-                            // open 
+                            // open
                             openUrlWithDefaultBrowser(plugin->getUrl());
                         }
                         ImGui::EndDisabled();
@@ -1183,14 +1174,13 @@ for(const item of a) {
                         labelBuf += key;
                         if (ImGui::Button(labelBuf.c_str())) {
                             auto project = currentProject();
-                            auto & disabledPluginNames = project->getDisabledPluginNames();
+                            auto& disabledPluginNames = project->getDisabledPluginNames();
                             if (plugin->isDisabledByProject()) {
                                 // turn on
                                 disabledPluginNames.erase(plugin->getName());
                                 addJsCommand(JsCommandType::PluginEnable, CommandArgs::copyFrom(plugin->getName()));
                                 logInfo("enabled plugin: $0", plugin->getName());
-                            }
-                            else {
+                            } else {
                                 // turn off
                                 disabledPluginNames.insert(plugin->getName());
                                 addJsCommand(JsCommandType::PluginDisable, CommandArgs::copyFrom(plugin->getName()));
@@ -1212,7 +1202,7 @@ for(const item of a) {
         }
     }
 
-    void showModals(){
+    void showModals() {
         // modals
         if (!g_UIStatus->modalStack.empty()) {
             auto& stack = g_UIStatus->modalStack;
@@ -1220,17 +1210,17 @@ for(const item of a) {
             p->show();
             if (!p->enabled) {
                 //remove
+                delete p;
                 stack.erase(stack.begin());
             }
         }
-
     }
 
     /**
      * @brief Handle some common keyboard input
      * 
      */
-    void handleKeyboardInput(){
+    void handleKeyboardInput() {
         auto keybindings = g_UIStatus->keybindings;
         if (!keybindings->controlKey.isKeyDown()) {
             return;
@@ -1243,9 +1233,9 @@ for(const item of a) {
         } else if (keybindings->undo) {
             undo();
         } else if (keybindings->redo) {
-            redo();  
+            redo();
         } else if (keybindings->copy) {
-            auto & selectedNodeOrLinks =g_UIStatus->selection.selectedNodeOrLinks;
+            auto& selectedNodeOrLinks = g_UIStatus->selection.selectedNodeOrLinks;
             if (selectedNodeOrLinks.size() == 1) {
                 auto n = g_UIStatus->selection.getSelectedNode();
                 if (n) {
@@ -1261,14 +1251,13 @@ for(const item of a) {
                 }
             }
         }
-        
     }
 
-    void showStatusBar(){
+    void showStatusBar() {
         //
         ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_MenuBar;
         float height = ImGui::GetFrameHeight();
-        
+
         auto& data = g_UIStatus->statusBarData;
         if (ImGui::BeginViewportSideBar("##MainStatusBar", NULL, ImGuiDir_Down, height, window_flags)) {
             if (ImGui::BeginMenuBar()) {
@@ -1303,7 +1292,7 @@ for(const item of a) {
         ImGui::End();
     }
 
-    void mainWindowFrame(UIStatus & uiStatus) {
+    void mainWindowFrame(UIStatus& uiStatus) {
         // HierarchyWindow and InspectorWindow will use node editor data.
         nodeEditorFrameBegin();
 
@@ -1345,7 +1334,7 @@ for(const item of a) {
             terminal->use_default_size();
             windowStatus.terminalWindow = terminal->show();
         }
-        if(windowStatus.codeSetSettingsWindow){
+        if (windowStatus.codeSetSettingsWindow) {
             showCodeSetSettingsWindow();
         }
 
@@ -1359,73 +1348,78 @@ for(const item of a) {
         }
     }
 
-    void runUICommand(UICommand *command){
+    void runUICommand(UICommand* command) {
         logDebug(static_cast<int>(command->type));
         switch (command->type) {
-            case UICommandType::UICommandHolder:
-                break;
-            case UICommandType::COMMON:
-                break;
-            case UICommandType::JsEndInit: {
-                logDebug("js end init.");
-                g_UIStatus->loadingStatus.jsThread = true;
-                break;
+        case UICommandType::UICommandHolder:
+            break;
+        case UICommandType::COMMON:
+            break;
+        case UICommandType::JsEndInit:
+        {
+            logDebug("js end init.");
+            g_UIStatus->loadingStatus.jsThread = true;
+            break;
+        }
+        case UICommandType::AddNode:
+        {
+            // command->args.needFree = false;
+            auto* nodePointer = (SightNode**)command->args.data;
+            auto size = command->args.dataLength;
+            for (int i = 0; i < size; ++i) {
+                uiAddNode(nodePointer[i]);
+                delete nodePointer[i];
             }
-            case UICommandType::AddNode:
-            {
-                // command->args.needFree = false;
-                auto* nodePointer = (SightNode**) command->args.data;
-                auto size = command->args.dataLength;
-                for (int i = 0; i < size; ++i) {
-                    uiAddNode(nodePointer[i]);
-                }
-                // pluginManager()->getPluginStatus().addNodesFinished = true;
-                break;
+            // pluginManager()->getPluginStatus().addNodesFinished = true;
+            break;
+        }
+        case UICommandType::AddTemplateNode:
+        {
+            auto* pointer = (SightNodeTemplateAddress**)command->args.data;
+            auto size = command->args.dataLength;
+            for (int i = 0; i < size; ++i) {
+                auto p = pointer[i];
+                addTemplateNode(*p);
+                p->dispose();     // free SightJsNode first.
+                delete p;
             }
-            case UICommandType::AddTemplateNode:{
-                auto *pointer = (SightNodeTemplateAddress**) command->args.data;
-                auto size = command->args.dataLength;
-                for (int i = 0; i < size; ++i) {
-                    auto p = pointer[i];
-                    addTemplateNode(*p);
-                    p->dispose();    // free SightJsNode first.
-                    delete p;
-                }
-                // pluginManager()->getPluginStatus().addTemplateNodesFinished = true;
-                break;
-            } 
-            case UICommandType::RegScriptGlobalFunctions: {
-                std::map<std::string, std::string>* map = (std::map<std::string, std::string>*) command->args.data;
-                command->args.data = nullptr;
-                registerToGlobal(g_UIStatus->isolate, map);
-                delete map;
-                break;
-            }
-            case UICommandType::RunScriptFile:{
-                // 
-                auto isolate = g_UIStatus->isolate;
-                v8::HandleScope handleScope(isolate);
-                auto module = v8::Object::New(isolate);
-                if (runJsFile(isolate, command->args.argString, nullptr, module) == CODE_OK) {
-                    // 
-                    logDebug("ok");
-                    registerToGlobal(isolate, module->Get(isolate->GetCurrentContext(), v8pp::to_v8(isolate, "globals")).ToLocalChecked());
-                };
+            // pluginManager()->getPluginStatus().addTemplateNodesFinished = true;
+            break;
+        }
+        case UICommandType::RegScriptGlobalFunctions:
+        {
+            std::map<std::string, std::string>* map = (std::map<std::string, std::string>*)command->args.data;
+            command->args.data = nullptr;
+            registerToGlobal(g_UIStatus->isolate, map);
+            delete map;
+            break;
+        }
+        case UICommandType::RunScriptFile:
+        {
+            //
+            auto isolate = g_UIStatus->isolate;
+            v8::HandleScope handleScope(isolate);
+            auto module = v8::Object::New(isolate);
+            if (runJsFile(isolate, command->args.argString, nullptr, module) == CODE_OK) {
+                //
+                logDebug("ok");
+                registerToGlobal(isolate, module->Get(isolate->GetCurrentContext(), v8pp::to_v8(isolate, "globals")).ToLocalChecked());
+            };
 
-                break;
-            }
-            case UICommandType::PluginReloadOver:
-                // std::string msg= "";
-                g_UIStatus->toastController.toast("Plugin Reload", command->args.argString);
-                break;
-            }
+            break;
+        }
+        case UICommandType::PluginReloadOver:
+            // std::string msg= "";
+            g_UIStatus->toastController.toast("Plugin Reload", command->args.argString);
+            break;
+        }
 
         command->args.dispose();
         uiCommandFree = true;
     }
 
-    void runUICommandCallback(uv_async_t *handle){
-        auto *command = (UICommand *)handle->data;
+    void runUICommandCallback(uv_async_t* handle) {
+        auto* command = (UICommand*)handle->data;
         runUICommand(command);
         free(command);
     }
@@ -1440,10 +1434,12 @@ for(const item of a) {
         // Setup Dear ImGui context
         IMGUI_CHECKVERSION();
 
-        auto sightWindow = initWindow("sight - loading", width, height, [](ImGuiIO& io) {
-            io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-            io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
-        }, true);
+        auto sightWindow = initWindow(
+            "sight - loading", width, height, [](ImGuiIO& io) {
+                io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+                io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
+            },
+            true);
         if (!sightWindow) {
             return CODE_FAIL;
         }
@@ -1451,12 +1447,12 @@ for(const item of a) {
         ImGuiIO& io = ImGui::GetIO();
         // init ...
         g_UIStatus = new UIStatus({
-                                    true,
-                                    &io,
-                                    false,
-                                    getSightSettings()->windowStatus,
-                                  });
-        UIStatus & uiStatus = *g_UIStatus;
+            true,
+            &io,
+            false,
+            getSightSettings()->windowStatus,
+        });
+        UIStatus& uiStatus = *g_UIStatus;
         uiStatus.uvAsync = new uv_async_t();
 
         // init node editor.
@@ -1524,13 +1520,13 @@ for(const item of a) {
                 s = ImTerm::message::severity::err;
                 break;
             }
-            g_UIStatus->terminalData.terminal->add_message({s, std::string{msg}, 0, msg.length()});
+            g_UIStatus->terminalData.terminal->add_message({ s, std::string{ msg }, 0, msg.length() });
             g_UIStatus->statusBarData.logLevel = l;
             g_UIStatus->statusBarData.logText = msg;
         };
         registerLogWriter(logWriterFunc);
 
-        // 
+        //
         uint progress = 0;
         bool pluginStartLoad = false;
         bool exitFlag = false;
@@ -1541,7 +1537,7 @@ for(const item of a) {
         auto beforeRenderFunc = [uvLoop]() -> int {
             uv_run(uvLoop, UV_RUN_NOWAIT);
             auto project = currentProject();
-            if (g_UIStatus->isLoadingOver() && project ) {
+            if (g_UIStatus->isLoadingOver() && project) {
                 logDebug("project loading over, should be turn into main window..");
                 return CODE_FAIL;
             }
@@ -1549,7 +1545,7 @@ for(const item of a) {
         };
 
         //
-        auto renderFunc = [=,&exitFlag, &progress, &uiStatus, &pluginStartLoad, &folderError, &lastOpenFolder]() {
+        auto renderFunc = [=, &exitFlag, &progress, &uiStatus, &pluginStartLoad, &folderError, &lastOpenFolder]() {
             ImGui::SetNextWindowPos(ImVec2(0, 0));
             ImGui::SetNextWindowSize(ImVec2(width, height));
             ImGui::Begin("loading", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize);
@@ -1620,7 +1616,7 @@ for(const item of a) {
         return 0;
     }
 
-    int showMainWindow(){
+    int showMainWindow() {
         if (!g_UIStatus) {
             return CODE_FAIL;
         }
@@ -1645,7 +1641,7 @@ for(const item of a) {
         // Setup Dear ImGui context
 
         ImGuiIO& io = ImGui::GetIO();
-        
+
         io.ConfigWindowsMoveFromTitleBarOnly = true;
         io.Fonts->AddFontDefault();
         ImFontConfig config;
@@ -1655,7 +1651,7 @@ for(const item of a) {
         // icon
         static const ImWchar icon_ranges[] = { ICON_MIN_MD, ICON_MAX_MD, 0 };
         config.GlyphOffset.y += 5.5f;
-        auto iconFontPointer = io.Fonts->AddFontFromFileTTF((resourceFolder + "font/MaterialIconsOutlined-Regular.otf").c_str(), 18.0f, &config, icon_ranges);
+        auto iconFontPointer = io.Fonts->AddFontFromFileTTF((resourceFolder + "font/MaterialSymbolsOutlined[FILL,GRAD,opsz,wght].ttf").c_str(), 18.0f, &config, icon_ranges);
 
         io.Fonts->Build();
 
@@ -1668,9 +1664,9 @@ for(const item of a) {
 
         // Setup Dear ImGui style
         ImGui::StyleColorsDark();
-        
 
-        // project path 
+
+        // project path
         auto project = currentProject();
         if (project) {
             onProjectAndUILoadSuccess(project);
@@ -1699,7 +1695,7 @@ for(const item of a) {
         cleanUpWindow(sightWindow);
 
         disposeHierarchy();
-        
+
         return 0;
     }
 
@@ -1731,10 +1727,8 @@ for(const item of a) {
 
     void addUICommand(UICommandType type, int argInt) {
         UICommand command = {
-                type,
-                {
-                        .argInt = argInt
-                }
+            type,
+            { .argInt = argInt }
         };
 
         addUICommand(command);
@@ -1746,7 +1740,7 @@ for(const item of a) {
     }
 
 
-    int addUICommand(UICommandType type, void *data, size_t dataLength, bool needFree) {
+    int addUICommand(UICommandType type, void* data, size_t dataLength, bool needFree) {
         UICommand command = {
             type,
             {
@@ -1759,7 +1753,7 @@ for(const item of a) {
         return addUICommand(command);
     }
 
-    int addUICommand(UICommandType type, const char *argString, int length, bool needFree) {
+    int addUICommand(UICommandType type, const char* argString, int length, bool needFree) {
         UICommand command = {
             type,
             {
@@ -1772,7 +1766,7 @@ for(const item of a) {
         return addUICommand(command);
     }
 
-    int addUICommand(UICommand &command) {
+    int addUICommand(UICommand& command) {
         while (!uiCommandFree) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
@@ -1784,7 +1778,7 @@ for(const item of a) {
         return CODE_OK;
     }
 
-    bool LeftLabeledInput(const char *label, char *buf, size_t bufSize) {
+    bool LeftLabeledInput(const char* label, char* buf, size_t bufSize) {
         ImGui::Text("%s", label);
         ImGui::SameLine();
         return ImGui::InputText("", buf, bufSize);
@@ -1799,18 +1793,16 @@ for(const item of a) {
             return;
         }
 
-        auto nodeWork = [](std::vector<SightNodePort> & list, bool showValue, bool alwaysShow) {
-            for( auto& item: list){                
+        auto nodeWork = [](std::vector<SightNodePort>& list, bool showValue, bool alwaysShow) {
+            for (auto& item : list) {
                 if (alwaysShow || (showValue && item.options.showValue) || item.options.typeList) {
                     ImGui::Text("%7s: ", item.portName.c_str());
                     ImGui::SameLine();
-                    if (item.options.typeList)
-                    {
-                        // 
+                    if (item.options.typeList) {
+                        //
                         // ImGui::InputText("##name", char *buf, size_t buf_size)
                         // ImGui::SameLine();
-                        if (ImGui::Button(ICON_MD_SEARCH "##toggle_type_list"))
-                        {
+                        if (ImGui::Button(ICON_MD_SEARCH "##toggle_type_list")) {
                             item.ownOptions.typeList = !item.ownOptions.typeList;
                         }
                     } else {
@@ -1818,29 +1810,27 @@ for(const item of a) {
                     }
                 }
 
-                if(item.ownOptions.typeList) {
+                if (item.ownOptions.typeList) {
                     std::string typeName = getTypeName(item.type);
-                    if (showTypeList(typeName))
-                    {
+                    if (showTypeList(typeName)) {
                         auto tmpType = getIntType(typeName);
-                        if(tmpType != 0){
+                        if (tmpType != 0) {
                             logDebug("change port $0 type from $1 to $2, now type name: $3", item.id, item.type, tmpType, typeName);
                             item.type = tmpType;
                             item.ownOptions.typeList = false;
                         }
                     }
-                } 
+                }
             }
         };
 
         nodeWork(node->fields, showValue, showField);
         nodeWork(node->outputPorts, showValue, showOutput);
         nodeWork(node->inputPorts, showValue, showInput);
-
     }
 
     void uiOpenProject(bool& folderError, std::string& lastOpenFolder, bool callLoadSuccess) {
-        // try open 
+        // try open
         int status = CODE_OK;
         std::string path = openFolderDialog(lastOpenFolder.c_str(), &status);
         if (status == CODE_OK) {
@@ -1890,7 +1880,6 @@ for(const item of a) {
         p->callback = callback;
 
         g_UIStatus->modalStack.push_back(p);
-
     }
 
     void openOneInputAskModal(std::string_view title, std::string_view content, std::string_view label, char* buf, size_t size, std::function<void(bool)> callback) {
@@ -1912,11 +1901,10 @@ for(const item of a) {
         p->content = content;
 
         g_UIStatus->modalStack.push_back(p);
-
     }
 
     void openGenerateResultWindow(std::string const& source, std::string const& text) {
-        auto &data = g_UIStatus->generateResultData;
+        auto& data = g_UIStatus->generateResultData;
         data.source = source;
         data.text = text;
         if (g_UIStatus->windowStatus.generateResultWindow) {
@@ -1933,7 +1921,7 @@ for(const item of a) {
     }
 
     void toast(std::string_view title, std::string_view content, float time) {
-        g_UIStatus->toastController.info().toast(title, content, time);        
+        g_UIStatus->toastController.info().toast(title, content, time);
     }
 
     void UICreateEntity::addField() {
@@ -1942,7 +1930,7 @@ for(const item of a) {
     }
 
     void UICreateEntity::resetFieldsStatus(bool editing, bool selected) {
-        for(auto& item: fields){
+        for (auto& item : fields) {
             if (editing) {
                 item.editing = false;
             }
@@ -1952,11 +1940,11 @@ for(const item of a) {
         }
     }
 
-    EntityField *UICreateEntity::lastField() {
+    EntityField* UICreateEntity::lastField() {
         if (fields.empty()) {
             return nullptr;
         }
-        return & fields.back();
+        return &fields.back();
     }
 
     int UICreateEntity::deleteSelected() {
@@ -1967,7 +1955,7 @@ for(const item of a) {
                     selectedFieldIndex = fields.size() - 1;
                 }
             }
-            
+
             return 1;
         }
         return 0;
@@ -1987,7 +1975,7 @@ for(const item of a) {
         }
     }
 
-    void UICreateEntity::loadFrom(struct SightNode *node) {
+    void UICreateEntity::loadFrom(struct SightNode* node) {
         if (!node) {
             return;
         }
@@ -1996,7 +1984,7 @@ for(const item of a) {
         sprintf(this->name, "%s", node->nodeName.c_str());
 
         // For entity node, inputs is same as outputs, so just foreach one is fine.
-        for (const auto &item : node->inputPorts) {
+        for (const auto& item : node->inputPorts) {
             addField();
 
             auto p = lastField();
@@ -2004,7 +1992,6 @@ for(const item of a) {
             sprintf(p->type, "%s", getTypeName(item.getType()).c_str());
             sprintf(p->defaultValue, "%s", item.getDefaultValue());
         }
-
     }
 
     void UICreateEntity::loadFrom(SightEntity const& info) {
@@ -2015,7 +2002,7 @@ for(const item of a) {
         snprintf(this->templateAddress, std::size(this->templateAddress), "%s", info.templateAddress.c_str());
         snprintf(this->parentEntity, std::size(this->parentEntity), "%s", info.parentEntity.c_str());
 
-        for( const auto& item: info.fields){
+        for (const auto& item : info.fields) {
             addField();
 
             auto p = lastField();
@@ -2045,7 +2032,6 @@ for(const item of a) {
     }
 
     UIColors::UIColors() {
-
     }
 
     UIStatus::~UIStatus() {
@@ -2069,10 +2055,9 @@ for(const item of a) {
             delete languageKeys;
             languageKeys = nullptr;
         }
-
     }
 
-    bool UIStatus::isLoadingOver() const{
+    bool UIStatus::isLoadingOver() const {
         return this->loadingStatus.isLoadingOver();
     }
 
@@ -2088,7 +2073,7 @@ for(const item of a) {
         if (selectedNodeOrLinks.empty()) {
             return nullptr;
         }
-        return currentGraph()->findNode( *selectedNodeOrLinks.begin() );
+        return currentGraph()->findNode(*selectedNodeOrLinks.begin());
     }
 
     SightNodeConnection* Selection::getSelectedConnection() const {
@@ -2184,7 +2169,7 @@ for(const item of a) {
         auto& entityOperations = g_UIStatus->entityOperations;
         checkEntityOperations(entityOperations);
         const auto& operationNames = entityOperations.names;
-        
+
         if (!operationNames.empty()) {
             const auto width = ImGui::GetWindowWidth();
             constexpr const auto comboWidth = 110;
@@ -2209,7 +2194,7 @@ for(const item of a) {
                 } else {
                     text = o.function.getString(currentUIStatus()->isolate, sightEntity);
                 }
-                
+
                 text = removeExcessSpaces(text);
                 openGenerateResultWindow(generateStr, text);     // todo more info about source
             }
@@ -2221,7 +2206,7 @@ for(const item of a) {
                     bool isSelected = (++tmpIndex) == entityOperations.selected;
                     if (ImGui::Selectable(item.c_str(), isSelected)) {
                         entityOperations.selected = tmpIndex;
-                        
+
                         getSightSettings()->lastUseEntityOperation = item;
                     }
 
@@ -2270,7 +2255,7 @@ for(const item of a) {
             }
         } else {
             addJsCommand(JsCommandType::GraphToJsonData, CommandArgs::copyFrom(pathArg));
-        }        
+        }
     }
 
 }

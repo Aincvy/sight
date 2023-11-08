@@ -50,6 +50,10 @@ typedef unsigned char u_char;
 typedef unsigned char uchar;
 #endif
 
+// icons
+#define ICON_MD_SHIFT "\xee\x97\xb2"     // U+e5f2
+
+
 namespace sight {
 
     extern std::string emptyString;
