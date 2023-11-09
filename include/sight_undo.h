@@ -30,6 +30,8 @@ namespace sight {
          * 
          */
         Replace,
+
+        DetachNode,
     };
 
     struct UndoCommand {
@@ -70,6 +72,8 @@ namespace sight {
         void redo();
 
         void freeNodeData();
+
+        void init();
         
     };
 

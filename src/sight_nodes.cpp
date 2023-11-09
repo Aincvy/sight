@@ -1104,7 +1104,42 @@ namespace sight {
         return (this->flags & (uchar)SightNodeFlags::Component) != 0;
     }
 
-   
+    bool SightNodeConnection::changeRight(uint newRight) {
+        auto rp = findRightPort();
+        auto newRp = graph->findPort(newRight);
+
+        if (rp && newRp) {
+            if (newRp->kind != NodePortType::Input) {
+                logError("right port must be input, port: $0, connection: $1", newRight, connectionId);
+                return false;
+            }
+            rp->removeConnection(this->connectionId);
+            newRp->addConnection(this);
+            this->right = newRight;
+            return true;
+        }
+
+        return false;
+    }
+
+    bool SightNodeConnection::changeLeft(uint newLeft) {
+        auto lp = findLeftPort();
+        auto newLp = graph->findPort(newLeft);
+
+        if (lp && newLp) {
+            if (newLp->kind != NodePortType::Output) {
+                logError("left port must be output, port: $0, connection: $1", newLeft, connectionId);
+                return false;
+            }
+            lp->removeConnection(this->connectionId);
+            newLp->addConnection(this);
+            this->left = newLeft;
+            return true;
+        }
+
+        return false;
+    }
+
 
     SightNode *SightAnyThingWrapper::asNode() const {
         if (type != SightAnyThingType::Node) {

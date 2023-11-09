@@ -23,3 +23,7 @@ paste: 'v'
 delete: backspace
 
 insertNode: 'q'
+markNode: 'm'
+
+detachNode: 'alt'
+

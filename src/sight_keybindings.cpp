@@ -90,6 +90,8 @@ namespace sight {
         CHECK_RETURN("paste", keybindingds->paste);
         CHECK_RETURN("delete", keybindingds->_delete);
         CHECK_RETURN("insertNode", keybindingds->insertNode);
+        CHECK_RETURN("markNode", keybindingds->markNode);
+        CHECK_RETURN("detachNode", keybindingds->detachNode);
 
         keybindingds->esc = getFromKeyMap("esc");
         return keybindingds;

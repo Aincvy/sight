@@ -158,6 +158,10 @@ namespace sight {
         }
     }
 
+    void UndoCommand::init() {
+        
+    }
+
     int getRuntimeId(StartOrStop type) {
         static std::atomic_int runtimeId = 1000;
         static int recordId = -1;
@@ -189,6 +193,8 @@ namespace sight {
             undoList.begin()->freeNodeData();
             undoList.erase(undoList.begin());
         }
+
+        undoList.back().init();
         return CODE_OK;
     }
 

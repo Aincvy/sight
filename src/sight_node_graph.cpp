@@ -884,12 +884,21 @@ namespace sight {
                     continue;
                 }
 
-                if (item.isConnect()) {
-                    continue;
-                }
-
                 crude_json::value tmp;
-                setValue(tmp, item.value);
+                if (item.getType() == IntTypeProcess) {
+                    crude_json::value connectionArray(crude_json::type_t::array);
+                    for (auto& connection : item.connections) {
+                        connectionArray.push_back(crude_json::value((double)connection->connectionId));
+                    }
+                    tmp[VALUE_STR] 	= connectionArray;
+                } else {
+                    if (item.isConnect()) {
+                        continue;
+                    }
+
+                    //  if this is connected, then it should using the port value.   todo
+                    setValue(tmp, item.value);
+                }
 
                 auto key = changeStringToCase(item.portName, config.fieldNameCaseType);
                 // contains key, then ignore
@@ -952,12 +961,12 @@ namespace sight {
 
             if (config.includeNodeIdOnConnectionData) {
                 auto port = item.findLeftPort();
-                if (port) {
+                if (port) {    
                     connection["leftNode"] = port->getNodeId() * 1.0;
                 }
 
                 port = item.findRightPort();
-                if (port) {
+                if (port) {     
                     connection["rightNode"] = port->getNodeId() * 1.0;
                 }
             }
@@ -1064,9 +1073,11 @@ namespace sight {
 
                 if (c->leftPortId() == fromPort->getId()) {
                     c->left = toPort->getId();     // this way will keep all connection info.
+                    toPort->addConnection(c);
 
                 } else if (c->rightPortId() == fromPort->getId()) {
                     c->right = toPort->getId();
+                    toPort->addConnection(c);
                 } else {
                     logError("connection $0 ids are not match. left=$0, right=$1", c->connectionId, c->leftPortId(), c->rightPortId());
                 }
@@ -1085,30 +1096,10 @@ namespace sight {
                     continue;
                 }
 
-                // name same also need type same
-                SightNodePort* nameSamePort = nullptr;
-                SightNodePort* typeSamePort = nullptr;
-                for (auto& search : searchList) {
-                    if (usedIds.contains(search.getId())) {
-                        continue;
-                    }
-                    if (search.type == p.type) {
-                        if (search.portName == p.portName) {
-                            nameSamePort = &search;
-                            break;
-                        }
-                        if (!typeSamePort) {
-                            typeSamePort = &search;
-                        }
-                    }
-                }
-
-                if (nameSamePort) {
-                    connectionFunc(&p, nameSamePort);
-                    usedIds.insert(nameSamePort->getId());
-                } else if (typeSamePort) {
-                    connectionFunc(&p, typeSamePort);
-                    usedIds.insert(typeSamePort->getId());
+                auto tmp = getReplaceablePort(searchList, p, usedIds);
+                if (tmp) {
+                    connectionFunc(&p, tmp);
+                    usedIds.insert(tmp->getId());
                 }
             }
         };
@@ -1147,29 +1138,14 @@ namespace sight {
 
 
         // find port.
-        SightNodePort* leftTypeSafePort = nullptr;
-        SightNodePort* rightTypeSafePort = nullptr;
-
-        for (auto& p : node->inputPorts) {
-            // find same type,  my input need connection left
-            if (connectionLeftPort->getType() == p.getType()) {
-                leftTypeSafePort = &p;
-                break;
-            }
-        }
+        absl::flat_hash_set<uint> ignoreIds;
+        SightNodePort* leftTypeSafePort = getReplaceablePort(node->inputPorts, *connectionLeftPort, ignoreIds);
         if (!leftTypeSafePort) {
             logError("can not found a valid left port on node $0", nodeId);
             return false;
         }
 
-        for (auto& p : node->outputPorts) {
-            // find same type,  my input need connection right
-            if (connectionRightPort->getType() == p.getType()) {
-                rightTypeSafePort = &p;
-                break;
-            }
-        }
-
+        SightNodePort* rightTypeSafePort = getReplaceablePort(node->outputPorts, *connectionRightPort, ignoreIds);
         if (!rightTypeSafePort) {
             logError("can not found a valid right port on node $0", nodeId);
             return false;
@@ -1190,6 +1166,48 @@ namespace sight {
             logError("something error right");
         }
         return true;
+    }
+
+    bool SightNodeGraph::detachNodeConnections(uint nodeId, bool onlyTitleBarPort) {
+        auto node = findNode(nodeId);
+        if (!node) {
+            return false;
+        }
+
+        // if left title bar and right title bar is connect, they are same type, then delete right connection, change left connection's right to right connections's right
+        //      if not same type, then just delete them
+        
+        // 0 = just delete, 1 = change right.
+        int titleBarOprType = 0;
+
+        // collect info
+        if (node->chainInPort->getType() == node->chainOutPort->getType()) {
+            if (node->chainInPort->connectionsSize() == 1
+                  && node->chainInPort->connectionsSize() == node->chainOutPort->connectionsSize()) {
+                titleBarOprType = 1;
+            }
+        }
+
+        if (titleBarOprType == 0) {
+            // just delete connections
+            node->chainInPort->clearLinks();
+            node->chainOutPort->clearLinks();
+        } else if (titleBarOprType == 1) {
+            auto lc = node->chainInPort->connections[0];
+            auto rc = node->chainOutPort->connections[0];
+
+            lc->changeRight(rc->rightPortId());
+
+            // node->chainInPort->removeConnection(lc->connectionId);
+            node->chainOutPort->clearLinks();
+        }
+
+        if (onlyTitleBarPort) {
+            return true;
+        }
+
+        logError("onlyTitleBarPort == false, that not impl..") ;
+        return false;
     }
 
     int SightNodeGraph::fakeDeleteConnection(uint id) {
@@ -1242,4 +1260,34 @@ namespace sight {
 
         markDirty();
     }
+
+    SightNodePort* getReplaceablePort(std::vector<SightNodePort> &ports, SightNodePort const& targetPort, absl::flat_hash_set<uint> const& ignoreIds) {
+
+        // name same also need type same
+        SightNodePort* nameSamePort = nullptr;
+        SightNodePort* typeSamePort = nullptr;
+        for (auto& search : ports) {
+            if (ignoreIds.contains(search.getId())) {
+                continue;
+            }
+            if (search.type == targetPort.type) {
+                if (search.portName == targetPort.portName) {
+                    nameSamePort = &search;
+                    break;
+                }
+                if (!typeSamePort) {
+                    typeSamePort = &search;
+                }
+            }
+        }
+
+        if (nameSamePort) {
+            return nameSamePort;
+        } else if (typeSamePort) {
+            return typeSamePort;
+        }
+
+        return nullptr;
+    }
+
 }

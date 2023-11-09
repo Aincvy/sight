@@ -75,10 +75,16 @@ namespace sight {
                         std::function<int()> beforeRenderFunc, std::function<void()> render_func) {
         ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
         g_ResizeHeight = g_ResizeWidth = 0;
+
+        const int targetFPS = 60;
+        const std::chrono::milliseconds targetFrameTime(1000 / targetFPS);
+
         while (!exitFlag) {
             if (beforeRenderFunc() != CODE_OK) {
                 break;
             }
+
+            auto frameStart = std::chrono::high_resolution_clock::now();
 
             // Poll and handle messages (inputs, window resize, etc.)
             // See the WndProc() function below for our to dispatch events to the Win32 backend.
@@ -129,6 +135,12 @@ namespace sight {
             g_pSwapChain->Present(1, 0);     // Present with vsync
                                              //g_pSwapChain->Present(0, 0); // Present without vsync
 
+            auto frameEnd = std::chrono::high_resolution_clock::now();
+            auto frameDuration = std::chrono::duration_cast<std::chrono::milliseconds>(frameEnd - frameStart);
+
+            if (frameDuration < targetFrameTime) {
+                std::this_thread::sleep_for(targetFrameTime - frameDuration);
+            }
         }
     }
 

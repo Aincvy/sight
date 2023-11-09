@@ -73,7 +73,8 @@ static struct {
     sight::SightNodeGraphOutputJsonConfig* graphOutputJsonConfig =  nullptr;
     char outputJsonFilePathBuf[NAME_BUF_SIZE * 2] = { 0 };
     bool outputJsonFilePathError = false;
-    int lastMarkedNodeId = 0;
+    uint lastMarkedNodeId = 0;
+    uint lastClickedNodeId = 0;
 
     bool isNextNodePositionEmpty() {
         return nextNodePosition.x == 0 && nextNodePosition.y == 0;
@@ -722,6 +723,11 @@ namespace sight {
                 setNodePos(node, ed::GetNodePosition(node->nodeId));
             }
 
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
+                // logDebug("clicked node: $0", node->getNodeId());
+                g_ContextStatus->lastClickedNodeId = node->getNodeId();
+            }
+
             return CODE_OK;
         }
 
@@ -808,7 +814,7 @@ namespace sight {
                             ed::DeleteLink(id);
                         }
                     }
-                } else if (keybindings->insertNode.isKeyDown()) {
+                } else if (keybindings->insertNode.isKeyReleased()) {
                     auto markedNodeId = g_ContextStatus->lastMarkedNodeId;
                     if (markedNodeId <= 0) {
                         logError("need mark a node first.");
@@ -837,11 +843,39 @@ namespace sight {
                             }
                         }
                     }
+                } else if (keybindings->markNode.isKeyDown()) {
+                    uint hoveredNode = ed::GetHoveredNode().Get();
+                    if (hoveredNode == 0) {
+                        auto const& ids = uiStatus.selection.selectedNodeOrLinks;
+                        if (ids.size() != 1) {
+                            logWarning("mark node shortcut only valid when select 1 node.");
+                        } else {
+                            auto tmpId = *ids.begin();
+                            auto a = graph->findSightAnyThing(tmpId);
+                            if (a.type == SightAnyThingType::Node) {
+                                hoveredNode = tmpId;
+                            }
+                        }
+                    }
+
+                    if (hoveredNode == 0) {
+                        logWarning("mark node shortcut only valid when select 1 node.");
+                    } else {
+                        g_ContextStatus->lastMarkedNodeId = hoveredNode;
+                    }
                 }
             }
             if (keybindings->esc.isKeyDown()) {
                 if (g_ContextStatus->contextMenuCreateNodeOpen) {
                     g_ContextStatus->resetAfterCreateNode();
+                }
+            } else if (keybindings->detachNode.isKeyDown()) {
+                auto clickedNode = g_ContextStatus->lastClickedNodeId;
+                if (clickedNode > 0) {
+                    recordUndo(UndoRecordType::DetachNode, clickedNode);
+                    if (graph->detachNodeConnections(clickedNode)) {
+                        
+                    }
                 }
             } 
         }
@@ -1146,6 +1180,9 @@ namespace sight {
                 showNodes(uiStatus, graph);
 
                 handleNodeEditorKeyboard(uiStatus, graph);
+
+                // do some reset work
+                g_ContextStatus->lastClickedNodeId = 0;
             } else {
                 ImGui::Text("Please open a graph.");
             }

@@ -1,7 +1,9 @@
 
 #pragma once
 
+#include "absl/container/flat_hash_set.h"
 #include "sight_node.h"
+#include <vector>
 
 namespace sight {
 
@@ -283,6 +285,9 @@ namespace sight {
 
         bool insertNodeAtConnectionMid(uint nodeId, uint connectionId);
 
+        bool detachNodeConnections(uint nodeId, bool onlyTitleBarPort = true);
+
+
     private:
         // save and read path.
         std::string filepath;
@@ -318,4 +323,14 @@ namespace sight {
         void rebuildIdMap();
     };
 
+    /**
+     * @brief Get the Replaceable(suitable) Port object
+     * 
+     * @param ports 
+     * @param targetPort 
+     * @param ignoreIds 
+     * @return SightNodePort* a pointer which point to an element of ports
+     */
+    SightNodePort* getReplaceablePort(std::vector<SightNodePort> &ports, SightNodePort const& targetPort, absl::flat_hash_set<uint> const& ignoreIds);
+    
 }

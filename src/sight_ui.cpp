@@ -679,8 +679,8 @@ for(const item of a) {
                 showProjectFolder(currentProject()->getFileCache());
 
 
-                if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-                    logDebug(" !!! right click !!! ");
+                if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+                    // logDebug(" !!! right click !!! ");
                     auto& selection = g_UIStatus->selection;
                     if (!selection.selectedFiles.empty()) {
                         // check if popup PROJECT_FILE_CONTEXT_MENU open, if yes, then close it, if no, then open it

@@ -362,6 +362,7 @@ namespace sight {
     struct SightNodeConnection : ResetAble {
         uint connectionId;
         uint left;
+        // using `changeRight`  to change 
         uint right;
         // left port color  
         uint leftColor = IM_COL32_WHITE;
@@ -410,6 +411,9 @@ namespace sight {
         bool isDeleted() const;
 
         bool isComponent() const;
+
+        bool changeRight(uint newRight);
+        bool changeLeft(uint newLeft);
     };
 
     /**
