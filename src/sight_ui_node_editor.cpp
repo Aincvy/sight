@@ -178,7 +178,7 @@ namespace sight {
         }
 
         // this function need node editor be suspend
-        void showContextMenu(uint nodeId, uint linkId, uint pinId) {
+        void showContextMenu(uint nodeId, uint linkId, uint pinId, SightNodeGraph* graph, ImVec2 const& mousePos) {
             auto showPortDebugInfo = [](SightNodePort const& item) {
                 auto portInfoMsg = absl::Substitute("$0, $1", item.getId(), item.portName);
                 logDebug(portInfoMsg);
@@ -261,8 +261,12 @@ namespace sight {
                 ImGui::EndPopup();
             }
             if (ImGui::BeginPopup(LINK_CONTEXT_MENU)) {
-                if (ImGui::MenuItem("itemA")) {
-                    logDebug("item a");
+                auto markedNodeId = g_ContextStatus->lastMarkedNodeId;
+                if (ImGui::MenuItem("insertAtMiddle", nullptr, false, markedNodeId != 0)) {
+                    if (graph->insertNodeAtConnectionMid(markedNodeId, linkId)) {
+                        ed::SetNodePosition(markedNodeId, mousePos);
+                        g_ContextStatus->lastMarkedNodeId = 0;
+                    }
                 }
                 ImGui::EndPopup();
             }
@@ -789,7 +793,7 @@ namespace sight {
                             c.loadAsNode(nodePointer, graph);
                             if (nodePointer) {
                                 // add node
-                                ed::SetNodePosition(nodePointer->getNodeId(), mousePos);
+                                ed::SetNodePosition(nodePointer->getNodeId(), canvasMousePos);
                                 uiAddNode(nodePointer);     // this function will delete nodePointer
                                 nodePointer = nullptr;
                             }
@@ -798,7 +802,7 @@ namespace sight {
                             std::vector<SightNodeConnection> connections;
                             c.loadAsMultiple(nodes, connections, graph);
                             regenerateId(nodes, connections, true);
-                            uiAddMultipleNodes(nodes, connections, mousePos);
+                            uiAddMultipleNodes(nodes, connections, canvasMousePos);
                         }
                     }
                 } else if (keybindings->_delete) {
@@ -1140,8 +1144,8 @@ namespace sight {
                 ImGui::OpenPopup(BACKGROUND_CONTEXT_MENU);
             }
 
-            showContextMenu(static_cast<uint>(contextNodeId.Get()),
-                            static_cast<uint>(contextLinkId.Get()), static_cast<uint>(contextPinId.Get()));
+            showContextMenu(static_cast<uint>(contextNodeId.Get()), static_cast<uint>(contextLinkId.Get()),
+                            static_cast<uint>(contextPinId.Get()), graph, openPopupPosition);
             checkResetCreateStatus();
 
             ed::Resume();

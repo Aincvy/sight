@@ -323,7 +323,7 @@ namespace sight {
     }
 
     bool SightKey::isKeyReleased() const {
-        logDebug(code);
+        // logDebug(code);
         return ImGui::IsKeyReleased(code);
     }
 
