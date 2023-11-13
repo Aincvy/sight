@@ -91,3 +91,4 @@ v8有问题的地方在于，  有一个API 被废弃了， 但是头文件里�
 所以现在可能需要修改代码， 以实现 msvc的编译。。 
 
 
+复制 others/v8pp/config.hpp 到 dep.../v8pp/v8pp/  目录里面
