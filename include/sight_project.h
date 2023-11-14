@@ -23,6 +23,8 @@
 #include "sight_node_graph.h"
 #include "sight_code_set.h"
 
+#include "crude_json.h"
+
 
 namespace sight {
 
@@ -119,6 +121,8 @@ namespace sight {
         void mergeFrom(TypeInfo const& rhs);
 
         std::string getSimpleName() const;
+
+        bool writeToJson(SightNodeValue const& value, crude_json::value & parent, std::string_view key) const;
     };
 
 

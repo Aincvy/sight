@@ -76,6 +76,8 @@ static struct {
     uint lastMarkedNodeId = 0;
     uint lastClickedNodeId = 0;
 
+    bool lastMarkNodeIsManually = false;
+    
     bool isNextNodePositionEmpty() {
         return nextNodePosition.x == 0 && nextNodePosition.y == 0;
     }
@@ -161,6 +163,17 @@ namespace sight {
         }
 
 
+        void tryAutoMarkNode(uint nodeId) {
+            if (g_ContextStatus->lastMarkedNodeId == 0 || !g_ContextStatus->lastMarkNodeIsManually) {
+                g_ContextStatus->lastMarkedNodeId = nodeId;
+            }
+        }
+
+        void clearMarkNodeInfo() {
+            g_ContextStatus->lastMarkedNodeId = 0;
+            g_ContextStatus->lastMarkNodeIsManually = false;
+        }
+        
         // node editor functions
 
         void checkResetCreateStatus() {
@@ -265,7 +278,8 @@ namespace sight {
                 if (ImGui::MenuItem("insertAtMiddle", nullptr, false, markedNodeId != 0)) {
                     if (graph->insertNodeAtConnectionMid(markedNodeId, linkId)) {
                         ed::SetNodePosition(markedNodeId, mousePos);
-                        g_ContextStatus->lastMarkedNodeId = 0;
+
+                        clearMarkNodeInfo();
                     }
                 }
                 ImGui::EndPopup();
@@ -748,17 +762,17 @@ namespace sight {
                     if (uiStatus.selection.selectedNodeOrLinks.size() == 1) {
                         auto tmpNode = uiStatus.selection.getSelectedNode();
                         if (tmpNode) {
-                            // auto node = tmpNode->clone();
                             auto node = graph->deepClone(tmpNode);
                             auto pos = ed::GetNodePosition(tmpNode->nodeId);
                             auto size = ed::GetNodeSize(tmpNode->nodeId);
                             auto nodeId = node->getNodeId();
                             ed::SetNodePosition(node->nodeId, ImVec2(pos.x, pos.y + size.y + 10));
-                            // uiAddNode(node);
                             recordUndo(UndoRecordType::Create, node->getNodeId(), convert(node->position));
 
                             // change selected
                             ed::SelectNode(nodeId);
+
+                            tryAutoMarkNode(nodeId);
                         } else {
                             logError("cannot find node by id: $0", *uiStatus.selection.selectedNodeOrLinks.begin());
                         }
@@ -795,7 +809,7 @@ namespace sight {
                                 // add node
                                 ed::SetNodePosition(nodePointer->getNodeId(), canvasMousePos);
                                 uiAddNode(nodePointer);     // this function will delete nodePointer
-                                nodePointer = nullptr;
+                                tryAutoMarkNode(nodePointer->getNodeId());
                             }
                         } else if (c.type == CopyTextType::Multiple) {
                             std::vector<SightNode*> nodes;
@@ -843,7 +857,8 @@ namespace sight {
                         } else {
                             if (graph->insertNodeAtConnectionMid(markedNodeId, connectionId)) {
                                 ed::SetNodePosition(markedNodeId, canvasMousePos);
-                                g_ContextStatus->lastMarkedNodeId = 0;
+
+                                clearMarkNodeInfo();
                             }
                         }
                     }
@@ -866,6 +881,7 @@ namespace sight {
                         logWarning("mark node shortcut only valid when select 1 node.");
                     } else {
                         g_ContextStatus->lastMarkedNodeId = hoveredNode;
+                        g_ContextStatus->lastMarkNodeIsManually = true;
                     }
                 }
             }
@@ -878,7 +894,7 @@ namespace sight {
                 if (clickedNode > 0) {
                     recordUndo(UndoRecordType::DetachNode, clickedNode);
                     if (graph->detachNodeConnections(clickedNode)) {
-                        
+                        tryAutoMarkNode(clickedNode);
                     }
                 }
             } 

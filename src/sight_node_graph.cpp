@@ -304,6 +304,10 @@ namespace sight {
             return -5;
         }
 
+        if (left->node == right->node) {
+            return -6;
+        }
+
         // find color ;
         ImU32 color = IM_COL32_WHITE;
         auto [typeInfo, find] = currentProject()->findTypeInfo(left->getType());
@@ -456,6 +460,14 @@ namespace sight {
                     }
                     if (errorStop) {
                         break;
+                    }
+
+                    auto l = item.findLeftPort();
+                    auto r = item.findRightPort();
+                    if (l && r) {
+                        if (l->node == r->node) {
+                            logWarning("connection id $0, two ports $1 and $2 are same node's ports.", id, l->id, r->id);
+                        }
                     }
                 }
 
@@ -768,7 +780,8 @@ namespace sight {
         logDebug("try output json to $0", path);
         using namespace v8;
 
-        auto setValue = [](crude_json::value& tmp, const SightNodeValue& value) {
+        int status = CODE_OK;
+        auto setValue = [&status](crude_json::value& tmp, const SightNodeValue& value) {
             switch (value.getType()) {
             case IntTypeString:
                 tmp[VALUE_STR] = value.getString();
@@ -789,10 +802,25 @@ namespace sight {
             case IntTypeBool:
                 tmp[VALUE_STR] = value.u.b;
                 break;
-            default:
-                tmp[VALUE_STR] = crude_json::value();
-                logError("output json,unknown int type: $0", value.getType());
+            case IntTypeProcess:
+                logWarning("not support process type, will fill use an empty array.");
+                tmp[VALUE_STR] = crude_json::value(crude_json::type_t::array);
                 break;
+            default:
+            {
+                auto [typeInfo, isFind] = currentProject()->findTypeInfo(value.getType());
+                if (isFind) {
+                    if (!typeInfo.writeToJson(value, tmp, VALUE_STR)) {
+                        logError("failed to write to json: $0", typeInfo.getSimpleName());
+                        status = CODE_FAIL;
+                    }
+                } else {
+                    logError("unknown type: $0", value.getType());
+                    status = CODE_FAIL;
+                }
+                break;
+            }
+                
             }
         };
 
@@ -813,7 +841,7 @@ namespace sight {
                 if (!result.IsEmpty()) {
                     // v8::JSON::Stringify(Local<Context> context, Local<Value> json_object)
                     std::string str = v8pp::from_v8<std::string>(isolate, result.ToLocalChecked());
-                    logDebug("try append string: $0", str);
+                    // logDebug("try append string: $0", str);
 
                     // convert and merge
                     auto fromComponent = crude_json::value::parse(str);
@@ -843,14 +871,6 @@ namespace sight {
 
             // delete
             // std::filesystem::remove(path);
-        }
-
-        // get file output stream
-        std::ofstream out;
-        out.open(path.data(), std::ios::trunc);
-
-        if (!out.is_open()) {
-            return CODE_FILE_ERROR;
         }
 
         // generate json
@@ -928,7 +948,7 @@ namespace sight {
 
             //
             crude_json::value members{ crude_json::type_t::array };
-            CALL_NODE_FUNC(&item, members);
+            CALL_NODE_FUNC(np, members);
             node["members"] = members;
 
             if (config.exportData) {
@@ -977,14 +997,24 @@ namespace sight {
 
         this->loopOf(connWork);
 
-        root[config.nodeRootName] = nodes;
-        root[config.connectionRootName] = connections;
+        if (status == CODE_OK) {
+            // get file output stream
+            std::ofstream out;
+            out.open(path.data(), std::ios::trunc);
 
-        out << root.dump(2);
-        out.close();
+            if (!out.is_open()) {
+                return CODE_FILE_ERROR;
+            }
 
-        logDebug("output json to $0 over! ", path);
-        return CODE_OK;
+            root[config.nodeRootName] = nodes;
+            root[config.connectionRootName] = connections;
+
+            out << root.dump(2);
+            out.close();
+        }
+        
+        logDebug("output json to $0 over: $1 ", path, status);
+        return status;
     }
 
     SightComponentContainer* SightNodeGraph::createComponentContainer() {

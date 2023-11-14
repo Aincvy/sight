@@ -43,7 +43,7 @@ namespace sight {
          * @param rightPortId
          * @return If create success, the connection's id.
          * -1: one of left,right is invalid. -2: they are same. -3: same kind. -4 left only can accept 1 connections
-         * -5: id repeat.
+         * -5: id repeat. -6: same node.
          */
         int createConnection(uint leftPortId, uint rightPortId, uint connectionId = 0, int priority = 10);
 

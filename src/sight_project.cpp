@@ -3,6 +3,7 @@
 //
 
 #include "sight_project.h"
+#include "crude_json.h"
 #include "sight_js.h"
 #include "sight_js_parser.h"
 #include "sight_log.h"
@@ -27,6 +28,7 @@
 #include <cstdio>
 #include <fstream>
 #include <iterator>
+#include <stdint.h>
 #include <stdio.h>
 #include <string>
 #include <string_view>
@@ -916,19 +918,6 @@ namespace sight {
                     continue;
                 }
 
-                // std::string source;
-                // if (parseGraph(path.c_str(), source) == CODE_OK) {
-                //     // parse success, write
-                //     auto relative = std::filesystem::relative(path, pathGraphFolder());
-                //     std::filesystem::path targetPath(targetPathString + relative.generic_string());
-                //     targetPath.replace_extension(".js");
-                //     logDebug(targetPath.generic_string());
-                //     std::filesystem::create_directories(targetPath.parent_path());
-
-                //     std::ofstream out(targetPath);
-                //     out << source;
-                //     out.close();
-                // }
                 parseGraph(path.string());
             }
         }
@@ -1321,6 +1310,18 @@ namespace sight {
 
     std::string TypeInfo::getSimpleName() const {
         return getLastAfter(name, ".");
+    }
+
+    bool TypeInfo::writeToJson(SightNodeValue const& value, crude_json::value & parent, std::string_view key) const {
+        switch (render.kind) {
+            case TypeInfoRenderKind::Default:
+                break;
+            case TypeInfoRenderKind::ComboBox:
+                parent[key.data()] = crude_json::value(static_cast<double>(value.u.i));
+                return true;
+        }
+        
+        return false;
     }
 
     void TypeStyle::init() {
