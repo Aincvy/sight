@@ -295,7 +295,7 @@ namespace sight {
         bool broken = false;
 
         // real nodes
-        SightArray<SightNode> nodes{ LITTLE_ARRAY_SIZE };
+        SightArray<SightNode> nodes{ LITTLE_ARRAY_SIZE * 2 };
         // real connections.
         SightArray<SightNodeConnection> connections{ MEDIUM_ARRAY_SIZE };
 

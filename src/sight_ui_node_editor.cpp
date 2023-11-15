@@ -76,6 +76,11 @@ static struct {
     uint lastMarkedNodeId = 0;
     uint lastClickedNodeId = 0;
 
+    uint lastMarkedPortId = 0;
+    // both means invalid port type
+    sight::NodePortType lastMarkedPortType = sight::NodePortType::Both;
+
+
     bool lastMarkNodeIsManually = false;
     
     bool isNextNodePositionEmpty() {
@@ -173,6 +178,11 @@ namespace sight {
             g_ContextStatus->lastMarkedNodeId = 0;
             g_ContextStatus->lastMarkNodeIsManually = false;
         }
+
+        void tryMarkPort(SightNodePort const& port) {
+            g_ContextStatus->lastMarkedPortId = port.getId();
+            g_ContextStatus->lastMarkedPortType = port.kind;
+        }
         
         // node editor functions
 
@@ -269,11 +279,21 @@ namespace sight {
                         ed::Flow(item->connectionId);
                         logDebug(item->connectionId);
                     }
+                } else if (ImGui::MenuItem("MarkPort")) {
+                    tryMarkPort(*port);
                 }
 
                 ImGui::EndPopup();
             }
             if (ImGui::BeginPopup(LINK_CONTEXT_MENU)) {
+                auto connection = graph->findConnection(linkId);
+                if (!connection) {
+                    logError("can't find connection: $0", linkId);
+                    ImGui::CloseCurrentPopup();
+                    ImGui::EndPopup();
+                    return;
+                }
+
                 auto markedNodeId = g_ContextStatus->lastMarkedNodeId;
                 if (ImGui::MenuItem("insertAtMiddle", nullptr, false, markedNodeId != 0)) {
                     if (graph->insertNodeAtConnectionMid(markedNodeId, linkId)) {
@@ -282,6 +302,25 @@ namespace sight {
                         clearMarkNodeInfo();
                     }
                 }
+                //
+                auto lastMarkedPortId = g_ContextStatus->lastMarkedPortId;
+                if (lastMarkedPortId > 0) {
+                    auto lastMarkedPortType = g_ContextStatus->lastMarkedPortType;
+                    if (lastMarkedPortType == NodePortType::Input || lastMarkedPortType == NodePortType::Output) {
+                        bool changed = false;
+                        if (ImGui::MenuItem("ChangeLeftToMark")) {
+                            changed = connection->changeLeft(lastMarkedPortId);
+                        } else if (ImGui::MenuItem("ChangeRightToMark")) {
+                            changed = connection->changeRight(lastMarkedPortId);
+                        }
+
+                        if (changed) {
+                            g_ContextStatus->lastMarkedPortId = 0;
+                            g_ContextStatus->lastMarkedPortType = NodePortType::Both;
+                        } 
+                    }
+                }
+
                 ImGui::EndPopup();
             }
             if (ImGui::BeginPopup(BACKGROUND_CONTEXT_MENU)) {

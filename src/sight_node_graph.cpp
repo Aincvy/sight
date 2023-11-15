@@ -98,6 +98,7 @@ namespace sight {
 
             // nodes
             auto nodeRoot = root["nodes"];
+            auto connectionRoot = root["connections"];
             logDebug(nodeRoot.size());
 
             int loadNodeStatus = CODE_OK;
@@ -119,7 +120,6 @@ namespace sight {
             }
 
             // connections
-            auto connectionRoot = root["connections"];
             for (const auto& item : connectionRoot) {
                 SightNodeConnection tmpConnection;
                 tmpConnection.graph = this;
